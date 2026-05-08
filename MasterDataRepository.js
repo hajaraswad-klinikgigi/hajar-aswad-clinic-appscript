@@ -1142,3 +1142,1496 @@ function testMasterDataPhase7BInsertDummyServiceDefaultOffLog() {
     return errorResult;
   }
 }
+
+function testMasterDataPhase7BWriteFlagEnabledPreMutationLog() {
+  const result = {
+    success: true,
+    stage: '7B-3',
+    checked_at: typeof nowIso === 'function' ? nowIso() : new Date().toISOString(),
+    default_backend_mode: typeof dbGetBackendMode_ === 'function' ? dbGetBackendMode_() : '',
+    ui_read_backend_mode: typeof repoGetUiReadBackendMode_ === 'function'
+      ? repoGetUiReadBackendMode_()
+      : '',
+    ui_read_supabase_test_enabled: typeof repoIsUiReadSupabaseTestEnabled_ === 'function'
+      ? repoIsUiReadSupabaseTestEnabled_()
+      : null,
+    supabase_staging_write_test_enabled: typeof repoIsSupabaseStagingWriteTestEnabled_ === 'function'
+      ? repoIsSupabaseStagingWriteTestEnabled_()
+      : null,
+    test_service: {
+      service_id: MASTER_DATA_PHASE_7B_TEST_SERVICE.SERVICE_ID,
+      service_name: MASTER_DATA_PHASE_7B_TEST_SERVICE.SERVICE_NAME
+    },
+    counts: {},
+    checks: [],
+    issue_count: 0,
+    issues: []
+  };
+
+  function addCheck(name, success, details) {
+    result.checks.push({
+      name: name,
+      success: !!success,
+      details: details || {}
+    });
+
+    if (!success) {
+      result.issues.push({
+        check: name,
+        issue: 'CHECK_FAILED',
+        details: details || {}
+      });
+    }
+  }
+
+  try {
+    const supabaseOptions = {
+      backend_mode: 'supabase'
+    };
+
+    addCheck('DEFAULT_BACKEND_STILL_SPREADSHEET', result.default_backend_mode === REPO_BACKEND_MODES.SPREADSHEET, {
+      actual: result.default_backend_mode
+    });
+
+    addCheck('UI_READ_BACKEND_STILL_SPREADSHEET', result.ui_read_backend_mode === REPO_BACKEND_MODES.SPREADSHEET, {
+      actual: result.ui_read_backend_mode,
+      ui_read_supabase_test_enabled: result.ui_read_supabase_test_enabled
+    });
+
+    addCheck('SUPABASE_STAGING_WRITE_FLAG_ENABLED', result.supabase_staging_write_test_enabled === true, {
+      actual: result.supabase_staging_write_test_enabled
+    });
+
+    const services = MasterDataRepository.getServiceCatalogRaw(supabaseOptions);
+    const existingById = MasterDataRepository.findServiceById(
+      MASTER_DATA_PHASE_7B_TEST_SERVICE.SERVICE_ID,
+      supabaseOptions
+    );
+    const existingByName = MasterDataRepository.findServiceByName(
+      MASTER_DATA_PHASE_7B_TEST_SERVICE.SERVICE_NAME,
+      supabaseOptions
+    );
+
+    result.counts.supabase_service_catalog = Array.isArray(services) ? services.length : -1;
+
+    addCheck('SUPABASE_SERVICE_CATALOG_STILL_BASELINE_100', result.counts.supabase_service_catalog === 100, {
+      actual: result.counts.supabase_service_catalog,
+      expected: 100
+    });
+
+    addCheck('TEST_SERVICE_STILL_NOT_EXISTING_BEFORE_REAL_INSERT', !existingById && !existingByName, {
+      service_id_exists: !!existingById,
+      service_name_exists: !!existingByName
+    });
+
+    const writeCheck = repoCheckSupabaseStagingWriteAllowed_({
+      backend_mode: REPO_BACKEND_MODES.SUPABASE,
+      write_intent: repoGetSupabaseStagingWriteIntent_(),
+      stage: '7B',
+      table_name: REPO_TABLES.SERVICE_CATALOG,
+      operation: 'TEST_SERVICE_CATALOG_WRITE_7B'
+    });
+
+    addCheck('SERVICE_CATALOG_WRITE_GUARD_ALLOWS_7B_WHEN_FLAG_TRUE', writeCheck.allowed === true, {
+      allowed: writeCheck.allowed,
+      message: writeCheck.message
+    });
+
+    let oldDbInsertSupabaseStillBlocked = false;
+    let oldDbInsertMessage = '';
+
+    try {
+      dbInsert_(REPO_TABLES.SERVICE_CATALOG, {
+        service_id: 'TEST-OLD-DBINSERT-STILL-BLOCKED-7B'
+      }, {
+        backend_mode: REPO_BACKEND_MODES.SUPABASE
+      });
+    } catch (errOldInsert) {
+      oldDbInsertSupabaseStillBlocked = true;
+      oldDbInsertMessage = errOldInsert && errOldInsert.message ? errOldInsert.message : String(errOldInsert || '');
+    }
+
+    addCheck('OLD_DB_INSERT_SUPABASE_STILL_BLOCKED_EVEN_WHEN_WRITE_FLAG_TRUE', oldDbInsertSupabaseStillBlocked, {
+      message: oldDbInsertMessage
+    });
+
+    result.issue_count = result.issues.length;
+    result.success = result.issue_count === 0;
+
+    Logger.log(JSON.stringify(result, null, 2));
+    return result;
+
+  } catch (err) {
+    const errorResult = {
+      success: false,
+      stage: '7B-3',
+      checked_at: typeof nowIso === 'function' ? nowIso() : new Date().toISOString(),
+      message: err && err.message ? err.message : String(err || 'Unknown error')
+    };
+
+    Logger.log(JSON.stringify(errorResult, null, 2));
+    return errorResult;
+  }
+}
+
+function testMasterDataPhase7BInsertDummyServiceLog() {
+  const result = {
+    success: true,
+    stage: '7B-4',
+    checked_at: typeof nowIso === 'function' ? nowIso() : new Date().toISOString(),
+    default_backend_mode: typeof dbGetBackendMode_ === 'function' ? dbGetBackendMode_() : '',
+    ui_read_backend_mode: typeof repoGetUiReadBackendMode_ === 'function'
+      ? repoGetUiReadBackendMode_()
+      : '',
+    ui_read_supabase_test_enabled: typeof repoIsUiReadSupabaseTestEnabled_ === 'function'
+      ? repoIsUiReadSupabaseTestEnabled_()
+      : null,
+    supabase_staging_write_test_enabled: typeof repoIsSupabaseStagingWriteTestEnabled_ === 'function'
+      ? repoIsSupabaseStagingWriteTestEnabled_()
+      : null,
+    test_service: {
+      service_id: MASTER_DATA_PHASE_7B_TEST_SERVICE.SERVICE_ID,
+      service_name: MASTER_DATA_PHASE_7B_TEST_SERVICE.SERVICE_NAME
+    },
+    counts_before: {},
+    counts_after: {},
+    insert_result: {},
+    readback: {},
+    checks: [],
+    issue_count: 0,
+    issues: []
+  };
+
+  function addCheck(name, success, details) {
+    result.checks.push({
+      name: name,
+      success: !!success,
+      details: details || {}
+    });
+
+    if (!success) {
+      result.issues.push({
+        check: name,
+        issue: 'CHECK_FAILED',
+        details: details || {}
+      });
+    }
+  }
+
+  function boolTrue_(value) {
+    if (value === true) return true;
+    if (value === false) return false;
+    return String(value || '').trim().toLowerCase() === 'true';
+  }
+
+  function boolFalse_(value) {
+    if (value === false) return true;
+    if (value === true) return false;
+    const text = String(value || '').trim().toLowerCase();
+    return text === '' || text === 'false';
+  }
+
+  try {
+    const supabaseOptions = {
+      backend_mode: 'supabase'
+    };
+
+    addCheck('DEFAULT_BACKEND_STILL_SPREADSHEET', result.default_backend_mode === REPO_BACKEND_MODES.SPREADSHEET, {
+      actual: result.default_backend_mode
+    });
+
+    addCheck('UI_READ_BACKEND_STILL_SPREADSHEET', result.ui_read_backend_mode === REPO_BACKEND_MODES.SPREADSHEET, {
+      actual: result.ui_read_backend_mode,
+      ui_read_supabase_test_enabled: result.ui_read_supabase_test_enabled
+    });
+
+    addCheck('SUPABASE_STAGING_WRITE_FLAG_ENABLED', result.supabase_staging_write_test_enabled === true, {
+      actual: result.supabase_staging_write_test_enabled
+    });
+
+    const spreadsheetBefore = MasterDataRepository.getServiceCatalogRaw({
+      backend_mode: 'spreadsheet'
+    });
+
+    const supabaseBefore = MasterDataRepository.getServiceCatalogRaw(supabaseOptions);
+
+    const existingByIdBefore = MasterDataRepository.findServiceById(
+      MASTER_DATA_PHASE_7B_TEST_SERVICE.SERVICE_ID,
+      supabaseOptions
+    );
+
+    const existingByNameBefore = MasterDataRepository.findServiceByName(
+      MASTER_DATA_PHASE_7B_TEST_SERVICE.SERVICE_NAME,
+      supabaseOptions
+    );
+
+    result.counts_before.spreadsheet_service_catalog = Array.isArray(spreadsheetBefore) ? spreadsheetBefore.length : -1;
+    result.counts_before.supabase_service_catalog = Array.isArray(supabaseBefore) ? supabaseBefore.length : -1;
+
+    addCheck('SPREADSHEET_COUNT_BASELINE_100_BEFORE_INSERT', result.counts_before.spreadsheet_service_catalog === 100, {
+      actual: result.counts_before.spreadsheet_service_catalog,
+      expected: 100
+    });
+
+    addCheck('SUPABASE_COUNT_BASELINE_100_BEFORE_INSERT', result.counts_before.supabase_service_catalog === 100, {
+      actual: result.counts_before.supabase_service_catalog,
+      expected: 100
+    });
+
+    addCheck('TEST_SERVICE_NOT_EXISTING_BEFORE_INSERT', !existingByIdBefore && !existingByNameBefore, {
+      service_id_exists: !!existingByIdBefore,
+      service_name_exists: !!existingByNameBefore
+    });
+
+    if (existingByIdBefore || existingByNameBefore) {
+      result.issue_count = result.issues.length;
+      result.success = false;
+      Logger.log(JSON.stringify(result, null, 2));
+      return result;
+    }
+
+    const payload = buildMasterDataPhase7BTestServicePayload_();
+
+    const insertResponse = dbSupabaseInsertStaging7A_(
+      REPO_TABLES.SERVICE_CATALOG,
+      payload,
+      {
+        stage: '7B'
+      }
+    );
+
+    result.insert_result = {
+      success: !!(insertResponse && insertResponse.success),
+      status_code: insertResponse ? insertResponse.status_code : null,
+      row_count: insertResponse ? insertResponse.row_count : null,
+      target_table: insertResponse ? insertResponse.target_table : ''
+    };
+
+    addCheck('DUMMY_SERVICE_INSERT_RESPONSE_SUCCESS', !!(insertResponse && insertResponse.success), result.insert_result);
+
+    const spreadsheetAfter = MasterDataRepository.getServiceCatalogRaw({
+      backend_mode: 'spreadsheet'
+    });
+
+    const supabaseAfter = MasterDataRepository.getServiceCatalogRaw(supabaseOptions);
+
+    const insertedById = MasterDataRepository.findServiceById(
+      MASTER_DATA_PHASE_7B_TEST_SERVICE.SERVICE_ID,
+      supabaseOptions
+    );
+
+    const insertedByName = MasterDataRepository.findServiceByName(
+      MASTER_DATA_PHASE_7B_TEST_SERVICE.SERVICE_NAME,
+      supabaseOptions
+    );
+
+    result.counts_after.spreadsheet_service_catalog = Array.isArray(spreadsheetAfter) ? spreadsheetAfter.length : -1;
+    result.counts_after.supabase_service_catalog = Array.isArray(supabaseAfter) ? supabaseAfter.length : -1;
+
+    result.readback = insertedById ? {
+      service_id: String(insertedById.service_id || '').trim(),
+      service_name: String(insertedById.service_name || '').trim(),
+      default_price: Number(insertedById.default_price || 0),
+      is_active: insertedById.is_active,
+      is_ortho_install: insertedById.is_ortho_install,
+      is_ortho_control: insertedById.is_ortho_control
+    } : null;
+
+    addCheck('SPREADSHEET_COUNT_UNCHANGED_AFTER_SUPABASE_INSERT', result.counts_after.spreadsheet_service_catalog === result.counts_before.spreadsheet_service_catalog, {
+      before_count: result.counts_before.spreadsheet_service_catalog,
+      after_count: result.counts_after.spreadsheet_service_catalog
+    });
+
+    addCheck('SUPABASE_COUNT_INCREASED_TO_101_AFTER_INSERT', result.counts_after.supabase_service_catalog === 101, {
+      before_count: result.counts_before.supabase_service_catalog,
+      after_count: result.counts_after.supabase_service_catalog,
+      expected_after_count: 101
+    });
+
+    addCheck('DUMMY_SERVICE_READBACK_BY_ID_FOUND', !!insertedById, {
+      service_id: MASTER_DATA_PHASE_7B_TEST_SERVICE.SERVICE_ID
+    });
+
+    addCheck('DUMMY_SERVICE_READBACK_BY_NAME_FOUND', !!insertedByName, {
+      service_name: MASTER_DATA_PHASE_7B_TEST_SERVICE.SERVICE_NAME
+    });
+
+    addCheck('DUMMY_SERVICE_READBACK_FIELDS_MATCH', !!(
+      insertedById &&
+      String(insertedById.service_id || '').trim() === MASTER_DATA_PHASE_7B_TEST_SERVICE.SERVICE_ID &&
+      String(insertedById.service_name || '').trim() === MASTER_DATA_PHASE_7B_TEST_SERVICE.SERVICE_NAME &&
+      Number(insertedById.default_price || 0) === MASTER_DATA_PHASE_7B_TEST_SERVICE.DEFAULT_PRICE &&
+      boolTrue_(insertedById.is_active) &&
+      boolFalse_(insertedById.is_ortho_install) &&
+      boolFalse_(insertedById.is_ortho_control)
+    ), {
+      readback: result.readback
+    });
+
+    result.issue_count = result.issues.length;
+    result.success = result.issue_count === 0;
+
+    Logger.log(JSON.stringify(result, null, 2));
+    return result;
+
+  } catch (err) {
+    const errorResult = {
+      success: false,
+      stage: '7B-4',
+      checked_at: typeof nowIso === 'function' ? nowIso() : new Date().toISOString(),
+      message: err && err.message ? err.message : String(err || 'Unknown error')
+    };
+
+    Logger.log(JSON.stringify(errorResult, null, 2));
+    return errorResult;
+  }
+}
+
+function testMasterDataPhase7BReadBackInsertedDummyServiceLog() {
+  const result = {
+    success: true,
+    stage: '7B-5',
+    checked_at: typeof nowIso === 'function' ? nowIso() : new Date().toISOString(),
+    default_backend_mode: typeof dbGetBackendMode_ === 'function' ? dbGetBackendMode_() : '',
+    ui_read_backend_mode: typeof repoGetUiReadBackendMode_ === 'function'
+      ? repoGetUiReadBackendMode_()
+      : '',
+    ui_read_supabase_test_enabled: typeof repoIsUiReadSupabaseTestEnabled_ === 'function'
+      ? repoIsUiReadSupabaseTestEnabled_()
+      : null,
+    supabase_staging_write_test_enabled: typeof repoIsSupabaseStagingWriteTestEnabled_ === 'function'
+      ? repoIsSupabaseStagingWriteTestEnabled_()
+      : null,
+    test_service: {
+      service_id: MASTER_DATA_PHASE_7B_TEST_SERVICE.SERVICE_ID,
+      service_name: MASTER_DATA_PHASE_7B_TEST_SERVICE.SERVICE_NAME
+    },
+    counts: {},
+    readback: {},
+    checks: [],
+    issue_count: 0,
+    issues: []
+  };
+
+  function addCheck(name, success, details) {
+    result.checks.push({
+      name: name,
+      success: !!success,
+      details: details || {}
+    });
+
+    if (!success) {
+      result.issues.push({
+        check: name,
+        issue: 'CHECK_FAILED',
+        details: details || {}
+      });
+    }
+  }
+
+  function boolTrue_(value) {
+    if (value === true) return true;
+    if (value === false) return false;
+    return String(value || '').trim().toLowerCase() === 'true';
+  }
+
+  function boolFalse_(value) {
+    if (value === false) return true;
+    if (value === true) return false;
+    const text = String(value || '').trim().toLowerCase();
+    return text === '' || text === 'false';
+  }
+
+  try {
+    const supabaseOptions = {
+      backend_mode: 'supabase'
+    };
+
+    addCheck('DEFAULT_BACKEND_STILL_SPREADSHEET', result.default_backend_mode === REPO_BACKEND_MODES.SPREADSHEET, {
+      actual: result.default_backend_mode
+    });
+
+    addCheck('UI_READ_BACKEND_STILL_SPREADSHEET', result.ui_read_backend_mode === REPO_BACKEND_MODES.SPREADSHEET, {
+      actual: result.ui_read_backend_mode,
+      ui_read_supabase_test_enabled: result.ui_read_supabase_test_enabled
+    });
+
+    addCheck('SUPABASE_STAGING_WRITE_FLAG_STILL_ENABLED_FOR_7B', result.supabase_staging_write_test_enabled === true, {
+      actual: result.supabase_staging_write_test_enabled
+    });
+
+    const spreadsheetServices = MasterDataRepository.getServiceCatalogRaw({
+      backend_mode: 'spreadsheet'
+    });
+
+    const supabaseServices = MasterDataRepository.getServiceCatalogRaw(supabaseOptions);
+    const activeServices = MasterDataRepository.listActiveServices(supabaseOptions);
+    const inactiveServices = MasterDataRepository.listInactiveServices(supabaseOptions);
+    const orthoInstallServices = MasterDataRepository.listActiveOrthoInstallServices(supabaseOptions);
+    const orthoControlServices = MasterDataRepository.listActiveOrthoControlServices(supabaseOptions);
+
+    result.counts.spreadsheet_service_catalog = Array.isArray(spreadsheetServices) ? spreadsheetServices.length : -1;
+    result.counts.supabase_service_catalog = Array.isArray(supabaseServices) ? supabaseServices.length : -1;
+    result.counts.supabase_active_services = Array.isArray(activeServices) ? activeServices.length : -1;
+    result.counts.supabase_inactive_services = Array.isArray(inactiveServices) ? inactiveServices.length : -1;
+    result.counts.supabase_ortho_install_services = Array.isArray(orthoInstallServices) ? orthoInstallServices.length : -1;
+    result.counts.supabase_ortho_control_services = Array.isArray(orthoControlServices) ? orthoControlServices.length : -1;
+
+    addCheck('SPREADSHEET_SERVICE_COUNT_STILL_100', result.counts.spreadsheet_service_catalog === 100, {
+      actual: result.counts.spreadsheet_service_catalog,
+      expected: 100
+    });
+
+    addCheck('SUPABASE_SERVICE_COUNT_NOW_101', result.counts.supabase_service_catalog === 101, {
+      actual: result.counts.supabase_service_catalog,
+      expected: 101
+    });
+
+    addCheck('SUPABASE_ACTIVE_INACTIVE_COUNT_MATCH_AFTER_INSERT', result.counts.supabase_service_catalog === result.counts.supabase_active_services + result.counts.supabase_inactive_services, {
+      service_count: result.counts.supabase_service_catalog,
+      active_count: result.counts.supabase_active_services,
+      inactive_count: result.counts.supabase_inactive_services
+    });
+
+    addCheck('SUPABASE_ORTHO_COUNTS_UNCHANGED_AFTER_INSERT', result.counts.supabase_ortho_install_services === 8 && result.counts.supabase_ortho_control_services === 10, {
+      ortho_install_count: result.counts.supabase_ortho_install_services,
+      expected_ortho_install_count: 8,
+      ortho_control_count: result.counts.supabase_ortho_control_services,
+      expected_ortho_control_count: 10
+    });
+
+    const serviceById = MasterDataRepository.findServiceById(
+      MASTER_DATA_PHASE_7B_TEST_SERVICE.SERVICE_ID,
+      supabaseOptions
+    );
+
+    const serviceByName = MasterDataRepository.findServiceByName(
+      MASTER_DATA_PHASE_7B_TEST_SERVICE.SERVICE_NAME,
+      supabaseOptions
+    );
+
+    const serviceByUpdatedName = MasterDataRepository.findServiceByName(
+      MASTER_DATA_PHASE_7B_TEST_SERVICE.SERVICE_NAME_UPDATED,
+      supabaseOptions
+    );
+
+    result.readback.by_id = serviceById ? {
+      service_id: String(serviceById.service_id || '').trim(),
+      service_name: String(serviceById.service_name || '').trim(),
+      default_price: Number(serviceById.default_price || 0),
+      is_active: serviceById.is_active,
+      is_ortho_install: serviceById.is_ortho_install,
+      is_ortho_control: serviceById.is_ortho_control
+    } : null;
+
+    addCheck('DUMMY_SERVICE_FOUND_BY_ID_AFTER_INSERT', !!serviceById, {
+      service_id: MASTER_DATA_PHASE_7B_TEST_SERVICE.SERVICE_ID
+    });
+
+    addCheck('DUMMY_SERVICE_FOUND_BY_NAME_AFTER_INSERT', !!serviceByName, {
+      service_name: MASTER_DATA_PHASE_7B_TEST_SERVICE.SERVICE_NAME
+    });
+
+    addCheck('DUMMY_SERVICE_UPDATED_NAME_NOT_YET_EXISTING', !serviceByUpdatedName, {
+      service_name_updated: MASTER_DATA_PHASE_7B_TEST_SERVICE.SERVICE_NAME_UPDATED,
+      exists: !!serviceByUpdatedName
+    });
+
+    addCheck('DUMMY_SERVICE_FIELDS_MATCH_AFTER_INSERT', !!(
+      serviceById &&
+      String(serviceById.service_id || '').trim() === MASTER_DATA_PHASE_7B_TEST_SERVICE.SERVICE_ID &&
+      String(serviceById.service_name || '').trim() === MASTER_DATA_PHASE_7B_TEST_SERVICE.SERVICE_NAME &&
+      Number(serviceById.default_price || 0) === MASTER_DATA_PHASE_7B_TEST_SERVICE.DEFAULT_PRICE &&
+      boolTrue_(serviceById.is_active) &&
+      boolFalse_(serviceById.is_ortho_install) &&
+      boolFalse_(serviceById.is_ortho_control)
+    ), {
+      readback: result.readback.by_id
+    });
+
+    result.issue_count = result.issues.length;
+    result.success = result.issue_count === 0;
+
+    Logger.log(JSON.stringify(result, null, 2));
+    return result;
+
+  } catch (err) {
+    const errorResult = {
+      success: false,
+      stage: '7B-5',
+      checked_at: typeof nowIso === 'function' ? nowIso() : new Date().toISOString(),
+      message: err && err.message ? err.message : String(err || 'Unknown error')
+    };
+
+    Logger.log(JSON.stringify(errorResult, null, 2));
+    return errorResult;
+  }
+}
+
+function testMasterDataPhase7BUpdateDummyServiceLog() {
+  const result = {
+    success: true,
+    stage: '7B-6',
+    checked_at: typeof nowIso === 'function' ? nowIso() : new Date().toISOString(),
+    default_backend_mode: typeof dbGetBackendMode_ === 'function' ? dbGetBackendMode_() : '',
+    ui_read_backend_mode: typeof repoGetUiReadBackendMode_ === 'function'
+      ? repoGetUiReadBackendMode_()
+      : '',
+    ui_read_supabase_test_enabled: typeof repoIsUiReadSupabaseTestEnabled_ === 'function'
+      ? repoIsUiReadSupabaseTestEnabled_()
+      : null,
+    supabase_staging_write_test_enabled: typeof repoIsSupabaseStagingWriteTestEnabled_ === 'function'
+      ? repoIsSupabaseStagingWriteTestEnabled_()
+      : null,
+    test_service: {
+      service_id: MASTER_DATA_PHASE_7B_TEST_SERVICE.SERVICE_ID,
+      service_name_before: MASTER_DATA_PHASE_7B_TEST_SERVICE.SERVICE_NAME,
+      service_name_after: MASTER_DATA_PHASE_7B_TEST_SERVICE.SERVICE_NAME_UPDATED
+    },
+    counts_before: {},
+    counts_after: {},
+    update_result: {},
+    readback: {},
+    checks: [],
+    issue_count: 0,
+    issues: []
+  };
+
+  function addCheck(name, success, details) {
+    result.checks.push({
+      name: name,
+      success: !!success,
+      details: details || {}
+    });
+
+    if (!success) {
+      result.issues.push({
+        check: name,
+        issue: 'CHECK_FAILED',
+        details: details || {}
+      });
+    }
+  }
+
+  function boolTrue_(value) {
+    if (value === true) return true;
+    if (value === false) return false;
+    return String(value || '').trim().toLowerCase() === 'true';
+  }
+
+  function boolFalse_(value) {
+    if (value === false) return true;
+    if (value === true) return false;
+    const text = String(value || '').trim().toLowerCase();
+    return text === '' || text === 'false';
+  }
+
+  try {
+    const supabaseOptions = {
+      backend_mode: 'supabase'
+    };
+
+    addCheck('DEFAULT_BACKEND_STILL_SPREADSHEET', result.default_backend_mode === REPO_BACKEND_MODES.SPREADSHEET, {
+      actual: result.default_backend_mode
+    });
+
+    addCheck('UI_READ_BACKEND_STILL_SPREADSHEET', result.ui_read_backend_mode === REPO_BACKEND_MODES.SPREADSHEET, {
+      actual: result.ui_read_backend_mode,
+      ui_read_supabase_test_enabled: result.ui_read_supabase_test_enabled
+    });
+
+    addCheck('SUPABASE_STAGING_WRITE_FLAG_STILL_ENABLED_FOR_7B', result.supabase_staging_write_test_enabled === true, {
+      actual: result.supabase_staging_write_test_enabled
+    });
+
+    const spreadsheetBefore = MasterDataRepository.getServiceCatalogRaw({
+      backend_mode: 'spreadsheet'
+    });
+
+    const supabaseBefore = MasterDataRepository.getServiceCatalogRaw(supabaseOptions);
+
+    const serviceBeforeById = MasterDataRepository.findServiceById(
+      MASTER_DATA_PHASE_7B_TEST_SERVICE.SERVICE_ID,
+      supabaseOptions
+    );
+
+    const serviceBeforeByName = MasterDataRepository.findServiceByName(
+      MASTER_DATA_PHASE_7B_TEST_SERVICE.SERVICE_NAME,
+      supabaseOptions
+    );
+
+    const serviceBeforeByUpdatedName = MasterDataRepository.findServiceByName(
+      MASTER_DATA_PHASE_7B_TEST_SERVICE.SERVICE_NAME_UPDATED,
+      supabaseOptions
+    );
+
+    result.counts_before.spreadsheet_service_catalog = Array.isArray(spreadsheetBefore) ? spreadsheetBefore.length : -1;
+    result.counts_before.supabase_service_catalog = Array.isArray(supabaseBefore) ? supabaseBefore.length : -1;
+
+    addCheck('SPREADSHEET_COUNT_STILL_100_BEFORE_UPDATE', result.counts_before.spreadsheet_service_catalog === 100, {
+      actual: result.counts_before.spreadsheet_service_catalog,
+      expected: 100
+    });
+
+    addCheck('SUPABASE_COUNT_STILL_101_BEFORE_UPDATE', result.counts_before.supabase_service_catalog === 101, {
+      actual: result.counts_before.supabase_service_catalog,
+      expected: 101
+    });
+
+    addCheck('DUMMY_SERVICE_EXISTS_BEFORE_UPDATE', !!serviceBeforeById && !!serviceBeforeByName && !serviceBeforeByUpdatedName, {
+      by_id_exists: !!serviceBeforeById,
+      by_old_name_exists: !!serviceBeforeByName,
+      by_updated_name_exists: !!serviceBeforeByUpdatedName
+    });
+
+    if (!serviceBeforeById || !serviceBeforeByName || serviceBeforeByUpdatedName) {
+      result.issue_count = result.issues.length;
+      result.success = false;
+      Logger.log(JSON.stringify(result, null, 2));
+      return result;
+    }
+
+    const patch = {
+      service_name: MASTER_DATA_PHASE_7B_TEST_SERVICE.SERVICE_NAME_UPDATED,
+      default_price: MASTER_DATA_PHASE_7B_TEST_SERVICE.DEFAULT_PRICE_UPDATED,
+      is_active: true,
+      updated_at: typeof nowIso === 'function' ? nowIso() : new Date().toISOString(),
+      is_ortho_install: false,
+      is_ortho_control: false
+    };
+
+    const updateResponse = dbSupabaseUpdateByIdStaging7A_(
+      REPO_TABLES.SERVICE_CATALOG,
+      'service_id',
+      MASTER_DATA_PHASE_7B_TEST_SERVICE.SERVICE_ID,
+      patch,
+      {
+        stage: '7B'
+      }
+    );
+
+    result.update_result = {
+      success: !!(updateResponse && updateResponse.success),
+      status_code: updateResponse ? updateResponse.status_code : null,
+      row_count: updateResponse ? updateResponse.row_count : null,
+      target_table: updateResponse ? updateResponse.target_table : ''
+    };
+
+    addCheck('DUMMY_SERVICE_UPDATE_RESPONSE_SUCCESS', !!(updateResponse && updateResponse.success), result.update_result);
+
+    const spreadsheetAfter = MasterDataRepository.getServiceCatalogRaw({
+      backend_mode: 'spreadsheet'
+    });
+
+    const supabaseAfter = MasterDataRepository.getServiceCatalogRaw(supabaseOptions);
+
+    const serviceAfterById = MasterDataRepository.findServiceById(
+      MASTER_DATA_PHASE_7B_TEST_SERVICE.SERVICE_ID,
+      supabaseOptions
+    );
+
+    const serviceAfterByOldName = MasterDataRepository.findServiceByName(
+      MASTER_DATA_PHASE_7B_TEST_SERVICE.SERVICE_NAME,
+      supabaseOptions
+    );
+
+    const serviceAfterByUpdatedName = MasterDataRepository.findServiceByName(
+      MASTER_DATA_PHASE_7B_TEST_SERVICE.SERVICE_NAME_UPDATED,
+      supabaseOptions
+    );
+
+    result.counts_after.spreadsheet_service_catalog = Array.isArray(spreadsheetAfter) ? spreadsheetAfter.length : -1;
+    result.counts_after.supabase_service_catalog = Array.isArray(supabaseAfter) ? supabaseAfter.length : -1;
+
+    result.readback.by_id = serviceAfterById ? {
+      service_id: String(serviceAfterById.service_id || '').trim(),
+      service_name: String(serviceAfterById.service_name || '').trim(),
+      default_price: Number(serviceAfterById.default_price || 0),
+      is_active: serviceAfterById.is_active,
+      is_ortho_install: serviceAfterById.is_ortho_install,
+      is_ortho_control: serviceAfterById.is_ortho_control
+    } : null;
+
+    addCheck('SPREADSHEET_COUNT_UNCHANGED_AFTER_SUPABASE_UPDATE', result.counts_after.spreadsheet_service_catalog === result.counts_before.spreadsheet_service_catalog, {
+      before_count: result.counts_before.spreadsheet_service_catalog,
+      after_count: result.counts_after.spreadsheet_service_catalog
+    });
+
+    addCheck('SUPABASE_COUNT_UNCHANGED_101_AFTER_UPDATE', result.counts_after.supabase_service_catalog === result.counts_before.supabase_service_catalog, {
+      before_count: result.counts_before.supabase_service_catalog,
+      after_count: result.counts_after.supabase_service_catalog
+    });
+
+    addCheck('DUMMY_SERVICE_FOUND_BY_ID_AFTER_UPDATE', !!serviceAfterById, {
+      service_id: MASTER_DATA_PHASE_7B_TEST_SERVICE.SERVICE_ID
+    });
+
+    addCheck('DUMMY_SERVICE_OLD_NAME_NOT_FOUND_AFTER_UPDATE', !serviceAfterByOldName, {
+      old_service_name: MASTER_DATA_PHASE_7B_TEST_SERVICE.SERVICE_NAME,
+      exists: !!serviceAfterByOldName
+    });
+
+    addCheck('DUMMY_SERVICE_UPDATED_NAME_FOUND_AFTER_UPDATE', !!serviceAfterByUpdatedName, {
+      updated_service_name: MASTER_DATA_PHASE_7B_TEST_SERVICE.SERVICE_NAME_UPDATED,
+      exists: !!serviceAfterByUpdatedName
+    });
+
+    addCheck('DUMMY_SERVICE_FIELDS_MATCH_AFTER_UPDATE', !!(
+      serviceAfterById &&
+      String(serviceAfterById.service_id || '').trim() === MASTER_DATA_PHASE_7B_TEST_SERVICE.SERVICE_ID &&
+      String(serviceAfterById.service_name || '').trim() === MASTER_DATA_PHASE_7B_TEST_SERVICE.SERVICE_NAME_UPDATED &&
+      Number(serviceAfterById.default_price || 0) === MASTER_DATA_PHASE_7B_TEST_SERVICE.DEFAULT_PRICE_UPDATED &&
+      boolTrue_(serviceAfterById.is_active) &&
+      boolFalse_(serviceAfterById.is_ortho_install) &&
+      boolFalse_(serviceAfterById.is_ortho_control)
+    ), {
+      readback: result.readback.by_id
+    });
+
+    result.issue_count = result.issues.length;
+    result.success = result.issue_count === 0;
+
+    Logger.log(JSON.stringify(result, null, 2));
+    return result;
+
+  } catch (err) {
+    const errorResult = {
+      success: false,
+      stage: '7B-6',
+      checked_at: typeof nowIso === 'function' ? nowIso() : new Date().toISOString(),
+      message: err && err.message ? err.message : String(err || 'Unknown error')
+    };
+
+    Logger.log(JSON.stringify(errorResult, null, 2));
+    return errorResult;
+  }
+}
+
+function testMasterDataPhase7BReadBackUpdatedDummyServiceLog() {
+  const result = {
+    success: true,
+    stage: '7B-7',
+    checked_at: typeof nowIso === 'function' ? nowIso() : new Date().toISOString(),
+    default_backend_mode: typeof dbGetBackendMode_ === 'function' ? dbGetBackendMode_() : '',
+    ui_read_backend_mode: typeof repoGetUiReadBackendMode_ === 'function'
+      ? repoGetUiReadBackendMode_()
+      : '',
+    ui_read_supabase_test_enabled: typeof repoIsUiReadSupabaseTestEnabled_ === 'function'
+      ? repoIsUiReadSupabaseTestEnabled_()
+      : null,
+    supabase_staging_write_test_enabled: typeof repoIsSupabaseStagingWriteTestEnabled_ === 'function'
+      ? repoIsSupabaseStagingWriteTestEnabled_()
+      : null,
+    test_service: {
+      service_id: MASTER_DATA_PHASE_7B_TEST_SERVICE.SERVICE_ID,
+      service_name_before: MASTER_DATA_PHASE_7B_TEST_SERVICE.SERVICE_NAME,
+      service_name_after: MASTER_DATA_PHASE_7B_TEST_SERVICE.SERVICE_NAME_UPDATED
+    },
+    counts: {},
+    readback: {},
+    checks: [],
+    issue_count: 0,
+    issues: []
+  };
+
+  function addCheck(name, success, details) {
+    result.checks.push({
+      name: name,
+      success: !!success,
+      details: details || {}
+    });
+
+    if (!success) {
+      result.issues.push({
+        check: name,
+        issue: 'CHECK_FAILED',
+        details: details || {}
+      });
+    }
+  }
+
+  function boolTrue_(value) {
+    if (value === true) return true;
+    if (value === false) return false;
+    return String(value || '').trim().toLowerCase() === 'true';
+  }
+
+  function boolFalse_(value) {
+    if (value === false) return true;
+    if (value === true) return false;
+    const text = String(value || '').trim().toLowerCase();
+    return text === '' || text === 'false';
+  }
+
+  try {
+    const supabaseOptions = {
+      backend_mode: 'supabase'
+    };
+
+    addCheck('DEFAULT_BACKEND_STILL_SPREADSHEET', result.default_backend_mode === REPO_BACKEND_MODES.SPREADSHEET, {
+      actual: result.default_backend_mode
+    });
+
+    addCheck('UI_READ_BACKEND_STILL_SPREADSHEET', result.ui_read_backend_mode === REPO_BACKEND_MODES.SPREADSHEET, {
+      actual: result.ui_read_backend_mode,
+      ui_read_supabase_test_enabled: result.ui_read_supabase_test_enabled
+    });
+
+    addCheck('SUPABASE_STAGING_WRITE_FLAG_STILL_ENABLED_FOR_7B', result.supabase_staging_write_test_enabled === true, {
+      actual: result.supabase_staging_write_test_enabled
+    });
+
+    const spreadsheetServices = MasterDataRepository.getServiceCatalogRaw({
+      backend_mode: 'spreadsheet'
+    });
+
+    const supabaseServices = MasterDataRepository.getServiceCatalogRaw(supabaseOptions);
+    const activeServices = MasterDataRepository.listActiveServices(supabaseOptions);
+    const inactiveServices = MasterDataRepository.listInactiveServices(supabaseOptions);
+    const orthoInstallServices = MasterDataRepository.listActiveOrthoInstallServices(supabaseOptions);
+    const orthoControlServices = MasterDataRepository.listActiveOrthoControlServices(supabaseOptions);
+
+    result.counts.spreadsheet_service_catalog = Array.isArray(spreadsheetServices) ? spreadsheetServices.length : -1;
+    result.counts.supabase_service_catalog = Array.isArray(supabaseServices) ? supabaseServices.length : -1;
+    result.counts.supabase_active_services = Array.isArray(activeServices) ? activeServices.length : -1;
+    result.counts.supabase_inactive_services = Array.isArray(inactiveServices) ? inactiveServices.length : -1;
+    result.counts.supabase_ortho_install_services = Array.isArray(orthoInstallServices) ? orthoInstallServices.length : -1;
+    result.counts.supabase_ortho_control_services = Array.isArray(orthoControlServices) ? orthoControlServices.length : -1;
+
+    addCheck('SPREADSHEET_SERVICE_COUNT_STILL_100_AFTER_UPDATE', result.counts.spreadsheet_service_catalog === 100, {
+      actual: result.counts.spreadsheet_service_catalog,
+      expected: 100
+    });
+
+    addCheck('SUPABASE_SERVICE_COUNT_STILL_101_AFTER_UPDATE', result.counts.supabase_service_catalog === 101, {
+      actual: result.counts.supabase_service_catalog,
+      expected: 101
+    });
+
+    addCheck('SUPABASE_ACTIVE_INACTIVE_COUNT_MATCH_AFTER_UPDATE', result.counts.supabase_service_catalog === result.counts.supabase_active_services + result.counts.supabase_inactive_services, {
+      service_count: result.counts.supabase_service_catalog,
+      active_count: result.counts.supabase_active_services,
+      inactive_count: result.counts.supabase_inactive_services
+    });
+
+    addCheck('SUPABASE_ORTHO_COUNTS_UNCHANGED_AFTER_UPDATE', result.counts.supabase_ortho_install_services === 8 && result.counts.supabase_ortho_control_services === 10, {
+      ortho_install_count: result.counts.supabase_ortho_install_services,
+      expected_ortho_install_count: 8,
+      ortho_control_count: result.counts.supabase_ortho_control_services,
+      expected_ortho_control_count: 10
+    });
+
+    const serviceById = MasterDataRepository.findServiceById(
+      MASTER_DATA_PHASE_7B_TEST_SERVICE.SERVICE_ID,
+      supabaseOptions
+    );
+
+    const serviceByOldName = MasterDataRepository.findServiceByName(
+      MASTER_DATA_PHASE_7B_TEST_SERVICE.SERVICE_NAME,
+      supabaseOptions
+    );
+
+    const serviceByUpdatedName = MasterDataRepository.findServiceByName(
+      MASTER_DATA_PHASE_7B_TEST_SERVICE.SERVICE_NAME_UPDATED,
+      supabaseOptions
+    );
+
+    result.readback.by_id = serviceById ? {
+      service_id: String(serviceById.service_id || '').trim(),
+      service_name: String(serviceById.service_name || '').trim(),
+      default_price: Number(serviceById.default_price || 0),
+      is_active: serviceById.is_active,
+      is_ortho_install: serviceById.is_ortho_install,
+      is_ortho_control: serviceById.is_ortho_control
+    } : null;
+
+    addCheck('DUMMY_SERVICE_FOUND_BY_ID_AFTER_UPDATE_VERIFY', !!serviceById, {
+      service_id: MASTER_DATA_PHASE_7B_TEST_SERVICE.SERVICE_ID
+    });
+
+    addCheck('DUMMY_SERVICE_OLD_NAME_NOT_FOUND_AFTER_UPDATE_VERIFY', !serviceByOldName, {
+      old_service_name: MASTER_DATA_PHASE_7B_TEST_SERVICE.SERVICE_NAME,
+      exists: !!serviceByOldName
+    });
+
+    addCheck('DUMMY_SERVICE_UPDATED_NAME_FOUND_AFTER_UPDATE_VERIFY', !!serviceByUpdatedName, {
+      updated_service_name: MASTER_DATA_PHASE_7B_TEST_SERVICE.SERVICE_NAME_UPDATED,
+      exists: !!serviceByUpdatedName
+    });
+
+    addCheck('DUMMY_SERVICE_FIELDS_MATCH_AFTER_UPDATE_VERIFY', !!(
+      serviceById &&
+      String(serviceById.service_id || '').trim() === MASTER_DATA_PHASE_7B_TEST_SERVICE.SERVICE_ID &&
+      String(serviceById.service_name || '').trim() === MASTER_DATA_PHASE_7B_TEST_SERVICE.SERVICE_NAME_UPDATED &&
+      Number(serviceById.default_price || 0) === MASTER_DATA_PHASE_7B_TEST_SERVICE.DEFAULT_PRICE_UPDATED &&
+      boolTrue_(serviceById.is_active) &&
+      boolFalse_(serviceById.is_ortho_install) &&
+      boolFalse_(serviceById.is_ortho_control)
+    ), {
+      readback: result.readback.by_id
+    });
+
+    const priceData = MasterDataRepository.getServicePriceData(
+      MASTER_DATA_PHASE_7B_TEST_SERVICE.SERVICE_ID,
+      supabaseOptions
+    );
+
+    const orthoFlags = MasterDataRepository.getServiceOrthoFlagsData(
+      MASTER_DATA_PHASE_7B_TEST_SERVICE.SERVICE_ID,
+      supabaseOptions
+    );
+
+    addCheck('DUMMY_SERVICE_PRICE_DATA_MATCH_AFTER_UPDATE', !!(
+      priceData &&
+      String(priceData.service_id || '').trim() === MASTER_DATA_PHASE_7B_TEST_SERVICE.SERVICE_ID &&
+      String(priceData.service_name || '').trim() === MASTER_DATA_PHASE_7B_TEST_SERVICE.SERVICE_NAME_UPDATED &&
+      Number(priceData.default_price || 0) === MASTER_DATA_PHASE_7B_TEST_SERVICE.DEFAULT_PRICE_UPDATED
+    ), {
+      price_data: priceData
+    });
+
+    addCheck('DUMMY_SERVICE_ORTHO_FLAGS_MATCH_AFTER_UPDATE', !!(
+      orthoFlags &&
+      String(orthoFlags.service_id || '').trim() === MASTER_DATA_PHASE_7B_TEST_SERVICE.SERVICE_ID &&
+      orthoFlags.is_ortho_install === false &&
+      orthoFlags.is_ortho_control === false
+    ), {
+      ortho_flags: orthoFlags
+    });
+
+    result.issue_count = result.issues.length;
+    result.success = result.issue_count === 0;
+
+    Logger.log(JSON.stringify(result, null, 2));
+    return result;
+
+  } catch (err) {
+    const errorResult = {
+      success: false,
+      stage: '7B-7',
+      checked_at: typeof nowIso === 'function' ? nowIso() : new Date().toISOString(),
+      message: err && err.message ? err.message : String(err || 'Unknown error')
+    };
+
+    Logger.log(JSON.stringify(errorResult, null, 2));
+    return errorResult;
+  }
+}
+
+function testMasterDataPhase7BDeleteDummyServiceLog() {
+  const result = {
+    success: true,
+    stage: '7B-8',
+    checked_at: typeof nowIso === 'function' ? nowIso() : new Date().toISOString(),
+    default_backend_mode: typeof dbGetBackendMode_ === 'function' ? dbGetBackendMode_() : '',
+    ui_read_backend_mode: typeof repoGetUiReadBackendMode_ === 'function'
+      ? repoGetUiReadBackendMode_()
+      : '',
+    ui_read_supabase_test_enabled: typeof repoIsUiReadSupabaseTestEnabled_ === 'function'
+      ? repoIsUiReadSupabaseTestEnabled_()
+      : null,
+    supabase_staging_write_test_enabled: typeof repoIsSupabaseStagingWriteTestEnabled_ === 'function'
+      ? repoIsSupabaseStagingWriteTestEnabled_()
+      : null,
+    test_service: {
+      service_id: MASTER_DATA_PHASE_7B_TEST_SERVICE.SERVICE_ID,
+      service_name_before: MASTER_DATA_PHASE_7B_TEST_SERVICE.SERVICE_NAME,
+      service_name_after: MASTER_DATA_PHASE_7B_TEST_SERVICE.SERVICE_NAME_UPDATED
+    },
+    counts_before: {},
+    counts_after: {},
+    delete_result: {},
+    checks: [],
+    issue_count: 0,
+    issues: []
+  };
+
+  function addCheck(name, success, details) {
+    result.checks.push({
+      name: name,
+      success: !!success,
+      details: details || {}
+    });
+
+    if (!success) {
+      result.issues.push({
+        check: name,
+        issue: 'CHECK_FAILED',
+        details: details || {}
+      });
+    }
+  }
+
+  try {
+    const supabaseOptions = {
+      backend_mode: 'supabase'
+    };
+
+    addCheck('DEFAULT_BACKEND_STILL_SPREADSHEET', result.default_backend_mode === REPO_BACKEND_MODES.SPREADSHEET, {
+      actual: result.default_backend_mode
+    });
+
+    addCheck('UI_READ_BACKEND_STILL_SPREADSHEET', result.ui_read_backend_mode === REPO_BACKEND_MODES.SPREADSHEET, {
+      actual: result.ui_read_backend_mode,
+      ui_read_supabase_test_enabled: result.ui_read_supabase_test_enabled
+    });
+
+    addCheck('SUPABASE_STAGING_WRITE_FLAG_STILL_ENABLED_FOR_7B', result.supabase_staging_write_test_enabled === true, {
+      actual: result.supabase_staging_write_test_enabled
+    });
+
+    const spreadsheetBefore = MasterDataRepository.getServiceCatalogRaw({
+      backend_mode: 'spreadsheet'
+    });
+
+    const supabaseBefore = MasterDataRepository.getServiceCatalogRaw(supabaseOptions);
+
+    const serviceBeforeById = MasterDataRepository.findServiceById(
+      MASTER_DATA_PHASE_7B_TEST_SERVICE.SERVICE_ID,
+      supabaseOptions
+    );
+
+    const serviceBeforeByOldName = MasterDataRepository.findServiceByName(
+      MASTER_DATA_PHASE_7B_TEST_SERVICE.SERVICE_NAME,
+      supabaseOptions
+    );
+
+    const serviceBeforeByUpdatedName = MasterDataRepository.findServiceByName(
+      MASTER_DATA_PHASE_7B_TEST_SERVICE.SERVICE_NAME_UPDATED,
+      supabaseOptions
+    );
+
+    result.counts_before.spreadsheet_service_catalog = Array.isArray(spreadsheetBefore) ? spreadsheetBefore.length : -1;
+    result.counts_before.supabase_service_catalog = Array.isArray(supabaseBefore) ? supabaseBefore.length : -1;
+
+    addCheck('SPREADSHEET_COUNT_STILL_100_BEFORE_DELETE', result.counts_before.spreadsheet_service_catalog === 100, {
+      actual: result.counts_before.spreadsheet_service_catalog,
+      expected: 100
+    });
+
+    addCheck('SUPABASE_COUNT_STILL_101_BEFORE_DELETE', result.counts_before.supabase_service_catalog === 101, {
+      actual: result.counts_before.supabase_service_catalog,
+      expected: 101
+    });
+
+    addCheck('DUMMY_SERVICE_EXISTS_BEFORE_DELETE', !!serviceBeforeById && !serviceBeforeByOldName && !!serviceBeforeByUpdatedName, {
+      by_id_exists: !!serviceBeforeById,
+      by_old_name_exists: !!serviceBeforeByOldName,
+      by_updated_name_exists: !!serviceBeforeByUpdatedName
+    });
+
+    if (!serviceBeforeById || serviceBeforeByOldName || !serviceBeforeByUpdatedName) {
+      result.issue_count = result.issues.length;
+      result.success = false;
+      Logger.log(JSON.stringify(result, null, 2));
+      return result;
+    }
+
+    const deleteResponse = dbSupabaseDeleteByIdStaging7A_(
+      REPO_TABLES.SERVICE_CATALOG,
+      'service_id',
+      MASTER_DATA_PHASE_7B_TEST_SERVICE.SERVICE_ID,
+      {
+        stage: '7B'
+      }
+    );
+
+    result.delete_result = {
+      success: !!(deleteResponse && deleteResponse.success),
+      status_code: deleteResponse ? deleteResponse.status_code : null,
+      row_count: deleteResponse ? deleteResponse.row_count : null,
+      target_table: deleteResponse ? deleteResponse.target_table : ''
+    };
+
+    addCheck('DUMMY_SERVICE_DELETE_RESPONSE_SUCCESS', !!(deleteResponse && deleteResponse.success), result.delete_result);
+
+    const spreadsheetAfter = MasterDataRepository.getServiceCatalogRaw({
+      backend_mode: 'spreadsheet'
+    });
+
+    const supabaseAfter = MasterDataRepository.getServiceCatalogRaw(supabaseOptions);
+
+    const serviceAfterById = MasterDataRepository.findServiceById(
+      MASTER_DATA_PHASE_7B_TEST_SERVICE.SERVICE_ID,
+      supabaseOptions
+    );
+
+    const serviceAfterByOldName = MasterDataRepository.findServiceByName(
+      MASTER_DATA_PHASE_7B_TEST_SERVICE.SERVICE_NAME,
+      supabaseOptions
+    );
+
+    const serviceAfterByUpdatedName = MasterDataRepository.findServiceByName(
+      MASTER_DATA_PHASE_7B_TEST_SERVICE.SERVICE_NAME_UPDATED,
+      supabaseOptions
+    );
+
+    result.counts_after.spreadsheet_service_catalog = Array.isArray(spreadsheetAfter) ? spreadsheetAfter.length : -1;
+    result.counts_after.supabase_service_catalog = Array.isArray(supabaseAfter) ? supabaseAfter.length : -1;
+
+    addCheck('SPREADSHEET_COUNT_UNCHANGED_AFTER_SUPABASE_DELETE', result.counts_after.spreadsheet_service_catalog === result.counts_before.spreadsheet_service_catalog, {
+      before_count: result.counts_before.spreadsheet_service_catalog,
+      after_count: result.counts_after.spreadsheet_service_catalog
+    });
+
+    addCheck('SUPABASE_COUNT_BACK_TO_100_AFTER_DELETE', result.counts_after.supabase_service_catalog === 100, {
+      before_count: result.counts_before.supabase_service_catalog,
+      after_count: result.counts_after.supabase_service_catalog,
+      expected_after_count: 100
+    });
+
+    addCheck('DUMMY_SERVICE_NOT_FOUND_AFTER_DELETE', !serviceAfterById && !serviceAfterByOldName && !serviceAfterByUpdatedName, {
+      by_id_exists: !!serviceAfterById,
+      by_old_name_exists: !!serviceAfterByOldName,
+      by_updated_name_exists: !!serviceAfterByUpdatedName
+    });
+
+    result.issue_count = result.issues.length;
+    result.success = result.issue_count === 0;
+
+    Logger.log(JSON.stringify(result, null, 2));
+    return result;
+
+  } catch (err) {
+    const errorResult = {
+      success: false,
+      stage: '7B-8',
+      checked_at: typeof nowIso === 'function' ? nowIso() : new Date().toISOString(),
+      message: err && err.message ? err.message : String(err || 'Unknown error')
+    };
+
+    Logger.log(JSON.stringify(errorResult, null, 2));
+    return errorResult;
+  }
+}
+
+function testMasterDataPhase7BConfirmCleanupLog() {
+  const result = {
+    success: true,
+    stage: '7B-9',
+    checked_at: typeof nowIso === 'function' ? nowIso() : new Date().toISOString(),
+    default_backend_mode: typeof dbGetBackendMode_ === 'function' ? dbGetBackendMode_() : '',
+    ui_read_backend_mode: typeof repoGetUiReadBackendMode_ === 'function'
+      ? repoGetUiReadBackendMode_()
+      : '',
+    ui_read_supabase_test_enabled: typeof repoIsUiReadSupabaseTestEnabled_ === 'function'
+      ? repoIsUiReadSupabaseTestEnabled_()
+      : null,
+    supabase_staging_write_test_enabled: typeof repoIsSupabaseStagingWriteTestEnabled_ === 'function'
+      ? repoIsSupabaseStagingWriteTestEnabled_()
+      : null,
+    test_service: {
+      service_id: MASTER_DATA_PHASE_7B_TEST_SERVICE.SERVICE_ID,
+      service_name_before: MASTER_DATA_PHASE_7B_TEST_SERVICE.SERVICE_NAME,
+      service_name_after: MASTER_DATA_PHASE_7B_TEST_SERVICE.SERVICE_NAME_UPDATED
+    },
+    counts: {},
+    checks: [],
+    issue_count: 0,
+    issues: []
+  };
+
+  function addCheck(name, success, details) {
+    result.checks.push({
+      name: name,
+      success: !!success,
+      details: details || {}
+    });
+
+    if (!success) {
+      result.issues.push({
+        check: name,
+        issue: 'CHECK_FAILED',
+        details: details || {}
+      });
+    }
+  }
+
+  try {
+    const supabaseOptions = {
+      backend_mode: 'supabase'
+    };
+
+    addCheck('DEFAULT_BACKEND_STILL_SPREADSHEET', result.default_backend_mode === REPO_BACKEND_MODES.SPREADSHEET, {
+      actual: result.default_backend_mode
+    });
+
+    addCheck('UI_READ_BACKEND_STILL_SPREADSHEET', result.ui_read_backend_mode === REPO_BACKEND_MODES.SPREADSHEET, {
+      actual: result.ui_read_backend_mode,
+      ui_read_supabase_test_enabled: result.ui_read_supabase_test_enabled
+    });
+
+    addCheck('SUPABASE_STAGING_WRITE_FLAG_STILL_ENABLED_FOR_CLEANUP_CHECK', result.supabase_staging_write_test_enabled === true, {
+      actual: result.supabase_staging_write_test_enabled
+    });
+
+    const spreadsheetServices = MasterDataRepository.getServiceCatalogRaw({
+      backend_mode: 'spreadsheet'
+    });
+
+    const supabaseServices = MasterDataRepository.getServiceCatalogRaw(supabaseOptions);
+    const activeServices = MasterDataRepository.listActiveServices(supabaseOptions);
+    const inactiveServices = MasterDataRepository.listInactiveServices(supabaseOptions);
+    const orthoInstallServices = MasterDataRepository.listActiveOrthoInstallServices(supabaseOptions);
+    const orthoControlServices = MasterDataRepository.listActiveOrthoControlServices(supabaseOptions);
+
+    result.counts.spreadsheet_service_catalog = Array.isArray(spreadsheetServices) ? spreadsheetServices.length : -1;
+    result.counts.supabase_service_catalog = Array.isArray(supabaseServices) ? supabaseServices.length : -1;
+    result.counts.supabase_active_services = Array.isArray(activeServices) ? activeServices.length : -1;
+    result.counts.supabase_inactive_services = Array.isArray(inactiveServices) ? inactiveServices.length : -1;
+    result.counts.supabase_ortho_install_services = Array.isArray(orthoInstallServices) ? orthoInstallServices.length : -1;
+    result.counts.supabase_ortho_control_services = Array.isArray(orthoControlServices) ? orthoControlServices.length : -1;
+
+    addCheck('SPREADSHEET_SERVICE_COUNT_BACK_TO_BASELINE_100', result.counts.spreadsheet_service_catalog === 100, {
+      actual: result.counts.spreadsheet_service_catalog,
+      expected: 100
+    });
+
+    addCheck('SUPABASE_SERVICE_COUNT_BACK_TO_BASELINE_100', result.counts.supabase_service_catalog === 100, {
+      actual: result.counts.supabase_service_catalog,
+      expected: 100
+    });
+
+    addCheck('SUPABASE_ACTIVE_INACTIVE_COUNT_BACK_TO_BASELINE', result.counts.supabase_active_services === 100 && result.counts.supabase_inactive_services === 0, {
+      active_count: result.counts.supabase_active_services,
+      expected_active_count: 100,
+      inactive_count: result.counts.supabase_inactive_services,
+      expected_inactive_count: 0
+    });
+
+    addCheck('SUPABASE_ORTHO_COUNTS_BACK_TO_BASELINE', result.counts.supabase_ortho_install_services === 8 && result.counts.supabase_ortho_control_services === 10, {
+      ortho_install_count: result.counts.supabase_ortho_install_services,
+      expected_ortho_install_count: 8,
+      ortho_control_count: result.counts.supabase_ortho_control_services,
+      expected_ortho_control_count: 10
+    });
+
+    const serviceById = MasterDataRepository.findServiceById(
+      MASTER_DATA_PHASE_7B_TEST_SERVICE.SERVICE_ID,
+      supabaseOptions
+    );
+
+    const serviceByOldName = MasterDataRepository.findServiceByName(
+      MASTER_DATA_PHASE_7B_TEST_SERVICE.SERVICE_NAME,
+      supabaseOptions
+    );
+
+    const serviceByUpdatedName = MasterDataRepository.findServiceByName(
+      MASTER_DATA_PHASE_7B_TEST_SERVICE.SERVICE_NAME_UPDATED,
+      supabaseOptions
+    );
+
+    addCheck('DUMMY_SERVICE_CLEANED_UP_BY_ID_AND_NAMES', !serviceById && !serviceByOldName && !serviceByUpdatedName, {
+      by_id_exists: !!serviceById,
+      by_old_name_exists: !!serviceByOldName,
+      by_updated_name_exists: !!serviceByUpdatedName
+    });
+
+    let oldDbInsertSupabaseStillBlocked = false;
+    let oldDbInsertMessage = '';
+
+    try {
+      dbInsert_(REPO_TABLES.SERVICE_CATALOG, {
+        service_id: 'TEST-OLD-DBINSERT-STILL-BLOCKED-7B-CLEANUP'
+      }, {
+        backend_mode: REPO_BACKEND_MODES.SUPABASE
+      });
+    } catch (errOldInsert) {
+      oldDbInsertSupabaseStillBlocked = true;
+      oldDbInsertMessage = errOldInsert && errOldInsert.message ? errOldInsert.message : String(errOldInsert || '');
+    }
+
+    addCheck('OLD_DB_INSERT_SUPABASE_STILL_BLOCKED_AFTER_7B_MUTATION', oldDbInsertSupabaseStillBlocked, {
+      message: oldDbInsertMessage
+    });
+
+    result.issue_count = result.issues.length;
+    result.success = result.issue_count === 0;
+
+    Logger.log(JSON.stringify(result, null, 2));
+    return result;
+
+  } catch (err) {
+    const errorResult = {
+      success: false,
+      stage: '7B-9',
+      checked_at: typeof nowIso === 'function' ? nowIso() : new Date().toISOString(),
+      message: err && err.message ? err.message : String(err || 'Unknown error')
+    };
+
+    Logger.log(JSON.stringify(errorResult, null, 2));
+    return errorResult;
+  }
+}
+
+function testMasterDataPhase7BFinalAuditLog() {
+  const result = {
+    success: true,
+    stage: '7B-11',
+    checked_at: typeof nowIso === 'function' ? nowIso() : new Date().toISOString(),
+    default_backend_mode: typeof dbGetBackendMode_ === 'function' ? dbGetBackendMode_() : '',
+    ui_read_backend_mode: typeof repoGetUiReadBackendMode_ === 'function'
+      ? repoGetUiReadBackendMode_()
+      : '',
+    ui_read_supabase_test_enabled: typeof repoIsUiReadSupabaseTestEnabled_ === 'function'
+      ? repoIsUiReadSupabaseTestEnabled_()
+      : null,
+    supabase_staging_write_test_enabled: typeof repoIsSupabaseStagingWriteTestEnabled_ === 'function'
+      ? repoIsSupabaseStagingWriteTestEnabled_()
+      : null,
+    counts: {},
+    test_service: {
+      service_id: MASTER_DATA_PHASE_7B_TEST_SERVICE.SERVICE_ID,
+      service_name_before: MASTER_DATA_PHASE_7B_TEST_SERVICE.SERVICE_NAME,
+      service_name_after: MASTER_DATA_PHASE_7B_TEST_SERVICE.SERVICE_NAME_UPDATED
+    },
+    checks: [],
+    issue_count: 0,
+    issues: []
+  };
+
+  function addCheck(name, success, details) {
+    result.checks.push({
+      name: name,
+      success: !!success,
+      details: details || {}
+    });
+
+    if (!success) {
+      result.issues.push({
+        check: name,
+        issue: 'CHECK_FAILED',
+        details: details || {}
+      });
+    }
+  }
+
+  try {
+    const supabaseOptions = {
+      backend_mode: 'supabase'
+    };
+
+    addCheck('DEFAULT_BACKEND_STILL_SPREADSHEET', result.default_backend_mode === REPO_BACKEND_MODES.SPREADSHEET, {
+      actual: result.default_backend_mode
+    });
+
+    addCheck('UI_READ_BACKEND_STILL_SPREADSHEET', result.ui_read_backend_mode === REPO_BACKEND_MODES.SPREADSHEET, {
+      actual: result.ui_read_backend_mode,
+      ui_read_supabase_test_enabled: result.ui_read_supabase_test_enabled
+    });
+
+    addCheck('SUPABASE_STAGING_WRITE_FLAG_BACK_TO_FALSE', result.supabase_staging_write_test_enabled === false, {
+      actual: result.supabase_staging_write_test_enabled
+    });
+
+    const spreadsheetServices = MasterDataRepository.getServiceCatalogRaw({
+      backend_mode: 'spreadsheet'
+    });
+
+    const supabaseServices = MasterDataRepository.getServiceCatalogRaw(supabaseOptions);
+    const supabaseActiveServices = MasterDataRepository.listActiveServices(supabaseOptions);
+    const supabaseInactiveServices = MasterDataRepository.listInactiveServices(supabaseOptions);
+    const supabaseOrthoInstallServices = MasterDataRepository.listActiveOrthoInstallServices(supabaseOptions);
+    const supabaseOrthoControlServices = MasterDataRepository.listActiveOrthoControlServices(supabaseOptions);
+
+    result.counts.spreadsheet_service_catalog = Array.isArray(spreadsheetServices) ? spreadsheetServices.length : -1;
+    result.counts.supabase_service_catalog = Array.isArray(supabaseServices) ? supabaseServices.length : -1;
+    result.counts.supabase_active_services = Array.isArray(supabaseActiveServices) ? supabaseActiveServices.length : -1;
+    result.counts.supabase_inactive_services = Array.isArray(supabaseInactiveServices) ? supabaseInactiveServices.length : -1;
+    result.counts.supabase_ortho_install_services = Array.isArray(supabaseOrthoInstallServices) ? supabaseOrthoInstallServices.length : -1;
+    result.counts.supabase_ortho_control_services = Array.isArray(supabaseOrthoControlServices) ? supabaseOrthoControlServices.length : -1;
+
+    addCheck('SPREADSHEET_SERVICE_CATALOG_STILL_100', result.counts.spreadsheet_service_catalog === 100, {
+      actual: result.counts.spreadsheet_service_catalog,
+      expected: 100
+    });
+
+    addCheck('SUPABASE_SERVICE_CATALOG_FINAL_100', result.counts.supabase_service_catalog === 100, {
+      actual: result.counts.supabase_service_catalog,
+      expected: 100
+    });
+
+    addCheck('SUPABASE_ACTIVE_INACTIVE_FINAL_BASELINE', result.counts.supabase_active_services === 100 && result.counts.supabase_inactive_services === 0, {
+      active_count: result.counts.supabase_active_services,
+      expected_active_count: 100,
+      inactive_count: result.counts.supabase_inactive_services,
+      expected_inactive_count: 0
+    });
+
+    addCheck('SUPABASE_ORTHO_COUNTS_FINAL_BASELINE', result.counts.supabase_ortho_install_services === 8 && result.counts.supabase_ortho_control_services === 10, {
+      ortho_install_count: result.counts.supabase_ortho_install_services,
+      expected_ortho_install_count: 8,
+      ortho_control_count: result.counts.supabase_ortho_control_services,
+      expected_ortho_control_count: 10
+    });
+
+    const dummyById = MasterDataRepository.findServiceById(
+      MASTER_DATA_PHASE_7B_TEST_SERVICE.SERVICE_ID,
+      supabaseOptions
+    );
+
+    const dummyByOldName = MasterDataRepository.findServiceByName(
+      MASTER_DATA_PHASE_7B_TEST_SERVICE.SERVICE_NAME,
+      supabaseOptions
+    );
+
+    const dummyByUpdatedName = MasterDataRepository.findServiceByName(
+      MASTER_DATA_PHASE_7B_TEST_SERVICE.SERVICE_NAME_UPDATED,
+      supabaseOptions
+    );
+
+    addCheck('DUMMY_SERVICE_FULLY_CLEANED_UP_FINAL', !dummyById && !dummyByOldName && !dummyByUpdatedName, {
+      by_id_exists: !!dummyById,
+      by_old_name_exists: !!dummyByOldName,
+      by_updated_name_exists: !!dummyByUpdatedName
+    });
+
+    const guardCheck = repoCheckSupabaseStagingWriteAllowed_({
+      backend_mode: REPO_BACKEND_MODES.SUPABASE,
+      write_intent: repoGetSupabaseStagingWriteIntent_(),
+      stage: '7B',
+      table_name: REPO_TABLES.SERVICE_CATALOG,
+      operation: 'FINAL_7B_WRITE_GUARD_CHECK'
+    });
+
+    addCheck('WRITE_GUARD_BLOCKS_AFTER_FLAG_FALSE_FINAL', guardCheck.allowed === false, {
+      allowed: guardCheck.allowed,
+      message: guardCheck.message
+    });
+
+    let oldDbInsertSupabaseStillBlocked = false;
+    let oldDbInsertMessage = '';
+
+    try {
+      dbInsert_(REPO_TABLES.SERVICE_CATALOG, {
+        service_id: 'TEST-7B-FINAL-OLD-DBINSERT-SHOULD-NOT-INSERT'
+      }, {
+        backend_mode: REPO_BACKEND_MODES.SUPABASE
+      });
+    } catch (errOldInsert) {
+      oldDbInsertSupabaseStillBlocked = true;
+      oldDbInsertMessage = errOldInsert && errOldInsert.message ? errOldInsert.message : String(errOldInsert || '');
+    }
+
+    addCheck('OLD_DB_INSERT_SUPABASE_STILL_BLOCKED_FINAL', oldDbInsertSupabaseStillBlocked, {
+      message: oldDbInsertMessage
+    });
+
+    result.issue_count = result.issues.length;
+    result.success = result.issue_count === 0;
+
+    Logger.log(JSON.stringify(result, null, 2));
+    return result;
+
+  } catch (err) {
+    const errorResult = {
+      success: false,
+      stage: '7B-11',
+      checked_at: typeof nowIso === 'function' ? nowIso() : new Date().toISOString(),
+      message: err && err.message ? err.message : String(err || 'Unknown error')
+    };
+
+    Logger.log(JSON.stringify(errorResult, null, 2));
+    return errorResult;
+  }
+}
