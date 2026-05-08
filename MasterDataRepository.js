@@ -811,3 +811,199 @@ function testMasterDataRepositoryPhase6FSpreadsheetRegressionLog() {
     return errorResult;
   }
 }
+
+/* =========================================================
+   PHASE 7B - MASTER DATA / SERVICE CATALOG MUTATION PREFLIGHT
+   Read-only preflight. Aman dijalankan. Tidak menulis data.
+   ========================================================= */
+
+const MASTER_DATA_PHASE_7B_TEST_SERVICE = Object.freeze({
+  SERVICE_ID: 'SRV-7B-TEST-001',
+  SERVICE_NAME: 'ZZ_TEST_7B_SUPABASE_SERVICE',
+  SERVICE_NAME_UPDATED: 'ZZ_TEST_7B_SUPABASE_SERVICE_UPDATED',
+  DEFAULT_PRICE: 777000,
+  DEFAULT_PRICE_UPDATED: 888000
+});
+
+function buildMasterDataPhase7BTestServicePayload_() {
+  const now = typeof nowIso === 'function' ? nowIso() : new Date().toISOString();
+
+  return {
+    service_id: MASTER_DATA_PHASE_7B_TEST_SERVICE.SERVICE_ID,
+    service_name: MASTER_DATA_PHASE_7B_TEST_SERVICE.SERVICE_NAME,
+    default_price: MASTER_DATA_PHASE_7B_TEST_SERVICE.DEFAULT_PRICE,
+    is_active: true,
+    created_at: now,
+    updated_at: now,
+    is_ortho_install: false,
+    is_ortho_control: false
+  };
+}
+
+function testMasterDataPhase7BPreflightLog() {
+  const result = {
+    success: true,
+    stage: '7B-1',
+    checked_at: typeof nowIso === 'function' ? nowIso() : new Date().toISOString(),
+    default_backend_mode: typeof dbGetBackendMode_ === 'function' ? dbGetBackendMode_() : '',
+    supabase_staging_write_test_enabled: typeof repoIsSupabaseStagingWriteTestEnabled_ === 'function'
+      ? repoIsSupabaseStagingWriteTestEnabled_()
+      : null,
+    test_service: {
+      service_id: MASTER_DATA_PHASE_7B_TEST_SERVICE.SERVICE_ID,
+      service_name: MASTER_DATA_PHASE_7B_TEST_SERVICE.SERVICE_NAME,
+      service_name_updated: MASTER_DATA_PHASE_7B_TEST_SERVICE.SERVICE_NAME_UPDATED
+    },
+    counts: {},
+    checks: [],
+    issue_count: 0,
+    issues: []
+  };
+
+  function addCheck(name, success, details) {
+    result.checks.push({
+      name: name,
+      success: !!success,
+      details: details || {}
+    });
+
+    if (!success) {
+      result.issues.push({
+        check: name,
+        issue: 'CHECK_FAILED',
+        details: details || {}
+      });
+    }
+  }
+
+  try {
+    const supabaseOptions = {
+      backend_mode: 'supabase'
+    };
+
+    addCheck('DEFAULT_BACKEND_STILL_SPREADSHEET', result.default_backend_mode === REPO_BACKEND_MODES.SPREADSHEET, {
+      actual: result.default_backend_mode
+    });
+
+    addCheck('SUPABASE_STAGING_WRITE_FLAG_STILL_OFF', result.supabase_staging_write_test_enabled === false, {
+      actual: result.supabase_staging_write_test_enabled
+    });
+
+    const spreadsheetServices = MasterDataRepository.getServiceCatalogRaw({
+      backend_mode: 'spreadsheet'
+    });
+
+    const supabaseServices = MasterDataRepository.getServiceCatalogRaw(supabaseOptions);
+    const supabaseActiveServices = MasterDataRepository.listActiveServices(supabaseOptions);
+    const supabaseInactiveServices = MasterDataRepository.listInactiveServices(supabaseOptions);
+    const supabaseOrthoInstallServices = MasterDataRepository.listActiveOrthoInstallServices(supabaseOptions);
+    const supabaseOrthoControlServices = MasterDataRepository.listActiveOrthoControlServices(supabaseOptions);
+
+    result.counts.spreadsheet_service_catalog = Array.isArray(spreadsheetServices) ? spreadsheetServices.length : -1;
+    result.counts.supabase_service_catalog = Array.isArray(supabaseServices) ? supabaseServices.length : -1;
+    result.counts.supabase_active_services = Array.isArray(supabaseActiveServices) ? supabaseActiveServices.length : -1;
+    result.counts.supabase_inactive_services = Array.isArray(supabaseInactiveServices) ? supabaseInactiveServices.length : -1;
+    result.counts.supabase_ortho_install_services = Array.isArray(supabaseOrthoInstallServices) ? supabaseOrthoInstallServices.length : -1;
+    result.counts.supabase_ortho_control_services = Array.isArray(supabaseOrthoControlServices) ? supabaseOrthoControlServices.length : -1;
+
+    addCheck('SUPABASE_SERVICE_CATALOG_READABLE', Array.isArray(supabaseServices), {
+      row_count: result.counts.supabase_service_catalog
+    });
+
+    addCheck('SUPABASE_SERVICE_CATALOG_BASELINE_COUNT_100', result.counts.supabase_service_catalog === 100, {
+      actual: result.counts.supabase_service_catalog,
+      expected: 100
+    });
+
+    addCheck('SUPABASE_ACTIVE_INACTIVE_COUNT_MATCH', result.counts.supabase_service_catalog === result.counts.supabase_active_services + result.counts.supabase_inactive_services, {
+      service_count: result.counts.supabase_service_catalog,
+      active_count: result.counts.supabase_active_services,
+      inactive_count: result.counts.supabase_inactive_services
+    });
+
+    addCheck('SUPABASE_ORTHO_COUNTS_BASELINE', result.counts.supabase_ortho_install_services === 8 && result.counts.supabase_ortho_control_services === 10, {
+      ortho_install_count: result.counts.supabase_ortho_install_services,
+      expected_ortho_install_count: 8,
+      ortho_control_count: result.counts.supabase_ortho_control_services,
+      expected_ortho_control_count: 10
+    });
+
+    const existingById = MasterDataRepository.findServiceById(
+      MASTER_DATA_PHASE_7B_TEST_SERVICE.SERVICE_ID,
+      supabaseOptions
+    );
+
+    const existingByName = MasterDataRepository.findServiceByName(
+      MASTER_DATA_PHASE_7B_TEST_SERVICE.SERVICE_NAME,
+      supabaseOptions
+    );
+
+    const existingByUpdatedName = MasterDataRepository.findServiceByName(
+      MASTER_DATA_PHASE_7B_TEST_SERVICE.SERVICE_NAME_UPDATED,
+      supabaseOptions
+    );
+
+    addCheck('TEST_SERVICE_ID_NOT_EXISTING_BEFORE_7B', !existingById, {
+      service_id: MASTER_DATA_PHASE_7B_TEST_SERVICE.SERVICE_ID,
+      exists: !!existingById
+    });
+
+    addCheck('TEST_SERVICE_NAME_NOT_EXISTING_BEFORE_7B', !existingByName && !existingByUpdatedName, {
+      service_name: MASTER_DATA_PHASE_7B_TEST_SERVICE.SERVICE_NAME,
+      service_name_updated: MASTER_DATA_PHASE_7B_TEST_SERVICE.SERVICE_NAME_UPDATED,
+      name_exists: !!existingByName,
+      updated_name_exists: !!existingByUpdatedName
+    });
+
+    const payload = buildMasterDataPhase7BTestServicePayload_();
+
+    addCheck('TEST_SERVICE_PAYLOAD_VALID_SHAPE', !!(
+      payload &&
+      payload.service_id === MASTER_DATA_PHASE_7B_TEST_SERVICE.SERVICE_ID &&
+      payload.service_name === MASTER_DATA_PHASE_7B_TEST_SERVICE.SERVICE_NAME &&
+      Number(payload.default_price || 0) > 0 &&
+      payload.is_active === true &&
+      payload.is_ortho_install === false &&
+      payload.is_ortho_control === false
+    ), {
+      payload: payload
+    });
+
+    let explicitInsertBlocked = false;
+    let explicitInsertMessage = '';
+
+    try {
+      dbSupabaseInsertStaging7A_(
+        REPO_TABLES.SERVICE_CATALOG,
+        payload,
+        {
+          stage: '7B'
+        }
+      );
+    } catch (errInsert) {
+      explicitInsertBlocked = true;
+      explicitInsertMessage = errInsert && errInsert.message ? errInsert.message : String(errInsert || '');
+    }
+
+    addCheck('SERVICE_CATALOG_INSERT_STILL_BLOCKED_WHEN_FLAG_FALSE', explicitInsertBlocked, {
+      message: explicitInsertMessage
+    });
+
+    result.issue_count = result.issues.length;
+    result.success = result.issue_count === 0;
+
+    Logger.log(JSON.stringify(result, null, 2));
+    return result;
+
+  } catch (err) {
+    const errorResult = {
+      success: false,
+      stage: '7B-1',
+      checked_at: typeof nowIso === 'function' ? nowIso() : new Date().toISOString(),
+      message: err && err.message ? err.message : String(err || 'Unknown error')
+    };
+
+    Logger.log(JSON.stringify(errorResult, null, 2));
+    return errorResult;
+  }
+}
