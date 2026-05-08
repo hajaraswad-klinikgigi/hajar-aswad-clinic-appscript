@@ -479,6 +479,380 @@ function dbBatchInsert_(tableName, objects, options) {
 }
 
 /* =========================================================
+   SUPABASE STAGING EXPLICIT WRITE HELPERS - PHASE 7A-3
+
+   Catatan aman:
+   - Helper ini eksplisit untuk Supabase staging Fase 7.
+   - Tidak mengubah dbInsert_/dbUpdateById_/dbDeleteById_ lama.
+   - Tidak dipakai otomatis oleh service/UI.
+   - Tetap blocked saat REPO_SUPABASE_STAGING_WRITE_TEST_ENABLED false.
+   ========================================================= */
+
+function dbAssertSupabaseStagingWriteHelpers7A_() {
+  const requiredHelpers = [
+    'supabaseStagingInsert7A_',
+    'supabaseStagingPatchByFilters7A_',
+    'supabaseStagingDeleteByFilters7A_',
+    'repoAssertSupabaseStagingWriteAllowed_'
+  ];
+
+  const missing = requiredHelpers.filter(function(fnName) {
+    return typeof this[fnName] !== 'function';
+  }, this);
+
+  if (missing.length) {
+    throw new Error('Helper Supabase staging write 7A belum tersedia: ' + missing.join(', '));
+  }
+
+  return true;
+}
+
+function dbBuildSupabaseStagingWriteOptions7A_(options, operationName) {
+  const opts = Object.assign({}, options || {});
+
+  return Object.assign({}, opts, {
+    backend_mode: REPO_BACKEND_MODES.SUPABASE,
+    write_intent: typeof repoGetSupabaseStagingWriteIntent_ === 'function'
+      ? repoGetSupabaseStagingWriteIntent_()
+      : 'SUPABASE_STAGING_MUTATION_TEST',
+    stage: opts.stage || '7A',
+    operation: operationName || opts.operation || 'DB_SUPABASE_STAGING_WRITE_7A'
+  });
+}
+
+function dbBuildSupabaseEqFilter7A_(fieldName, value) {
+  const keyField = String(fieldName || '').trim();
+  const normalizedValue = String(value || '').trim();
+  const filter = {};
+
+  if (!keyField) {
+    throw new Error('Field filter Supabase staging tidak boleh kosong');
+  }
+
+  if (!normalizedValue) {
+    throw new Error('Value filter Supabase staging tidak boleh kosong');
+  }
+
+  filter[keyField] = 'eq.' + normalizedValue;
+
+  return filter;
+}
+
+function dbAssertSupabaseStagingSafeUpdateDeleteById7A_(tableName, idFieldName) {
+  const normalizedTableName = dbNormalizeTableName_(tableName);
+  const keyField = String(idFieldName || dbGetPrimaryKeyForTable_(normalizedTableName) || '').trim();
+
+  if (!keyField) {
+    throw new Error('Primary key tidak ditemukan untuk table: ' + normalizedTableName);
+  }
+
+  if (
+    normalizedTableName === REPO_TABLES.TREATMENT_ITEMS &&
+    keyField === repoGetPrimaryKeyForTable_(REPO_TABLES.TREATMENT_ITEMS)
+  ) {
+    throw new Error(
+      'Update/delete TreatmentItems via legacy treatment_item_id diblokir. ' +
+      'ID legacy TreatmentItems tidak dijamin unik; gunakan UUID internal Supabase pada fase khusus jika diperlukan.'
+    );
+  }
+
+  return true;
+}
+
+function dbNormalizeSupabaseStagingWriteResult7A_(response, operationName, tableName) {
+  const normalizedOperationName = String(operationName || 'SUPABASE_STAGING_WRITE_7A').trim();
+  const normalizedTableName = dbNormalizeTableName_(tableName);
+
+  if (!response || !response.success) {
+    throw new Error(
+      normalizedOperationName + ' gagal untuk table ' + normalizedTableName +
+      '. Status: ' + (response ? response.status_code : 'NO_RESPONSE') +
+      '. Body: ' + JSON.stringify(response ? response.body : null)
+    );
+  }
+
+  return {
+    success: true,
+    operation: normalizedOperationName,
+    table_name: normalizedTableName,
+    target_table: response.target_table || dbGetSupabaseTargetTableForSheet_(normalizedTableName),
+    status_code: response.status_code,
+    row_count: Array.isArray(response.body) ? response.body.length : null,
+    body: response.body
+  };
+}
+
+function dbSupabaseInsertStaging7A_(tableName, obj, options) {
+  const normalizedTableName = dbNormalizeTableName_(tableName);
+  const data = Object.assign({}, obj || {});
+  const accessOptions = dbBuildSupabaseStagingWriteOptions7A_(
+    options,
+    'DB_SUPABASE_INSERT_7A'
+  );
+
+  dbAssertSupabaseStagingWriteHelpers7A_();
+
+  const response = supabaseStagingInsert7A_(
+    normalizedTableName,
+    data,
+    accessOptions
+  );
+
+  return dbNormalizeSupabaseStagingWriteResult7A_(
+    response,
+    'DB_SUPABASE_INSERT_7A',
+    normalizedTableName
+  );
+}
+
+function dbSupabaseUpdateByIdStaging7A_(tableName, idFieldName, idValue, patch, options) {
+  const normalizedTableName = dbNormalizeTableName_(tableName);
+  const keyField = String(idFieldName || dbGetPrimaryKeyForTable_(normalizedTableName) || '').trim();
+  const normalizedIdValue = String(idValue || '').trim();
+  const dataPatch = Object.assign({}, patch || {});
+  const accessOptions = dbBuildSupabaseStagingWriteOptions7A_(
+    options,
+    'DB_SUPABASE_UPDATE_BY_ID_7A'
+  );
+
+  if (!keyField) {
+    throw new Error('Primary key tidak ditemukan untuk table: ' + normalizedTableName);
+  }
+
+  if (!normalizedIdValue) {
+    throw new Error('ID update Supabase staging tidak boleh kosong untuk table: ' + normalizedTableName);
+  }
+
+  dbAssertSupabaseStagingSafeUpdateDeleteById7A_(normalizedTableName, keyField);
+  dbAssertSupabaseStagingWriteHelpers7A_();
+
+  const response = supabaseStagingPatchByFilters7A_(
+    normalizedTableName,
+    dbBuildSupabaseEqFilter7A_(keyField, normalizedIdValue),
+    dataPatch,
+    accessOptions
+  );
+
+  return dbNormalizeSupabaseStagingWriteResult7A_(
+    response,
+    'DB_SUPABASE_UPDATE_BY_ID_7A',
+    normalizedTableName
+  );
+}
+
+function dbSupabaseDeleteByIdStaging7A_(tableName, idFieldName, idValue, options) {
+  const normalizedTableName = dbNormalizeTableName_(tableName);
+  const keyField = String(idFieldName || dbGetPrimaryKeyForTable_(normalizedTableName) || '').trim();
+  const normalizedIdValue = String(idValue || '').trim();
+  const accessOptions = dbBuildSupabaseStagingWriteOptions7A_(
+    options,
+    'DB_SUPABASE_DELETE_BY_ID_7A'
+  );
+
+  if (!keyField) {
+    throw new Error('Primary key tidak ditemukan untuk table: ' + normalizedTableName);
+  }
+
+  if (!normalizedIdValue) {
+    throw new Error('ID delete Supabase staging tidak boleh kosong untuk table: ' + normalizedTableName);
+  }
+
+  dbAssertSupabaseStagingSafeUpdateDeleteById7A_(normalizedTableName, keyField);
+  dbAssertSupabaseStagingWriteHelpers7A_();
+
+  const response = supabaseStagingDeleteByFilters7A_(
+    normalizedTableName,
+    dbBuildSupabaseEqFilter7A_(keyField, normalizedIdValue),
+    accessOptions
+  );
+
+  return dbNormalizeSupabaseStagingWriteResult7A_(
+    response,
+    'DB_SUPABASE_DELETE_BY_ID_7A',
+    normalizedTableName
+  );
+}
+
+function testDataAccessPhase7AExplicitSupabaseWriteHelpersLog() {
+  const result = {
+    success: true,
+    stage: '7A-3',
+    checked_at: typeof nowIso === 'function' ? nowIso() : new Date().toISOString(),
+    default_backend_mode: typeof dbGetBackendMode_ === 'function' ? dbGetBackendMode_() : '',
+    supabase_staging_write_test_enabled: typeof repoIsSupabaseStagingWriteTestEnabled_ === 'function'
+      ? repoIsSupabaseStagingWriteTestEnabled_()
+      : null,
+    checks: [],
+    issue_count: 0,
+    issues: []
+  };
+
+  function addCheck(name, success, details) {
+    result.checks.push({
+      name: name,
+      success: !!success,
+      details: details || {}
+    });
+
+    if (!success) {
+      result.issues.push({
+        check: name,
+        issue: 'CHECK_FAILED',
+        details: details || {}
+      });
+    }
+  }
+
+  try {
+    addCheck('DEFAULT_BACKEND_STILL_SPREADSHEET', result.default_backend_mode === REPO_BACKEND_MODES.SPREADSHEET, {
+      actual: result.default_backend_mode
+    });
+
+    addCheck('SUPABASE_STAGING_WRITE_FLAG_DEFAULT_OFF', result.supabase_staging_write_test_enabled === false, {
+      actual: result.supabase_staging_write_test_enabled
+    });
+
+    let helpersAvailable = false;
+    let helpersMessage = '';
+
+    try {
+      helpersAvailable = dbAssertSupabaseStagingWriteHelpers7A_() === true;
+    } catch (errHelpers) {
+      helpersMessage = errHelpers && errHelpers.message ? errHelpers.message : String(errHelpers || '');
+    }
+
+    addCheck('SUPABASE_STAGING_WRITE_HELPERS_AVAILABLE', helpersAvailable, {
+      message: helpersMessage
+    });
+
+    let explicitInsertBlocked = false;
+    let explicitInsertMessage = '';
+
+    try {
+      dbSupabaseInsertStaging7A_(REPO_TABLES.PATIENTS, {
+        patient_id: 'TEST-7A-3-SHOULD-NOT-INSERT',
+        full_name: 'Test 7A-3 Should Not Insert'
+      }, {
+        stage: '7A'
+      });
+    } catch (errInsert) {
+      explicitInsertBlocked = true;
+      explicitInsertMessage = errInsert && errInsert.message ? errInsert.message : String(errInsert || '');
+    }
+
+    addCheck('EXPLICIT_DB_SUPABASE_INSERT_DEFAULT_OFF_BLOCKED', explicitInsertBlocked, {
+      message: explicitInsertMessage
+    });
+
+    let explicitUpdateBlocked = false;
+    let explicitUpdateMessage = '';
+
+    try {
+      dbSupabaseUpdateByIdStaging7A_(
+        REPO_TABLES.PATIENTS,
+        'patient_id',
+        'TEST-7A-3-SHOULD-NOT-UPDATE',
+        {
+          full_name: 'Test 7A-3 Should Not Update'
+        },
+        {
+          stage: '7A'
+        }
+      );
+    } catch (errUpdate) {
+      explicitUpdateBlocked = true;
+      explicitUpdateMessage = errUpdate && errUpdate.message ? errUpdate.message : String(errUpdate || '');
+    }
+
+    addCheck('EXPLICIT_DB_SUPABASE_UPDATE_DEFAULT_OFF_BLOCKED', explicitUpdateBlocked, {
+      message: explicitUpdateMessage
+    });
+
+    let explicitDeleteBlocked = false;
+    let explicitDeleteMessage = '';
+
+    try {
+      dbSupabaseDeleteByIdStaging7A_(
+        REPO_TABLES.PATIENTS,
+        'patient_id',
+        'TEST-7A-3-SHOULD-NOT-DELETE',
+        {
+          stage: '7A'
+        }
+      );
+    } catch (errDelete) {
+      explicitDeleteBlocked = true;
+      explicitDeleteMessage = errDelete && errDelete.message ? errDelete.message : String(errDelete || '');
+    }
+
+    addCheck('EXPLICIT_DB_SUPABASE_DELETE_DEFAULT_OFF_BLOCKED', explicitDeleteBlocked, {
+      message: explicitDeleteMessage
+    });
+
+    let treatmentItemsLegacyUpdateBlocked = false;
+    let treatmentItemsLegacyUpdateMessage = '';
+
+    try {
+      dbSupabaseUpdateByIdStaging7A_(
+        REPO_TABLES.TREATMENT_ITEMS,
+        '',
+        'TEST-LEGACY-TREATMENT-ITEM-ID',
+        {
+          quantity: 1
+        },
+        {
+          stage: '7A'
+        }
+      );
+    } catch (errTreatmentItemUpdate) {
+      treatmentItemsLegacyUpdateBlocked = true;
+      treatmentItemsLegacyUpdateMessage = errTreatmentItemUpdate && errTreatmentItemUpdate.message
+        ? errTreatmentItemUpdate.message
+        : String(errTreatmentItemUpdate || '');
+    }
+
+    addCheck('TREATMENT_ITEMS_LEGACY_ID_UPDATE_BLOCKED', treatmentItemsLegacyUpdateBlocked, {
+      message: treatmentItemsLegacyUpdateMessage
+    });
+
+    let oldDbInsertSupabaseStillBlocked = false;
+    let oldDbInsertMessage = '';
+
+    try {
+      dbInsert_(REPO_TABLES.PATIENTS, {
+        patient_id: 'TEST-OLD-DBINSERT-SHOULD-NOT-INSERT'
+      }, {
+        backend_mode: REPO_BACKEND_MODES.SUPABASE
+      });
+    } catch (errOldInsert) {
+      oldDbInsertSupabaseStillBlocked = true;
+      oldDbInsertMessage = errOldInsert && errOldInsert.message ? errOldInsert.message : String(errOldInsert || '');
+    }
+
+    addCheck('OLD_DB_INSERT_SUPABASE_STILL_BLOCKED', oldDbInsertSupabaseStillBlocked, {
+      message: oldDbInsertMessage
+    });
+
+    result.issue_count = result.issues.length;
+    result.success = result.issue_count === 0;
+
+    Logger.log(JSON.stringify(result, null, 2));
+    return result;
+
+  } catch (err) {
+    const errorResult = {
+      success: false,
+      stage: '7A-3',
+      checked_at: typeof nowIso === 'function' ? nowIso() : new Date().toISOString(),
+      message: err && err.message ? err.message : String(err || 'Unknown error')
+    };
+
+    Logger.log(JSON.stringify(errorResult, null, 2));
+    return errorResult;
+  }
+}
+
+/* =========================================================
    SPREADSHEET INSPECTION HELPERS
    Read-only. Aman untuk aplikasi yang sedang dipakai.
    ========================================================= */
