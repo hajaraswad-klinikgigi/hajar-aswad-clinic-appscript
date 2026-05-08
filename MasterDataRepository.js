@@ -1007,3 +1007,138 @@ function testMasterDataPhase7BPreflightLog() {
     return errorResult;
   }
 }
+
+/* =========================================================
+   PHASE 7B-2 - SERVICE CATALOG INSERT TEST DEFAULT-OFF
+   Tidak menulis data. Memastikan insert helper siap tetapi tetap blocked.
+   ========================================================= */
+
+function testMasterDataPhase7BInsertDummyServiceDefaultOffLog() {
+  const result = {
+    success: true,
+    stage: '7B-2',
+    checked_at: typeof nowIso === 'function' ? nowIso() : new Date().toISOString(),
+    default_backend_mode: typeof dbGetBackendMode_ === 'function' ? dbGetBackendMode_() : '',
+    supabase_staging_write_test_enabled: typeof repoIsSupabaseStagingWriteTestEnabled_ === 'function'
+      ? repoIsSupabaseStagingWriteTestEnabled_()
+      : null,
+    test_service: {
+      service_id: MASTER_DATA_PHASE_7B_TEST_SERVICE.SERVICE_ID,
+      service_name: MASTER_DATA_PHASE_7B_TEST_SERVICE.SERVICE_NAME
+    },
+    counts_before: {},
+    counts_after: {},
+    checks: [],
+    issue_count: 0,
+    issues: []
+  };
+
+  function addCheck(name, success, details) {
+    result.checks.push({
+      name: name,
+      success: !!success,
+      details: details || {}
+    });
+
+    if (!success) {
+      result.issues.push({
+        check: name,
+        issue: 'CHECK_FAILED',
+        details: details || {}
+      });
+    }
+  }
+
+  try {
+    const supabaseOptions = {
+      backend_mode: 'supabase'
+    };
+
+    addCheck('DEFAULT_BACKEND_STILL_SPREADSHEET', result.default_backend_mode === REPO_BACKEND_MODES.SPREADSHEET, {
+      actual: result.default_backend_mode
+    });
+
+    addCheck('SUPABASE_STAGING_WRITE_FLAG_STILL_OFF', result.supabase_staging_write_test_enabled === false, {
+      actual: result.supabase_staging_write_test_enabled
+    });
+
+    const beforeRows = MasterDataRepository.getServiceCatalogRaw(supabaseOptions);
+    const beforeById = MasterDataRepository.findServiceById(
+      MASTER_DATA_PHASE_7B_TEST_SERVICE.SERVICE_ID,
+      supabaseOptions
+    );
+
+    result.counts_before.supabase_service_catalog = Array.isArray(beforeRows) ? beforeRows.length : -1;
+
+    addCheck('BASELINE_SERVICE_COUNT_100_BEFORE_INSERT_TEST', result.counts_before.supabase_service_catalog === 100, {
+      actual: result.counts_before.supabase_service_catalog,
+      expected: 100
+    });
+
+    addCheck('TEST_SERVICE_NOT_EXISTING_BEFORE_INSERT_TEST', !beforeById, {
+      service_id: MASTER_DATA_PHASE_7B_TEST_SERVICE.SERVICE_ID,
+      exists: !!beforeById
+    });
+
+    const payload = buildMasterDataPhase7BTestServicePayload_();
+
+    let insertBlocked = false;
+    let insertMessage = '';
+
+    try {
+      dbSupabaseInsertStaging7A_(
+        REPO_TABLES.SERVICE_CATALOG,
+        payload,
+        {
+          stage: '7B'
+        }
+      );
+    } catch (errInsert) {
+      insertBlocked = true;
+      insertMessage = errInsert && errInsert.message ? errInsert.message : String(errInsert || '');
+    }
+
+    addCheck('DUMMY_SERVICE_INSERT_BLOCKED_WHEN_FLAG_FALSE', insertBlocked, {
+      message: insertMessage
+    });
+
+    const afterRows = MasterDataRepository.getServiceCatalogRaw(supabaseOptions);
+    const afterById = MasterDataRepository.findServiceById(
+      MASTER_DATA_PHASE_7B_TEST_SERVICE.SERVICE_ID,
+      supabaseOptions
+    );
+    const afterByName = MasterDataRepository.findServiceByName(
+      MASTER_DATA_PHASE_7B_TEST_SERVICE.SERVICE_NAME,
+      supabaseOptions
+    );
+
+    result.counts_after.supabase_service_catalog = Array.isArray(afterRows) ? afterRows.length : -1;
+
+    addCheck('SERVICE_COUNT_UNCHANGED_AFTER_BLOCKED_INSERT', result.counts_after.supabase_service_catalog === result.counts_before.supabase_service_catalog, {
+      before_count: result.counts_before.supabase_service_catalog,
+      after_count: result.counts_after.supabase_service_catalog
+    });
+
+    addCheck('TEST_SERVICE_STILL_NOT_INSERTED_AFTER_BLOCKED_INSERT', !afterById && !afterByName, {
+      service_id_exists: !!afterById,
+      service_name_exists: !!afterByName
+    });
+
+    result.issue_count = result.issues.length;
+    result.success = result.issue_count === 0;
+
+    Logger.log(JSON.stringify(result, null, 2));
+    return result;
+
+  } catch (err) {
+    const errorResult = {
+      success: false,
+      stage: '7B-2',
+      checked_at: typeof nowIso === 'function' ? nowIso() : new Date().toISOString(),
+      message: err && err.message ? err.message : String(err || 'Unknown error')
+    };
+
+    Logger.log(JSON.stringify(errorResult, null, 2));
+    return errorResult;
+  }
+}
