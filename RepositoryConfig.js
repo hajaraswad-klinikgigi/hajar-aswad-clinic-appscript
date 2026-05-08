@@ -120,6 +120,217 @@ function repoIsSupabaseBackendMode_(backendMode) {
 }
 
 /* =========================================================
+   SUPABASE STAGING WRITE TEST SWITCH - PHASE 7A
+   ========================================================= */
+
+/**
+ * Switch sementara untuk mutation regression di Supabase staging.
+ *
+ * AMAN:
+ * - Default false = semua write Supabase staging tetap diblokir.
+ * - Hanya boleh true saat test Fase 7 di Supabase staging.
+ * - Tidak memengaruhi dbInsert_/dbUpdate_/dbDelete_ lama.
+ * - Tidak mengubah backend default aplikasi.
+ * - Wajib dikembalikan false setelah test tiap tahap.
+ */
+const REPO_SUPABASE_STAGING_WRITE_TEST_ENABLED = false;
+
+const REPO_SUPABASE_STAGING_WRITE_INTENT = 'SUPABASE_STAGING_MUTATION_TEST';
+
+function repoIsSupabaseStagingWriteTestEnabled_() {
+  return REPO_SUPABASE_STAGING_WRITE_TEST_ENABLED === true;
+}
+
+function repoGetSupabaseStagingWriteIntent_() {
+  return REPO_SUPABASE_STAGING_WRITE_INTENT;
+}
+
+function repoNormalizeSupabaseStagingWriteStage_(stage) {
+  return String(stage || '').trim().toUpperCase();
+}
+
+function repoAssertSupabaseStagingWriteAllowed_(options) {
+  const opts = Object.assign({}, options || {});
+  const operationName = String(opts.operation || 'SUPABASE_STAGING_WRITE').trim() || 'SUPABASE_STAGING_WRITE';
+  const backendMode = repoNormalizeBackendMode_(opts.backend_mode || opts.backendMode || '');
+  const writeIntent = String(opts.write_intent || opts.writeIntent || '').trim();
+  const stage = repoNormalizeSupabaseStagingWriteStage_(opts.stage);
+  const tableName = String(opts.table_name || opts.tableName || '').trim();
+  const issues = [];
+
+  if (!repoIsSupabaseStagingWriteTestEnabled_()) {
+    issues.push('REPO_SUPABASE_STAGING_WRITE_TEST_ENABLED masih false');
+  }
+
+  if (backendMode !== REPO_BACKEND_MODES.SUPABASE) {
+    issues.push('backend_mode harus supabase untuk write staging');
+  }
+
+  if (writeIntent !== REPO_SUPABASE_STAGING_WRITE_INTENT) {
+    issues.push('write_intent tidak valid atau kosong');
+  }
+
+  if (!stage || stage.charAt(0) !== '7') {
+    issues.push('stage write Supabase harus eksplisit Fase 7, contoh: 7A');
+  }
+
+  if (tableName) {
+    try {
+      repoNormalizeTableName_(tableName);
+    } catch (errTable) {
+      issues.push('table_name tidak terdaftar di RepositoryConfig: ' + tableName);
+    }
+  }
+
+  if (issues.length) {
+    throw new Error(operationName + ' diblokir. ' + issues.join(' | '));
+  }
+
+  return true;
+}
+
+function repoCheckSupabaseStagingWriteAllowed_(options) {
+  try {
+    repoAssertSupabaseStagingWriteAllowed_(options);
+    return {
+      allowed: true,
+      message: ''
+    };
+  } catch (err) {
+    return {
+      allowed: false,
+      message: err && err.message ? err.message : String(err || '')
+    };
+  }
+}
+
+function testSupabaseWriteLayerPhase7AGuardDefaultOffLog() {
+  const result = {
+    success: true,
+    stage: '7A-1',
+    checked_at: typeof nowIso === 'function' ? nowIso() : new Date().toISOString(),
+    default_backend_mode: typeof repoGetDefaultBackendMode_ === 'function'
+      ? repoGetDefaultBackendMode_()
+      : '',
+    ui_read_backend_mode: typeof repoGetUiReadBackendMode_ === 'function'
+      ? repoGetUiReadBackendMode_()
+      : '',
+    ui_read_supabase_test_enabled: typeof repoIsUiReadSupabaseTestEnabled_ === 'function'
+      ? repoIsUiReadSupabaseTestEnabled_()
+      : null,
+    supabase_staging_write_test_enabled: repoIsSupabaseStagingWriteTestEnabled_(),
+    checks: [],
+    issue_count: 0,
+    issues: []
+  };
+
+  function addCheck(name, success, details) {
+    result.checks.push({
+      name: name,
+      success: !!success,
+      details: details || {}
+    });
+
+    if (!success) {
+      result.issues.push({
+        check: name,
+        issue: 'CHECK_FAILED',
+        details: details || {}
+      });
+    }
+  }
+
+  try {
+    addCheck('DEFAULT_BACKEND_STILL_SPREADSHEET', result.default_backend_mode === REPO_BACKEND_MODES.SPREADSHEET, {
+      actual: result.default_backend_mode
+    });
+
+    addCheck('UI_READ_BACKEND_STILL_SPREADSHEET', result.ui_read_backend_mode === REPO_BACKEND_MODES.SPREADSHEET, {
+      actual: result.ui_read_backend_mode,
+      ui_read_supabase_test_enabled: result.ui_read_supabase_test_enabled
+    });
+
+    addCheck('SUPABASE_STAGING_WRITE_FLAG_DEFAULT_OFF', result.supabase_staging_write_test_enabled === false, {
+      actual: result.supabase_staging_write_test_enabled
+    });
+
+    const guardCheck = repoCheckSupabaseStagingWriteAllowed_({
+      backend_mode: REPO_BACKEND_MODES.SUPABASE,
+      write_intent: REPO_SUPABASE_STAGING_WRITE_INTENT,
+      stage: '7A',
+      table_name: REPO_TABLES.PATIENTS,
+      operation: 'TEST_SUPABASE_STAGING_WRITE'
+    });
+
+    addCheck('GUARD_DEFAULT_OFF_BLOCKS_WRITE', guardCheck.allowed === false, {
+      allowed: guardCheck.allowed,
+      message: guardCheck.message
+    });
+
+    let existingDataAccessSupabaseWriteStillBlocked = false;
+    let existingDataAccessMessage = '';
+
+    if (typeof dbInsert_ === 'function') {
+      try {
+        dbInsert_(REPO_TABLES.PATIENTS, {
+          patient_id: 'TEST-7A-SHOULD-NOT-INSERT'
+        }, {
+          backend_mode: REPO_BACKEND_MODES.SUPABASE
+        });
+      } catch (errDbInsert) {
+        existingDataAccessSupabaseWriteStillBlocked = true;
+        existingDataAccessMessage = errDbInsert && errDbInsert.message
+          ? errDbInsert.message
+          : String(errDbInsert || '');
+      }
+    } else {
+      existingDataAccessMessage = 'dbInsert_ tidak tersedia saat test dijalankan';
+    }
+
+    addCheck('EXISTING_DATA_ACCESS_SUPABASE_WRITE_STILL_BLOCKED', existingDataAccessSupabaseWriteStillBlocked, {
+      message: existingDataAccessMessage
+    });
+
+    let existingSupabaseClientPostStillBlocked = false;
+    let existingSupabaseClientMessage = '';
+
+    if (typeof supabaseStagingRequest_ === 'function') {
+      try {
+        supabaseStagingRequest_('POST', '/rest/v1/patients', {});
+      } catch (errClientPost) {
+        existingSupabaseClientPostStillBlocked = true;
+        existingSupabaseClientMessage = errClientPost && errClientPost.message
+          ? errClientPost.message
+          : String(errClientPost || '');
+      }
+    } else {
+      existingSupabaseClientMessage = 'supabaseStagingRequest_ tidak tersedia saat test dijalankan';
+    }
+
+    addCheck('EXISTING_SUPABASE_CLIENT_POST_STILL_BLOCKED', existingSupabaseClientPostStillBlocked, {
+      message: existingSupabaseClientMessage
+    });
+
+    result.issue_count = result.issues.length;
+    result.success = result.issue_count === 0;
+
+    Logger.log(JSON.stringify(result, null, 2));
+    return result;
+
+  } catch (err) {
+    const errorResult = {
+      success: false,
+      stage: '7A-1',
+      checked_at: typeof nowIso === 'function' ? nowIso() : new Date().toISOString(),
+      message: err && err.message ? err.message : String(err || 'Unknown error')
+    };
+
+    Logger.log(JSON.stringify(errorResult, null, 2));
+    return errorResult;
+  }
+}
+
+/* =========================================================
    UI READ BACKEND TEST SWITCH - PHASE 6G
    ========================================================= */
 
