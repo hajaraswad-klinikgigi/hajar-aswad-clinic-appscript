@@ -1,0 +1,640 @@
+<style>
+  /* =========================================================
+     1. GLOBAL RESPONSIVE <= 1100px
+     ========================================================= */
+  @media (max-width: 1100px) {
+    .dashboard-kpi-subgrid {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+
+    .dashboard-feedback-summary-grid {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+  }
+
+  /* =========================================================
+     2. GLOBAL RESPONSIVE <= 1024px
+     ========================================================= */
+  @media (max-width: 1024px) {
+    .sidebar {
+      width: 220px;
+      padding: 16px;
+    }
+
+    .main-content {
+      padding: 20px;
+    }
+
+    .content-card {
+      padding: 20px;
+    }
+
+    .table {
+      min-width: 700px;
+    }
+  }
+
+  /* =========================================================
+     3. DASHBOARD RESPONSIVE <= 900px
+     ========================================================= */
+  @media (max-width: 900px) {
+    .dashboard-summary-grid {
+      grid-template-columns: 1fr;
+    }
+  }
+
+  /* =========================================================
+     4. DASHBOARD / APPOINTMENTS / PATIENTS <= 860px
+     ========================================================= */
+  @media (max-width: 860px) {
+    .dashboard-kpi-subgrid,
+    .dashboard-feedback-summary-grid {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .dashboard-panels {
+      grid-template-columns: 1fr;
+    }
+
+    .dashboard-title,
+    .appointments-title,
+    .patients-title {
+      font-size: 28px;
+    }
+
+    .appointments-toolbar,
+    .patients-toolbar {
+      flex-direction: column;
+      align-items: stretch;
+    }
+
+    .appointments-search-wrap,
+    .appointments-toggle-wrap,
+    .patients-search-wrap,
+    .patients-toggle-wrap {
+      width: 100%;
+      min-width: 0;
+    }
+  }
+
+  /* =========================================================
+     5. GLOBAL MOBILE LAYOUT <= 768px
+     ========================================================= */
+  @media (max-width: 768px) {
+    .mobile-menu-btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .app-shell {
+      min-height: 100vh;
+    }
+
+    .sidebar {
+      position: fixed;
+      top: 0;
+      left: 0;
+      height: 100vh;
+      width: 280px;
+      max-width: 82vw;
+      transform: translateX(-100%);
+      box-shadow: 8px 0 24px rgba(0, 0, 0, .18);
+      overflow-y: auto;
+    }
+
+    body.sidebar-open .sidebar {
+      transform: translateX(0);
+    }
+
+    .sidebar-overlay {
+      display: block;
+      position: fixed;
+      inset: 0;
+      background: rgba(15, 23, 42, 0.45);
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.25s ease;
+      z-index: 1001;
+    }
+
+    body.sidebar-open .sidebar-overlay {
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    .main-content {
+      padding: 16px;
+      width: 100%;
+    }
+
+    .topbar {
+      flex-direction: column;
+      align-items: stretch;
+    }
+
+    .topbar-left {
+      width: 100%;
+      justify-content: flex-start;
+    }
+
+    .content-card {
+      padding: 16px;
+      border-radius: 16px;
+    }
+
+    .page-title {
+      font-size: 20px;
+      margin-bottom: 12px;
+    }
+
+    .page-header {
+      flex-direction: column;
+      align-items: stretch;
+    }
+
+    .action-btn {
+      width: 100%;
+      min-width: 0;
+    }
+
+    .toolbar {
+      flex-direction: column;
+      align-items: stretch;
+    }
+
+    .search-box {
+      width: 100%;
+    }
+
+    .pagination {
+      justify-content: flex-start;
+    }
+
+    .toast-container {
+      top: auto;
+      right: 12px;
+      left: 12px;
+      bottom: 12px;
+      max-width: none;
+    }
+
+    .toast {
+      min-width: 0;
+      max-width: none;
+      width: 100%;
+    }
+
+    .table {
+      min-width: 640px;
+    }
+
+    .login-wrap {
+      padding: 16px;
+      align-items: center;
+    }
+
+    .login-card {
+      max-width: 100%;
+      padding: 20px;
+      border-radius: 16px;
+    }
+  }
+
+  /* =========================================================
+     6. MODAL MOBILE <= 768px
+     ========================================================= */
+  @media (max-width: 768px) {
+    .modal {
+      padding: 10px;
+      align-items: flex-end;
+    }
+
+    .modal-box {
+      width: 100%;
+      max-width: 100%;
+      max-height: 92vh;
+      border-radius: 16px 16px 0 0;
+      padding: 16px;
+    }
+
+    .modal-box-sticky,
+    .detail-modal-box-sticky,
+    .patient-photo-preview-modal-box {
+      padding: 0 !important;
+      overflow: hidden;
+    }
+
+    .modal-actions {
+      flex-direction: column;
+    }
+
+    .modal-actions button {
+      width: 100%;
+    }
+
+    .detail-grid {
+      grid-template-columns: 1fr;
+      gap: 6px;
+    }
+
+    .detail-label {
+      margin-top: 8px;
+    }
+
+    .appointment-modal-box,
+    .appointment-detail-modal-box,
+    .patient-modal-box,
+    .patient-detail-modal-box,
+    .treatment-modal-box,
+    .patient-photo-upload-modal-box,
+    .patient-photo-preview-modal-box {
+      width: 100%;
+      max-width: 100%;
+    }
+
+    .detail-modal-header-sticky {
+      padding: 16px 16px 14px;
+    }
+
+    .detail-modal-title-sticky {
+      font-size: 18px;
+    }
+
+    .detail-close-btn {
+      width: 36px;
+      height: 36px;
+      min-width: 36px;
+      border-radius: 10px;
+    }
+
+    .detail-close-btn svg {
+      width: 17px;
+      height: 17px;
+    }
+
+    .modal-form-scroll,
+    .detail-modal-content-scroll,
+    .patient-photo-preview-content {
+      padding: 16px 16px 20px;
+    }
+  }
+
+  /* =========================================================
+     7. TREATMENT / APPOINTMENT MOBILE <= 768px
+     ========================================================= */
+  @media (max-width: 768px) {
+    .treatment-modal-box .table {
+      min-width: 620px;
+    }
+
+    .treatment-actions {
+      justify-content: stretch;
+    }
+
+    .treatment-actions button,
+    .treatment-btn-top {
+      width: 100%;
+      min-width: 0;
+    }
+
+    .appointment-expand-row.open .appointment-expand-box {
+      align-items: stretch;
+    }
+
+    .appointment-expand-box button,
+    .appointment-expand-box .mini-btn.treatment,
+    .appointment-expand-box .mini-btn.cancel,
+    .appointment-expand-box .mini-btn.restore {
+      width: 100%;
+    }
+
+    .appointments-fullscreen-target:fullscreen,
+    .appointments-fullscreen-target.appointments-fullscreen-active {
+      padding: 16px 14px;
+    }
+
+    .appointments-fullscreen-target:fullscreen .appointments-table,
+    .appointments-fullscreen-target.appointments-fullscreen-active .appointments-table {
+      min-width: 760px;
+    }
+  }
+
+  /* =========================================================
+     8. PATIENTS MOBILE <= 768px
+     ========================================================= */
+  @media (max-width: 768px) {
+    .patient-modal-box,
+    .patient-detail-modal-box {
+      width: 100%;
+      max-width: 100%;
+    }
+  }
+
+  /* =========================================================
+     9. DASHBOARD RESPONSIVE <= 520px
+     ========================================================= */
+  @media (max-width: 520px) {
+    .dashboard-header {
+      align-items: stretch;
+    }
+
+    .dashboard-filter-wrap {
+      width: 100%;
+      min-width: 0;
+    }
+
+    .dashboard-filter-select {
+      width: 100%;
+    }
+
+    .dashboard-kpi-subgrid,
+    .dashboard-feedback-summary-grid {
+      grid-template-columns: 1fr;
+    }
+
+    .dashboard-highlight-time {
+      font-size: 24px;
+    }
+
+    .dashboard-highlight-name {
+      font-size: 18px;
+    }
+  }
+
+  /* =========================================================
+     10. GLOBAL SMALL MOBILE <= 480px
+     ========================================================= */
+  @media (max-width: 480px) {
+    h1 {
+      font-size: 22px;
+    }
+
+    .login-card {
+      padding: 18px 16px;
+    }
+
+    .main-content {
+      padding: 12px;
+    }
+
+    .content-card {
+      padding: 14px;
+    }
+
+    .page-title {
+      font-size: 18px;
+    }
+
+    .table th,
+    .table td {
+      padding: 10px;
+      font-size: 13px;
+    }
+
+    .mini-btn {
+      width: 100%;
+      text-align: center;
+    }
+
+    .inline-actions {
+      flex-direction: column;
+      align-items: stretch;
+    }
+
+    .role-badge {
+      font-size: 11px;
+    }
+
+    .topbar-title {
+      font-size: 18px;
+    }
+
+    .topbar-subtitle {
+      font-size: 12px;
+    }
+  }
+
+  /* =========================================================
+     11. DASHBOARD SMALL MOBILE <= 480px
+     ========================================================= */
+  @media (max-width: 480px) {
+    .dashboard-kpi-section {
+      padding: 14px;
+      border-radius: 16px;
+    }
+
+    .dashboard-kpi-subgrid,
+    .dashboard-feedback-summary-grid {
+      gap: 10px;
+    }
+
+    .dashboard-kpi-card {
+      min-height: 86px;
+    }
+
+    .dashboard-kpi-value {
+      font-size: 20px;
+    }
+
+    .dashboard-feedback-summary-value {
+      font-size: 19px;
+    }
+  }
+
+  /* =========================================================
+     12. RECALL RESPONSIVE <= 1024px
+     ========================================================= */
+  @media (max-width: 1024px) {
+    .recall-filter-grid {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+  }
+
+  /* =========================================================
+     13. RECALL RESPONSIVE <= 768px
+     ========================================================= */
+  @media (max-width: 768px) {
+    .recall-toolbar-main {
+      flex-direction: column;
+      align-items: stretch;
+    }
+
+    .recall-search-wrap {
+      width: 100%;
+      min-width: 0;
+    }
+
+    .recall-search-wrap .search-box {
+      width: 100%;
+      max-width: none;
+    }
+
+    .recall-toolbar-actions {
+      justify-content: flex-start;
+    }
+
+    .recall-filter-grid {
+      grid-template-columns: 1fr;
+    }
+
+    .recall-expand-layout {
+      grid-template-columns: 1fr;
+    }
+
+    .recall-expand-grid {
+      grid-template-columns: 1fr;
+    }
+
+    .recall-expand-actions {
+      justify-content: flex-start;
+    }
+
+    .recall-expand-actions .mini-btn {
+      width: 100%;
+    }
+  }
+
+  /* =========================================================
+     14. FINANCE RESPONSIVE <= 1100px
+     ========================================================= */
+  @media (max-width: 1100px) {
+    .finance-table {
+      min-width: 760px;
+    }
+
+    .finance-receivable-table {
+      min-width: 820px;
+    }
+
+    .finance-detail-table {
+      min-width: 620px;
+    }
+
+    .finance-installment-table {
+      min-width: 820px;
+    }
+
+    .finance-installment-editor-table {
+      min-width: 780px;
+    }
+
+    .finance-kpi-grid {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+
+    .finance-detail-grid,
+    .finance-total-strip,
+    .finance-installment-summary-grid {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .finance-receivable-summary-grid,
+    .finance-feedback-summary-grid {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+  }
+
+  /* =========================================================
+     15. FINANCE RESPONSIVE <= 860px
+     ========================================================= */
+  @media (max-width: 860px) {
+    .finance-kpi-grid {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .finance-toolbar,
+    .finance-receivable-toolbar {
+      flex-direction: column;
+      align-items: stretch;
+    }
+
+    .finance-search-wrap,
+    .finance-filter-wrap {
+      width: 100%;
+      min-width: 0;
+    }
+
+    .finance-receivable-summary-grid,
+    .finance-feedback-summary-grid {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .finance-title {
+      font-size: 28px;
+    }
+  }
+
+  /* =========================================================
+     16. FINANCE RESPONSIVE <= 768px
+     ========================================================= */
+  @media (max-width: 768px) {
+    .finance-detail-grid,
+    .finance-total-strip,
+    .finance-installment-summary-grid,
+    .finance-installment-generator,
+    .finance-feedback-detail-grid {
+      grid-template-columns: 1fr;
+    }
+
+    .finance-detail-actions {
+      flex-direction: column;
+    }
+
+    .finance-detail-actions .btn {
+      width: 100%;
+    }
+
+    .finance-installment-generator .btn {
+      width: 100%;
+      margin-bottom: 0;
+    }
+
+    .finance-installment-plan-actions {
+      justify-content: stretch;
+      flex-direction: column;
+      align-items: stretch;
+    }
+
+    .finance-installment-plan-actions .btn {
+      width: 100%;
+      min-width: 0;
+    }
+
+    .finance-invoice-digital-card {
+      flex-direction: column;
+    }
+
+    .finance-invoice-digital-grid {
+      grid-template-columns: 1fr;
+    }
+
+    .finance-invoice-digital-actions {
+      width: 100%;
+    }
+  }
+
+  /* =========================================================
+     17. FINANCE RESPONSIVE <= 520px
+     ========================================================= */
+  @media (max-width: 520px) {
+    .finance-header {
+      align-items: stretch;
+    }
+
+    .finance-period-filter-wrap {
+      width: 100%;
+      min-width: 0;
+    }
+
+    .finance-period-select {
+      width: 100%;
+    }
+
+    .finance-kpi-grid,
+    .finance-receivable-summary-grid,
+    .finance-feedback-summary-grid {
+      grid-template-columns: 1fr;
+    }
+  }
+</style>

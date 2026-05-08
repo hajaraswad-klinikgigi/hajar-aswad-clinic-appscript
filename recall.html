@@ -1,0 +1,1314 @@
+<script>
+  let allRecallRows = [];
+  let filteredRecallRows = [];
+  let recallCurrentPage = 1;
+  const recallPageSize = 5;
+  let recallSearchDebounce = null;
+  let recallContactSubmitInFlight = false;
+  let recallProgramActionInFlight = false;
+  let recallCreateAppointmentInFlight = false;
+  let recallListLoadingInFlight = false;
+  let recallFiltersExpanded = false;
+  let pendingRecallProgramAction = {
+    type: '',
+    ortho_recall_id: '',
+    patient_name: ''
+  };
+
+  function showRecallPage() {
+    setActiveMenu('menuRecall');
+
+    const contentArea = document.getElementById('contentArea');
+    if (!contentArea) return;
+
+    contentArea.innerHTML = `
+      <div class="patients-shell">
+        <div class="patients-header">
+          <div>
+            <div class="patients-eyebrow">Orthodontic Follow Up</div>
+            <h1 class="patients-title">Recall</h1>
+            <div class="patients-subtitle">Track brace patients who need follow-up visits</div>
+          </div>
+
+          <button type="button" id="recallRefreshBtn" class="action-btn" onclick="loadRecallList()">
+            Refresh
+          </button>
+        </div>
+
+        <div class="content-card patients-toolbar-card">
+          <div class="recall-toolbar">
+            <div class="recall-toolbar-main">
+              <div class="patients-search-wrap recall-search-wrap">
+                <label class="patients-toolbar-label">Search</label>
+                <input
+                  type="text"
+                  id="recallSearchInput"
+                  class="search-box"
+                  placeholder="Search patient name, phone, status..."
+                  oninput="handleRecallSearch()"
+                >
+              </div>
+
+              <div class="recall-toolbar-actions">
+                <button
+                  type="button"
+                  id="recallFiltersToggleBtn"
+                  class="recall-filter-chip"
+                  onclick="toggleRecallFilters()"
+                  aria-label="Toggle filters"
+                  title="Filters"
+                >
+                  <svg viewBox="0 0 24 24" fill="none" stroke-width="2">
+                    <path d="M3 5h18"></path>
+                    <path d="M6 12h12"></path>
+                    <path d="M10 19h4"></path>
+                  </svg>
+                  <span class="recall-filter-chip-label">Filters</span>
+                </button>
+
+                <button
+                  type="button"
+                  id="recallFiltersResetBtn"
+                  class="recall-reset-link"
+                  onclick="resetRecallFilters()"
+                  style="display:none;"
+                >
+                  Reset
+                </button>
+              </div>
+            </div>
+
+            <div id="recallFiltersPanel" class="recall-filter-panel">
+              <div class="recall-filter-grid">
+                <div class="recall-filter-wrap">
+                  <label class="patients-toolbar-label">Follow Up Status</label>
+                  <select id="recallStatusFilter" onchange="applyRecallFilters(false)">
+                    <option value="">All status</option>
+                    <option value="upcoming">Upcoming</option>
+                    <option value="due">Due</option>
+                    <option value="overdue">Overdue</option>
+                    <option value="reached_target">Reached Target</option>
+                    <option value="done">Done</option>
+                  </select>
+                </div>
+
+                <div class="recall-filter-wrap">
+                  <label class="patients-toolbar-label">Program Status</label>
+                  <select id="recallProgramFilter" onchange="applyRecallFilters(false)">
+                    <option value="">All program</option>
+                    <option value="active">Active</option>
+                    <option value="completed">Completed</option>
+                    <option value="cancelled">Cancelled</option>
+                  </select>
+                </div>
+
+                <div class="recall-filter-wrap">
+                  <label class="patients-toolbar-label">Contact Status</label>
+                  <select id="recallContactFilter" onchange="applyRecallFilters(false)">
+                    <option value="">All contact</option>
+                    <option value="contacted">Contacted</option>
+                    <option value="not_contacted">Not Contacted</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="content-card">
+          <div class="patients-table-head">
+            <div>
+              <h3 class="patients-section-title">Recall List</h3>
+              <div class="patients-section-subtitle">Active monitoring for orthodontic follow-up</div>
+            </div>
+          </div>
+
+          <div class="table-wrapper">
+            <table class="table recall-table">
+              <thead>
+                <tr>
+                  <th>Patient</th>
+                  <th>Install Date</th>
+                  <th>Controls</th>
+                  <th>Next Due</th>
+                  <th>Follow Up</th>
+                  <th class="recall-action-col">Action</th>
+                </tr>
+              </thead>
+              <tbody id="recallTableBody">
+                <tr>
+                  <td colspan="6">Memuat data...</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div class="pagination">
+            <button type="button" onclick="prevRecallPage()">Prev</button>
+            <div id="recallPaginationInfo" class="pagination-info">Halaman 1 dari 1</div>
+            <button type="button" onclick="nextRecallPage()">Next</button>
+          </div>
+        </div>
+      </div>
+
+      <div id="recallContactModal" class="modal hidden">
+        <div class="modal-box modal-box-sticky" style="width:680px; max-width:100%;">
+          <div class="detail-modal-header-sticky">
+            <h2 class="detail-modal-title-sticky">Log Recall Contact</h2>
+
+            <button
+              type="button"
+              class="detail-close-btn"
+              onclick="closeRecallContactModal()"
+              aria-label="Tutup modal recall contact"
+              title="Tutup"
+            >
+              <svg viewBox="0 0 24 24" fill="none" stroke-width="2">
+                <path d="M6 6l12 12"></path>
+                <path d="M18 6l-12 12"></path>
+              </svg>
+            </button>
+          </div>
+
+          <div class="modal-form-scroll">
+            <form onsubmit="submitRecallContact(event)">
+              <input type="hidden" id="recall_contact_id_hidden">
+
+              <label>Patient</label>
+              <input type="text" id="recall_contact_patient_name" readonly>
+
+              <label>Phone</label>
+              <input type="text" id="recall_contact_phone" readonly>
+
+              <label>Next Due</label>
+              <input type="text" id="recall_contact_next_due" readonly>
+
+              <label>Follow Up Status</label>
+              <input type="text" id="recall_contact_followup_status" readonly>
+
+              <label>Last Contact Date</label>
+              <input type="text" id="recall_contact_last_date" readonly>
+
+              <label>Contact Note</label>
+              <textarea
+                id="recall_contact_note"
+                placeholder="Contoh: Sudah dihubungi, pasien janji datang minggu depan"
+              ></textarea>
+              <div id="error_recall_contact_note" class="field-error"></div>
+
+              <div class="modal-actions modal-actions-right">
+                <button type="button" class="btn btn-secondary" onclick="closeRecallContactModal()">Batal</button>
+                <button type="submit" class="btn btn-primary" id="recallContactSubmitBtn">Save Contact</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      </div>
+      <div id="recallProgramActionModal" class="modal hidden">
+        <div class="modal-box modal-box-sticky" style="width:620px; max-width:100%;">
+          <div class="detail-modal-header-sticky">
+            <h2 class="detail-modal-title-sticky" id="recallProgramActionTitle">Program Recall</h2>
+
+            <button
+              type="button"
+              class="detail-close-btn"
+              onclick="closeRecallProgramActionModal()"
+              aria-label="Tutup modal program recall"
+              title="Tutup"
+            >
+              <svg viewBox="0 0 24 24" fill="none" stroke-width="2">
+                <path d="M6 6l12 12"></path>
+                <path d="M18 6l-12 12"></path>
+              </svg>
+            </button>
+          </div>
+
+          <div class="modal-form-scroll">
+            <input type="hidden" id="recall_program_action_id_hidden">
+            <input type="hidden" id="recall_program_action_type_hidden">
+
+            <div id="recallProgramActionMessage" style="color:#475569; line-height:1.6; margin-bottom:14px;"></div>
+
+            <label>Catatan / Alasan</label>
+            <textarea
+              id="recall_program_action_reason"
+              placeholder="Contoh: Program kontrol behel sudah selesai / pasien tidak melanjutkan program"
+            ></textarea>
+
+            <div class="modal-actions modal-actions-right">
+              <button type="button" class="btn btn-secondary" onclick="closeRecallProgramActionModal()">Batal</button>
+              <button type="button" class="btn btn-primary" id="recallProgramActionSubmitBtn" onclick="submitRecallProgramAction()">Simpan</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    `;
+
+    recallFiltersExpanded = false;
+    updateRecallFilterControls();
+    loadRecallList();
+  }
+
+  function loadRecallList() {
+    if (isRecallWorkflowBusy()) {
+      showRecallWorkflowBusyToast();
+      return;
+      }
+      
+    if (recallListLoadingInFlight) return;
+
+    const tbody = document.getElementById('recallTableBody');
+
+    recallListLoadingInFlight = true;
+    setRecallRefreshButtonState(true);
+
+    if (tbody) {
+      tbody.innerHTML = `
+        <tr>
+          <td colspan="6">Memuat data...</td>
+        </tr>
+      `;
+    }
+
+    google.script.run
+      .withSuccessHandler(function(res) {
+        recallListLoadingInFlight = false;
+        setRecallRefreshButtonState(false);
+
+        if (!res || !res.success) {
+          if (tbody) {
+            tbody.innerHTML = renderRecallTableState(
+              'Gagal memuat data recall',
+              (res && res.message) || 'Silakan klik Refresh untuk mencoba lagi.'
+            );
+          }
+
+          showToast((res && res.message) || 'Gagal memuat data recall', 'error');
+          return;
+        }
+
+        allRecallRows = (res.data || []).map(function(row) {
+          row._search_text = [
+            row.patient_name || '',
+            row.phone || '',
+            row.followup_status || '',
+            row.program_status || '',
+            row.install_date || '',
+            row.next_due_date || '',
+            row.last_control_date || '',
+            row.last_contact_date || '',
+            row.last_contact_note || '',
+            row.notes || '',
+            row.patient_id || ''
+          ].join(' ').toLowerCase();
+
+          return row;
+        });
+
+        applyRecallFilters(false);
+      })
+      .withFailureHandler(function(err) {
+        recallListLoadingInFlight = false;
+        setRecallRefreshButtonState(false);
+
+        if (tbody) {
+          tbody.innerHTML = renderRecallTableState(
+            'Error memuat data recall',
+            err && err.message ? err.message : String(err || 'Terjadi kesalahan.')
+          );
+        }
+
+        showToast('Error: ' + (err && err.message ? err.message : err), 'error');
+      })
+      .getOrthoRecallList();
+  }
+
+  function handleRecallSearch() {
+    if (recallSearchDebounce) {
+      clearTimeout(recallSearchDebounce);
+    }
+
+    recallSearchDebounce = setTimeout(function() {
+      recallCurrentPage = 1;
+      applyRecallFilters(false);
+    }, 220);
+  }
+
+  function getActiveRecallFilterCount() {
+    const statusEl = document.getElementById('recallStatusFilter');
+    const programEl = document.getElementById('recallProgramFilter');
+    const contactEl = document.getElementById('recallContactFilter');
+
+    let count = 0;
+    if (statusEl && String(statusEl.value || '').trim()) count++;
+    if (programEl && String(programEl.value || '').trim()) count++;
+    if (contactEl && String(contactEl.value || '').trim()) count++;
+
+    return count;
+  }
+
+  function updateRecallFilterControls() {
+    const panel = document.getElementById('recallFiltersPanel');
+    const toggleBtn = document.getElementById('recallFiltersToggleBtn');
+    const resetBtn = document.getElementById('recallFiltersResetBtn');
+
+    const activeCount = getActiveRecallFilterCount();
+
+    if (panel) {
+      panel.classList.toggle('show', !!recallFiltersExpanded);
+    }
+
+    if (toggleBtn) {
+      toggleBtn.classList.toggle('active', !!recallFiltersExpanded);
+      toggleBtn.innerHTML = `
+        <svg viewBox="0 0 24 24" fill="none" stroke-width="2">
+          <path d="M3 5h18"></path>
+          <path d="M6 12h12"></path>
+          <path d="M10 19h4"></path>
+        </svg>
+        <span class="recall-filter-chip-label">Filters</span>
+        ${
+          activeCount > 0
+            ? `<span class="recall-filter-chip-count">${activeCount}</span>`
+            : ''
+        }
+      `;
+    }
+
+    if (resetBtn) {
+      resetBtn.style.display = activeCount > 0 ? 'inline-flex' : 'none';
+    }
+  }
+
+  function toggleRecallFilters() {
+    recallFiltersExpanded = !recallFiltersExpanded;
+    updateRecallFilterControls();
+  }
+
+  function resetRecallFilters() {
+    const statusEl = document.getElementById('recallStatusFilter');
+    const programEl = document.getElementById('recallProgramFilter');
+    const contactEl = document.getElementById('recallContactFilter');
+
+    if (statusEl) statusEl.value = '';
+    if (programEl) programEl.value = '';
+    if (contactEl) contactEl.value = '';
+
+    applyRecallFilters(false);
+  }
+
+  function applyRecallFilters(keepPage) {
+    const keywordEl = document.getElementById('recallSearchInput');
+    const statusEl = document.getElementById('recallStatusFilter');
+    const programEl = document.getElementById('recallProgramFilter');
+    const contactEl = document.getElementById('recallContactFilter');
+
+    const keyword = String(keywordEl ? keywordEl.value : '').trim().toLowerCase();
+    const statusValue = String(statusEl ? statusEl.value : '').trim().toLowerCase();
+    const programValue = String(programEl ? programEl.value : '').trim().toLowerCase();
+    const contactValue = String(contactEl ? contactEl.value : '').trim().toLowerCase();
+
+    filteredRecallRows = (allRecallRows || []).filter(function(row) {
+      const matchKeyword = !keyword || String(row._search_text || '').includes(keyword);
+      const matchStatus = !statusValue || String(row.followup_status || '').trim().toLowerCase() === statusValue;
+      const matchProgram = !programValue || String(row.program_status || '').trim().toLowerCase() === programValue;
+
+      const hasContact = !!String(row.last_contact_date || '').trim();
+      const matchContact =
+        !contactValue ||
+        (contactValue === 'contacted' && hasContact) ||
+        (contactValue === 'not_contacted' && !hasContact);
+
+      return matchKeyword && matchStatus && matchProgram && matchContact;
+    });
+
+    filteredRecallRows.sort(function(a, b) {
+      const dueCompare = String(a.next_due_date || '').localeCompare(String(b.next_due_date || ''));
+      if (dueCompare !== 0) return dueCompare;
+
+      return String(a.patient_name || '').localeCompare(String(b.patient_name || ''));
+    });
+
+    if (!keepPage) {
+      recallCurrentPage = 1;
+    }
+
+    updateRecallFilterControls();
+    renderRecallTable();
+  }
+
+  function getRecallFollowupBadge(status) {
+    const value = String(status || '').trim().toLowerCase();
+
+    if (value === 'due') {
+      return '<span class="status-badge scheduled">Due</span>';
+    }
+
+    if (value === 'overdue') {
+      return '<span class="status-badge cancelled">Overdue</span>';
+    }
+
+    if (value === 'reached_target') {
+      return '<span class="status-badge completed">Reached Target</span>';
+    }
+
+    if (value === 'done') {
+      return '<span class="status-badge default">Done</span>';
+    }
+
+    return '<span class="status-badge default">Upcoming</span>';
+  }
+
+  function getRecallProgramBadge(status) {
+    const value = String(status || '').trim().toLowerCase();
+
+    if (value === 'active') {
+      return '<span class="status-badge completed">Active</span>';
+    }
+
+    if (value === 'completed') {
+      return '<span class="status-badge scheduled">Completed</span>';
+    }
+
+    if (value === 'cancelled') {
+      return '<span class="status-badge cancelled">Cancelled</span>';
+    }
+
+    return '<span class="status-badge default">Unknown</span>';
+  }
+
+  function getRecallContactBadge(lastContactDate) {
+    const value = String(lastContactDate || '').trim();
+
+    if (value) {
+      return '<span class="status-badge completed">Contacted</span>';
+    }
+
+    return '<span class="status-badge default">Not Contacted</span>';
+  }
+
+  function formatRecallDate(value) {
+    const s = String(value || '').trim();
+    if (!s) return '-';
+
+    if (/^\d{4}-\d{2}-\d{2}$/.test(s)) {
+      const parts = s.split('-');
+      return parts[2] + '-' + parts[1] + '-' + parts[0];
+    }
+
+    if (/^\d{4}-\d{2}-\d{2}\s/.test(s)) {
+      const datePart = s.slice(0, 10);
+      const parts = datePart.split('-');
+      return parts[2] + '-' + parts[1] + '-' + parts[0];
+    }
+
+    return s;
+  }
+
+  function escapeRecallHtml(value) {
+    return String(value || '')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#039;');
+  }
+
+  function renderRecallTableState(title, subtitle) {
+    return `
+      <tr>
+        <td colspan="6">
+          <div class="patients-empty-state">
+            <div class="patients-empty-title">${escapeRecallHtml(title || '')}</div>
+            <div class="patients-empty-subtitle">${escapeRecallHtml(subtitle || '')}</div>
+          </div>
+        </td>
+      </tr>
+    `;
+  }
+
+  function getRecallSearchKeyword() {
+    const input = document.getElementById('recallSearchInput');
+    return String(input ? input.value : '').trim();
+  }
+
+  function getRecallEmptyStateContent() {
+    const hasRows = Array.isArray(allRecallRows) && allRecallRows.length > 0;
+    const keyword = getRecallSearchKeyword();
+    const activeFilterCount = getActiveRecallFilterCount();
+
+    if (!hasRows) {
+      return {
+        title: 'Belum ada data recall',
+        subtitle: 'Data recall akan muncul setelah pasien memiliki program ortho recall.'
+      };
+    }
+
+    if (keyword || activeFilterCount > 0) {
+      return {
+        title: 'Data recall tidak ditemukan',
+        subtitle: 'Coba ubah kata kunci pencarian, filter status, atau klik Reset.'
+      };
+    }
+
+    return {
+      title: 'Data recall tidak ditemukan',
+      subtitle: 'Belum ada data recall sesuai kondisi saat ini.'
+    };
+  }
+
+  function setRecallRefreshButtonState(isLoading) {
+    const btn = document.getElementById('recallRefreshBtn');
+    if (!btn) return;
+
+    if (isLoading) {
+      btn.disabled = true;
+
+      if (!btn.dataset.idleText) {
+        btn.dataset.idleText = btn.innerText;
+      }
+
+      btn.innerText = 'Loading...';
+      return;
+    }
+
+    btn.disabled = false;
+    btn.innerText = btn.dataset.idleText || 'Refresh';
+    delete btn.dataset.idleText;
+  }
+
+  function isRecallWorkflowBusy() {
+    return recallContactSubmitInFlight ||
+      recallProgramActionInFlight ||
+      recallCreateAppointmentInFlight;
+  }
+
+  function showRecallWorkflowBusyToast() {
+    showToast('Tunggu proses recall selesai', 'info');
+  }
+
+  function buildRecallExpandSelector(recallId) {
+    return '[data-recall-expand-id="' + String(recallId || '').replace(/"/g, '\\"') + '"]';
+  }
+
+  function setRecallRowButtonsDisabled(recallId, isDisabled) {
+    const normalizedId = String(recallId || '').trim();
+    if (!normalizedId) return;
+
+    const mainRow = document.getElementById('recall-row-' + normalizedId);
+    if (mainRow) {
+      mainRow.querySelectorAll('button').forEach(function(btn) {
+        btn.disabled = !!isDisabled;
+      });
+    }
+
+    document.querySelectorAll(buildRecallExpandSelector(normalizedId)).forEach(function(row) {
+      row.querySelectorAll('button').forEach(function(btn) {
+        btn.disabled = !!isDisabled;
+      });
+    });
+  }
+
+  function toggleRecallExpand(recallId) {
+    if (recallCreateAppointmentInFlight || recallProgramActionInFlight) {
+      showRecallWorkflowBusyToast();
+      return;
+    }
+    const targetBtn = document.getElementById('recall-expand-btn-' + recallId);
+    const targetRows = document.querySelectorAll('[data-recall-expand-id="' + recallId + '"]');
+
+    if (!targetRows.length) return;
+
+    const isOpen = Array.from(targetRows).some(function(row) {
+      return row.classList.contains('open');
+    });
+
+    document.querySelectorAll('.recall-expand-row, .recall-cta-row').forEach(function(row) {
+      row.classList.remove('open');
+    });
+
+    document.querySelectorAll('.recall-expand-trigger-btn').forEach(function(btn) {
+      btn.classList.remove('active');
+    });
+
+    if (!isOpen) {
+      targetRows.forEach(function(row) {
+        row.classList.add('open');
+      });
+
+      if (targetBtn) {
+        targetBtn.classList.add('active');
+      }
+    }
+  }
+
+  function renderRecallTable() {
+    const tbody = document.getElementById('recallTableBody');
+    const info = document.getElementById('recallPaginationInfo');
+
+    if (!tbody || !info) return;
+
+    if (!filteredRecallRows || !filteredRecallRows.length) {
+      const emptyState = getRecallEmptyStateContent();
+
+      tbody.innerHTML = renderRecallTableState(
+        emptyState.title,
+        emptyState.subtitle
+      );
+
+      info.innerText = 'Halaman 0 dari 0';
+      return;
+    }
+
+    const totalPages = Math.ceil(filteredRecallRows.length / recallPageSize);
+    if (recallCurrentPage > totalPages) {
+      recallCurrentPage = totalPages;
+    }
+
+    const startIndex = (recallCurrentPage - 1) * recallPageSize;
+    const pageRows = filteredRecallRows.slice(startIndex, startIndex + recallPageSize);
+
+    tbody.innerHTML = pageRows.map(function(row) {
+      const safePatientId = String(row.patient_id || '').replace(/'/g, "\\'");
+      const safeRecallId = String(row.ortho_recall_id || '').replace(/'/g, "\\'");
+      const canCreateAppointment = String(row.program_status || '').trim().toLowerCase() === 'active';
+      const lastContactNote = String(row.last_contact_note || '').trim() || '-';
+      const recallNotes = String(row.notes || '').trim() || '-';
+
+      return `
+        <tr id="recall-row-${row.ortho_recall_id}" class="recall-main-row">
+          <td>
+            <span class="recall-patient-name">${row.patient_name || '-'}</span>
+            <span class="recall-patient-subid">${row.patient_id || '-'}</span>
+          </td>
+
+          <td>${formatRecallDate(row.install_date || '')}</td>
+
+          <td>${Number(row.control_count || 0)}</td>
+
+          <td>${formatRecallDate(row.next_due_date || '')}</td>
+
+          <td>${getRecallFollowupBadge(row.followup_status)}</td>
+
+          <td class="recall-action-col">
+            <div class="recall-action-stack">
+              <div class="recall-icon-actions">
+                <button
+                  type="button"
+                  class="icon-btn detail"
+                  title="Detail pasien"
+                  aria-label="Detail pasien"
+                  onclick="openPatientDetail('${safePatientId}')"
+                >
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z"></path>
+                    <circle cx="12" cy="12" r="3"></circle>
+                  </svg>
+                </button>
+
+                <button
+                  type="button"
+                  class="icon-btn phone"
+                  title="Log contact"
+                  aria-label="Log contact"
+                  onclick="openRecallContactModal('${safeRecallId}')"
+                >
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.8 19.8 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.12 4.18 2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.12.9.33 1.77.63 2.6a2 2 0 0 1-.45 2.11L8 9.91a16 16 0 0 0 6.09 6.09l1.48-1.29a2 2 0 0 1 2.11-.45c.83.3 1.7.51 2.6.63A2 2 0 0 1 22 16.92z"></path>
+                  </svg>
+                </button>
+
+                <button
+                  type="button"
+                  id="recall-expand-btn-${row.ortho_recall_id}"
+                  class="icon-btn expand recall-expand-trigger-btn"
+                  title="Tampilkan detail"
+                  aria-label="Tampilkan detail"
+                  onclick="toggleRecallExpand('${safeRecallId}')"
+                >
+                  <svg class="expand-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M6 9l6 6 6-6"></path>
+                  </svg>
+                </button>
+              </div>
+            </div>
+          </td>
+        </tr>
+
+        <tr class="recall-cta-row" data-recall-expand-id="${row.ortho_recall_id}">
+          <td colspan="5"></td>
+
+          <td class="recall-action-col">
+            <div class="recall-action-stack recall-program-actions">
+              ${
+                canCreateAppointment
+                  ? `
+                    <button
+                      type="button"
+                      class="mini-btn treatment recall-create-btn"
+                      onclick="createAppointmentFromRecall('${safeRecallId}', this)"
+                      title="Create appointment"
+                      aria-label="Create appointment"
+                    >
+                      <span>+ Appointment</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      class="mini-btn restore recall-program-complete-btn"
+                      onclick="openRecallProgramActionModal('complete', '${safeRecallId}', '${String(row.patient_name || '').replace(/'/g, "\\'")}')"
+                      title="Complete program"
+                      aria-label="Complete program"
+                    >
+                      Complete
+                    </button>
+
+                    <button
+                      type="button"
+                      class="mini-btn cancel recall-program-cancel-btn"
+                      onclick="openRecallProgramActionModal('cancel', '${safeRecallId}', '${String(row.patient_name || '').replace(/'/g, "\\'")}')"
+                      title="Cancel program"
+                      aria-label="Cancel program"
+                    >
+                      Cancel
+                    </button>
+                  `
+                  : `
+                    <button
+                      type="button"
+                      class="mini-btn treatment recall-create-btn"
+                      disabled
+                      title="Program tidak aktif"
+                      aria-label="Program tidak aktif"
+                    >
+                      <span>Not Active</span>
+                    </button>
+                  `
+              }
+            </div>
+          </td>
+        </tr>
+
+        <tr class="recall-expand-row" data-recall-expand-id="${row.ortho_recall_id}">
+          <td colspan="6">
+            <div class="recall-expand-box">
+              <div class="recall-expand-grid">
+                <div class="recall-expand-item">
+                  <div class="recall-expand-label">Patient ID</div>
+                  <div class="recall-expand-value">${row.patient_id || '-'}</div>
+                </div>
+
+                <div class="recall-expand-item">
+                  <div class="recall-expand-label">Phone</div>
+                  <div class="recall-expand-value">${row.phone || '-'}</div>
+                </div>
+
+                <div class="recall-expand-item">
+                  <div class="recall-expand-label">Install Date</div>
+                  <div class="recall-expand-value">${formatRecallDate(row.install_date || '')}</div>
+                </div>
+
+                <div class="recall-expand-item">
+                  <div class="recall-expand-label">Last Control</div>
+                  <div class="recall-expand-value">${formatRecallDate(row.last_control_date || '')}</div>
+                </div>
+
+                <div class="recall-expand-item">
+                  <div class="recall-expand-label">Controls</div>
+                  <div class="recall-expand-value">${Number(row.control_count || 0)}</div>
+                </div>
+
+                <div class="recall-expand-item">
+                  <div class="recall-expand-label">Program</div>
+                  <div class="recall-expand-value">${getRecallProgramBadge(row.program_status)}</div>
+                </div>
+
+                <div class="recall-expand-item">
+                  <div class="recall-expand-label">Last Contact Date</div>
+                  <div class="recall-expand-value">${formatRecallDate(row.last_contact_date || '')}</div>
+                </div>
+
+                <div class="recall-expand-item">
+                  <div class="recall-expand-label">Contact Status</div>
+                  <div class="recall-expand-value">${getRecallContactBadge(row.last_contact_date)}</div>
+                </div>
+
+                <div class="recall-expand-item" style="grid-column: 1 / -1;">
+                  <div class="recall-expand-label">Last Contact Note</div>
+                  <div class="recall-expand-value">${escapeRecallHtml(lastContactNote)}</div>
+                </div>
+
+                <div class="recall-expand-item" style="grid-column: 1 / -1;">
+                  <div class="recall-expand-label">Notes</div>
+                  <div class="recall-expand-value">${escapeRecallHtml(recallNotes)}</div>
+                </div>
+              </div>
+            </div>
+          </td>
+        </tr>
+      `;
+    }).join('');
+
+    info.innerText = 'Halaman ' + recallCurrentPage + ' dari ' + totalPages;
+  }
+
+  function prevRecallPage() {
+    if (recallCurrentPage > 1) {
+      recallCurrentPage--;
+      renderRecallTable();
+    }
+  }
+
+  function nextRecallPage() {
+    const totalPages = Math.ceil(filteredRecallRows.length / recallPageSize) || 1;
+    if (recallCurrentPage < totalPages) {
+      recallCurrentPage++;
+      renderRecallTable();
+    }
+  }
+
+  function findRecallRowById(orthoRecallId) {
+    return (allRecallRows || []).find(function(row) {
+      return String(row.ortho_recall_id || '') === String(orthoRecallId || '');
+    }) || null;
+  }
+
+  function clearRecallContactErrors() {
+    const errorEl = document.getElementById('error_recall_contact_note');
+    if (errorEl) errorEl.textContent = '';
+  }
+
+  function openRecallContactModal(orthoRecallId) {
+    if (recallCreateAppointmentInFlight || recallProgramActionInFlight) {
+      showRecallWorkflowBusyToast();
+      return;
+    }
+    clearRecallContactErrors();
+    recallContactSubmitInFlight = false;
+
+    const row = findRecallRowById(orthoRecallId);
+    if (!row) {
+      showToast('Data recall tidak ditemukan', 'error');
+      return;
+    }
+
+    document.getElementById('recall_contact_id_hidden').value = row.ortho_recall_id || '';
+    document.getElementById('recall_contact_patient_name').value = row.patient_name || '';
+    document.getElementById('recall_contact_phone').value = row.phone || '';
+    document.getElementById('recall_contact_next_due').value = formatRecallDate(row.next_due_date || '');
+    document.getElementById('recall_contact_followup_status').value = String(row.followup_status || '').trim() || '-';
+    document.getElementById('recall_contact_last_date').value = formatRecallDate(row.last_contact_date || '');
+    document.getElementById('recall_contact_note').value = row.last_contact_note || '';
+
+    setModalProcessingState('recallContactModal', false, {
+      primaryButtonId: 'recallContactSubmitBtn',
+      idleText: 'Save Contact'
+    });
+
+    const modal = document.getElementById('recallContactModal');
+    if (modal) {
+      modal.style.display = 'flex';
+      modal.classList.remove('hidden');
+    }
+  }
+
+  function closeRecallContactModal() {
+    recallContactSubmitInFlight = false;
+
+    setModalProcessingState('recallContactModal', false, {
+      primaryButtonId: 'recallContactSubmitBtn',
+      idleText: 'Save Contact'
+    });
+
+    clearRecallContactErrors();
+
+    const modal = document.getElementById('recallContactModal');
+    if (modal) {
+      modal.classList.add('hidden');
+      modal.style.display = 'none';
+    }
+  }
+
+  function resetRecallProgramActionState() {
+  recallProgramActionInFlight = false;
+
+  pendingRecallProgramAction = {
+    type: '',
+    ortho_recall_id: '',
+    patient_name: ''
+  };
+
+  setModalProcessingState('recallProgramActionModal', false, {
+    primaryButtonId: 'recallProgramActionSubmitBtn',
+    idleText: 'Simpan'
+  });
+}
+
+function openRecallProgramActionModal(actionType, orthoRecallId, patientName) {
+    if (recallCreateAppointmentInFlight || recallContactSubmitInFlight || recallProgramActionInFlight) {
+      showRecallWorkflowBusyToast();
+      return;
+    }
+    
+  const type = String(actionType || '').trim().toLowerCase();
+  const recallId = String(orthoRecallId || '').trim();
+  const name = String(patientName || '').trim() || 'pasien ini';
+
+  if (!recallId) {
+    showToast('Recall ID tidak ditemukan', 'error');
+    return;
+  }
+
+  if (type !== 'complete' && type !== 'cancel') {
+    showToast('Aksi program tidak valid', 'error');
+    return;
+  }
+
+  recallProgramActionInFlight = false;
+
+  pendingRecallProgramAction = {
+    type: type,
+    ortho_recall_id: recallId,
+    patient_name: name
+  };
+
+  const titleEl = document.getElementById('recallProgramActionTitle');
+  const messageEl = document.getElementById('recallProgramActionMessage');
+  const reasonEl = document.getElementById('recall_program_action_reason');
+  const idEl = document.getElementById('recall_program_action_id_hidden');
+  const typeEl = document.getElementById('recall_program_action_type_hidden');
+  const submitBtn = document.getElementById('recallProgramActionSubmitBtn');
+
+  if (idEl) idEl.value = recallId;
+  if (typeEl) typeEl.value = type;
+  if (reasonEl) reasonEl.value = '';
+
+  if (type === 'complete') {
+    if (titleEl) titleEl.innerText = 'Complete Recall Program';
+    if (messageEl) {
+      messageEl.innerHTML =
+        'Anda akan menandai program recall ortho untuk <strong>' +
+        escapeRecallHtml(name) +
+        '</strong> sebagai <strong>completed</strong>.';
+    }
+    if (submitBtn) {
+      submitBtn.className = 'btn btn-success';
+      submitBtn.innerText = 'Complete Program';
+    }
+  }
+
+  if (type === 'cancel') {
+    if (titleEl) titleEl.innerText = 'Cancel Recall Program';
+    if (messageEl) {
+      messageEl.innerHTML =
+        'Anda akan membatalkan program recall ortho untuk <strong>' +
+        escapeRecallHtml(name) +
+        '</strong>.';
+    }
+    if (submitBtn) {
+      submitBtn.className = 'btn btn-danger';
+      submitBtn.innerText = 'Cancel Program';
+    }
+  }
+
+  setModalProcessingState('recallProgramActionModal', false, {
+    primaryButtonId: 'recallProgramActionSubmitBtn',
+    idleText: type === 'complete' ? 'Complete Program' : 'Cancel Program'
+  });
+
+  const modal = document.getElementById('recallProgramActionModal');
+  if (modal) {
+    modal.style.display = 'flex';
+    modal.classList.remove('hidden');
+  }
+}
+
+function closeRecallProgramActionModal() {
+  resetRecallProgramActionState();
+
+  const modal = document.getElementById('recallProgramActionModal');
+  if (modal) {
+    modal.classList.add('hidden');
+    modal.style.display = 'none';
+  }
+}
+
+function submitRecallProgramAction() {
+  if (recallProgramActionInFlight) return;
+
+  const typeEl = document.getElementById('recall_program_action_type_hidden');
+  const idEl = document.getElementById('recall_program_action_id_hidden');
+  const reasonEl = document.getElementById('recall_program_action_reason');
+
+  const type = String(typeEl ? typeEl.value : '').trim().toLowerCase();
+  const recallId = String(idEl ? idEl.value : '').trim();
+  const reason = String(reasonEl ? reasonEl.value : '').trim();
+
+  if (!recallId) {
+    showToast('Recall ID tidak ditemukan', 'error');
+    return;
+  }
+
+  if (type !== 'complete' && type !== 'cancel') {
+    showToast('Aksi program tidak valid', 'error');
+    return;
+  }
+
+  recallProgramActionInFlight = true;
+
+  setModalProcessingState('recallProgramActionModal', true, {
+    primaryButtonId: 'recallProgramActionSubmitBtn',
+    loadingText: type === 'complete' ? 'Completing...' : 'Cancelling...'
+  });
+
+  const payload = {
+    ortho_recall_id: recallId,
+    reason: reason
+  };
+
+  if (type === 'complete') {
+    google.script.run
+      .withSuccessHandler(handleRecallProgramActionSuccess)
+      .withFailureHandler(handleRecallProgramActionFailure)
+      .completeOrthoRecallProgram(payload);
+    return;
+  }
+
+  google.script.run
+    .withSuccessHandler(handleRecallProgramActionSuccess)
+    .withFailureHandler(handleRecallProgramActionFailure)
+    .cancelOrthoRecallProgram(payload);
+}
+
+function handleRecallProgramActionSuccess(res) {
+  recallProgramActionInFlight = false;
+
+  if (!res || !res.success) {
+    const type = String(pendingRecallProgramAction.type || '').trim().toLowerCase();
+
+    setModalProcessingState('recallProgramActionModal', false, {
+      primaryButtonId: 'recallProgramActionSubmitBtn',
+      idleText: type === 'complete' ? 'Complete Program' : 'Cancel Program'
+    });
+
+    showToast((res && res.message) || 'Gagal memproses program recall', 'error');
+    return;
+  }
+
+  closeRecallProgramActionModal();
+  loadRecallList();
+  showToast(res.message || 'Program recall berhasil diproses', 'success');
+
+  if (currentPatientDetailId) {
+    clearPatientDetailFrontendCache(currentPatientDetailId);
+  }
+}
+
+function handleRecallProgramActionFailure(err) {
+  recallProgramActionInFlight = false;
+
+  const type = String(pendingRecallProgramAction.type || '').trim().toLowerCase();
+
+  setModalProcessingState('recallProgramActionModal', false, {
+    primaryButtonId: 'recallProgramActionSubmitBtn',
+    idleText: type === 'complete' ? 'Complete Program' : 'Cancel Program'
+  });
+
+  showToast('Error: ' + (err && err.message ? err.message : err), 'error');
+}
+
+  function submitRecallContact(e) {
+    e.preventDefault();
+
+    if (recallContactSubmitInFlight) return;
+
+    clearRecallContactErrors();
+
+    const payload = {
+      ortho_recall_id: document.getElementById('recall_contact_id_hidden').value,
+      last_contact_note: document.getElementById('recall_contact_note').value.trim()
+    };
+
+    if (!payload.ortho_recall_id) {
+      showToast('Recall ID tidak ditemukan', 'error');
+      return;
+    }
+
+    recallContactSubmitInFlight = true;
+
+    setModalProcessingState('recallContactModal', true, {
+      primaryButtonId: 'recallContactSubmitBtn',
+      loadingText: 'Saving...'
+    });
+
+    google.script.run
+      .withSuccessHandler(function(res) {
+        recallContactSubmitInFlight = false;
+
+        if (!res || !res.success) {
+          setModalProcessingState('recallContactModal', false, {
+            primaryButtonId: 'recallContactSubmitBtn',
+            idleText: 'Save Contact'
+          });
+
+          showToast((res && res.message) || 'Gagal menyimpan follow up kontak', 'error');
+          return;
+        }
+
+        closeRecallContactModal();
+        loadRecallList();
+        showToast('Follow up kontak berhasil disimpan', 'success');
+      })
+      .withFailureHandler(function(err) {
+        recallContactSubmitInFlight = false;
+
+        setModalProcessingState('recallContactModal', false, {
+          primaryButtonId: 'recallContactSubmitBtn',
+          idleText: 'Save Contact'
+        });
+
+        showToast('Error: ' + (err && err.message ? err.message : err), 'error');
+      })
+      .saveOrthoRecallContact(payload);
+  }
+
+  function getRecallSuggestedAppointmentDate(row) {
+    const today = typeof getTodayYmd === 'function' ? getTodayYmd() : '';
+    const nextDueDate = String((row && row.next_due_date) || '').trim();
+
+    if (/^\d{4}-\d{2}-\d{2}$/.test(nextDueDate) && nextDueDate >= today) {
+      return nextDueDate;
+    }
+
+    return today;
+  }
+
+  function openAppointmentModalFromRecallRow(row) {
+    if (typeof openCreateAppointmentModal !== 'function') {
+      showToast('Fitur appointment belum tersedia', 'error');
+      return;
+    }
+
+    openCreateAppointmentModal();
+
+    const patientIdEl = document.getElementById('appointment_patient_id');
+    const patientSearchEl = document.getElementById('appointment_patient_search');
+    const dateEl = document.getElementById('appointment_date');
+    const timeEl = document.getElementById('appointment_time');
+    const complaintEl = document.getElementById('appointment_complaint');
+    const statusEl = document.getElementById('appointment_status');
+    const resultsEl = document.getElementById('appointment_patient_results');
+
+    if (patientIdEl) patientIdEl.value = row.patient_id || '';
+    if (patientSearchEl) patientSearchEl.value = row.patient_name || '';
+    if (dateEl) dateEl.value = getRecallSuggestedAppointmentDate(row);
+    if (timeEl) timeEl.value = '';
+    if (complaintEl) complaintEl.value = 'Kontrol behel rutin';
+    if (statusEl) statusEl.value = 'scheduled';
+
+    if (typeof setSelectedAppointmentPatientCard === 'function') {
+      setSelectedAppointmentPatientCard(row.patient_name || '', '', row.phone || '', false);
+    }
+
+    if (typeof setAppointmentPatientWarning === 'function') {
+      setAppointmentPatientWarning('');
+    }
+
+    if (typeof clearAppointmentErrors === 'function') {
+      clearAppointmentErrors();
+    }
+
+    if (resultsEl) {
+      resultsEl.style.display = 'none';
+      resultsEl.innerHTML = '';
+    }
+
+    if (typeof checkSelectedAppointmentPatientOpenStatus === 'function') {
+      checkSelectedAppointmentPatientOpenStatus(row.patient_id || '', '');
+    }
+
+    if (timeEl) {
+      setTimeout(function() {
+        timeEl.focus();
+      }, 50);
+    }
+  }
+
+  function setRecallCreateAppointmentButtonState(button, isLoading) {
+    if (!button) return;
+
+    const ctaRow = button.closest('.recall-cta-row');
+    const recallId = ctaRow ? String(ctaRow.getAttribute('data-recall-expand-id') || '').trim() : '';
+
+    if (isLoading) {
+      if (!button.dataset.idleHtml) {
+        button.dataset.idleHtml = button.innerHTML;
+      }
+
+      setRecallRowButtonsDisabled(recallId, true);
+
+      button.innerHTML = '<span>Checking...</span>';
+      button.disabled = true;
+      return;
+    }
+
+    setRecallRowButtonsDisabled(recallId, false);
+
+    if (button.dataset.idleHtml) {
+      button.innerHTML = button.dataset.idleHtml;
+      delete button.dataset.idleHtml;
+    }
+
+    button.disabled = false;
+  }
+
+  function createAppointmentFromRecall(orthoRecallId, button) {
+    if (recallCreateAppointmentInFlight) return;
+
+    if (recallProgramActionInFlight) {
+      showToast('Tunggu proses program recall selesai', 'info');
+      return;
+    }
+
+    const row = findRecallRowById(orthoRecallId);
+
+    if (!row) {
+      showToast('Data recall tidak ditemukan', 'error');
+      return;
+    }
+
+    if (String(row.program_status || '').trim().toLowerCase() !== 'active') {
+      showToast('Hanya recall aktif yang bisa dibuat appointment', 'error');
+      return;
+    }
+
+    recallCreateAppointmentInFlight = true;
+    setRecallCreateAppointmentButtonState(button, true);
+    showToast('Memeriksa appointment aktif pasien...', 'info');
+
+    google.script.run
+      .withSuccessHandler(function(res) {
+        recallCreateAppointmentInFlight = false;
+        setRecallCreateAppointmentButtonState(button, false);
+
+        if (!res || !res.success) {
+          showToast((res && res.message) || 'Gagal memeriksa appointment pasien', 'error');
+          return;
+        }
+
+        if (res.hasOpenAppointment) {
+          showToast('Pasien ini masih memiliki appointment aktif. Selesaikan dulu appointment sebelumnya.', 'error');
+          return;
+        }
+
+        openAppointmentModalFromRecallRow(row);
+      })
+      .withFailureHandler(function(err) {
+        recallCreateAppointmentInFlight = false;
+        setRecallCreateAppointmentButtonState(button, false);
+
+        showToast('Error: ' + (err && err.message ? err.message : err), 'error');
+      })
+      .checkPatientOpenAppointment(row.patient_id || '', '');
+  }
+</script>

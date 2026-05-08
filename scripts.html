@@ -1,0 +1,586 @@
+<script>
+  let currentUser = null;
+  let allPatients = [];
+  let filteredPatients = [];
+  let patientCurrentPage = 1;
+  const patientPageSize = 5;
+  let patientFormMode = 'create';
+  let pendingDeactivatePatientId = null;
+  let pendingDeactivatePatientName = '';
+
+  let patientSubmitInFlight = false;
+
+  function setLoadingState(message) {
+    const msg = document.getElementById('message');
+    if (msg) {
+      msg.textContent = message || 'Memproses...';
+    }
+  }
+
+  function clearLoadingState() {
+    const msg = document.getElementById('message');
+    if (msg) {
+      msg.textContent = '';
+    }
+  }
+
+  function toggleSidebar() {
+    document.body.classList.toggle('sidebar-open');
+  }
+
+  function closeSidebar() {
+    document.body.classList.remove('sidebar-open');
+  }
+
+  function submitLogin(e) {
+    e.preventDefault();
+
+    const username = document.getElementById('username').value.trim();
+    const password = document.getElementById('password').value.trim();
+
+    setLoadingState('Login...');
+
+    google.script.run
+      .withSuccessHandler(function(res) {
+        if (!res.success) {
+          setLoadingState(res.message || 'Login gagal');
+          return;
+        }
+
+        clearLoadingState();
+        currentUser = res.data;
+        showDashboard(res.data);
+        showDashboardPage();
+      })
+      .withFailureHandler(function(err) {
+        setLoadingState('Error: ' + (err && err.message ? err.message : err));
+      })
+      .loginUser(username, password);
+  }
+
+  function showDashboard(user) {
+    closeSidebar();
+
+    document.getElementById('loginView').style.display = 'none';
+    document.getElementById('dashboardView').style.display = 'block';
+
+    const fullName = String((user && user.full_name) || '').trim();
+    const role = String((user && user.role) || '').toLowerCase();
+
+    const welcome = fullName || 'Pengguna';
+
+    document.getElementById('welcomeText').innerText = welcome;
+
+    const subtitleEl = document.getElementById('topbarSubtitle');
+    if (subtitleEl) {
+      subtitleEl.innerText = 'Selamat datang kembali';
+    }
+
+    document.getElementById('roleText').innerText = role || '-';
+  }
+
+  function getCurrentUserRole() {
+    return String((currentUser && currentUser.role) || '').toLowerCase();
+  }
+
+  function getCurrentSessionToken() {
+    return String((currentUser && currentUser.session_token) || '').trim();
+  }
+
+  function getCurrentAuthContext() {
+    return {
+      session_token: getCurrentSessionToken()
+    };
+  }
+
+  function attachAuthContext(payload) {
+    return Object.assign({}, payload || {}, getCurrentAuthContext());
+  }
+
+  function isOwner() {
+    return getCurrentUserRole() === 'owner';
+  }
+
+  function isDokter() {
+    return getCurrentUserRole() === 'dokter';
+  }
+
+  function isAdmin() {
+    return getCurrentUserRole() === 'admin';
+  }
+
+  function logoutLocal() {
+    const sessionToken = getCurrentSessionToken();
+
+    if (sessionToken) {
+      google.script.run.logoutAuthSession(sessionToken);
+    }
+    currentUser = null;
+    allPatients = [];
+    filteredPatients = [];
+    patientCurrentPage = 1;
+    patientFormMode = 'create';
+    pendingDeactivatePatientId = null;
+    pendingDeactivatePatientName = '';
+
+    closeSidebar();
+
+    document.getElementById('dashboardView').style.display = 'none';
+    document.getElementById('loginView').style.display = 'flex';
+    document.getElementById('message').innerText = '';
+    document.getElementById('username').value = '';
+    document.getElementById('password').value = '';
+    document.getElementById('contentArea').innerHTML = '';
+  }
+
+  function showToast(message, type) {
+    const container = document.getElementById('toastContainer');
+    if (!container) return;
+
+    if (container.children.length >= 3) {
+      container.removeChild(container.firstChild);
+    }
+
+    const toast = document.createElement('div');
+    toast.className = 'toast ' + (type || 'info');
+    toast.textContent = message;
+
+    container.appendChild(toast);
+
+    setTimeout(function() {
+      if (toast.parentNode) {
+        toast.remove();
+      }
+    }, 3000);
+  }
+
+  /* =========================================================
+    APP SHARED UTILITY HELPERS
+    Formatter dan escaping umum lintas modul
+    ========================================================= */
+
+  function formatAppRupiah(value) {
+    const num = Number(value || 0);
+    const safeNum = isNaN(num) ? 0 : num;
+
+    return 'Rp ' + safeNum.toLocaleString('id-ID');
+  }
+
+  function formatAppDateDmy(value) {
+    const s = String(value || '').trim();
+
+    if (!s) return '-';
+
+    if (/^\d{4}-\d{2}-\d{2}([T\s]|$)/.test(s)) {
+      const parts = s.slice(0, 10).split('-');
+      return parts[2] + '-' + parts[1] + '-' + parts[0];
+    }
+
+    return s;
+  }
+
+  function escapeAppHtml(value) {
+    return String(value || '')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#039;');
+  }
+
+  function setModalProcessingState(modalId, isLoading, options) {
+    const modal = document.getElementById(modalId);
+    if (!modal) return;
+
+    const opts = options || {};
+    const controls = modal.querySelectorAll('button, input, select, textarea');
+
+    controls.forEach(function(el) {
+      if (isLoading) {
+        if (!el.hasAttribute('data-prev-disabled')) {
+          el.setAttribute('data-prev-disabled', el.disabled ? '1' : '0');
+        }
+        el.disabled = true;
+      } else {
+        const prev = el.getAttribute('data-prev-disabled');
+        if (prev !== null) {
+          el.disabled = prev === '1';
+          el.removeAttribute('data-prev-disabled');
+        } else {
+          el.disabled = false;
+        }
+      }
+    });
+
+    const primaryBtn = opts.primaryButtonId
+      ? document.getElementById(opts.primaryButtonId)
+      : (opts.primarySelector ? modal.querySelector(opts.primarySelector) : null);
+
+    if (primaryBtn) {
+      if (isLoading) {
+        if (!primaryBtn.hasAttribute('data-original-text')) {
+          primaryBtn.setAttribute('data-original-text', primaryBtn.textContent);
+        }
+        primaryBtn.textContent = opts.loadingText || 'Memproses...';
+      } else {
+        primaryBtn.textContent =
+          opts.idleText ||
+          primaryBtn.getAttribute('data-original-text') ||
+          primaryBtn.textContent;
+
+        primaryBtn.removeAttribute('data-original-text');
+      }
+    }
+
+    if (isLoading) {
+      modal.classList.add('modal-is-processing');
+    } else {
+      modal.classList.remove('modal-is-processing');
+    }
+  }
+
+  function clearPatientErrors() {
+    const fieldIds = [
+      'patient_full_name',
+      'patient_gender',
+      'patient_birth_date',
+      'patient_phone',
+      'patient_email',
+      'patient_guardian_name',
+      'patient_guardian_relationship',
+      'patient_guardian_phone',
+      'patient_guardian_email',
+      'patient_address',
+      'patient_allergy_notes',
+      'patient_medical_notes'
+    ];
+
+    fieldIds.forEach(function(id) {
+      const el = document.getElementById(id);
+      if (el) el.classList.remove('input-error');
+
+      const err = document.getElementById('error_' + id);
+      if (err) err.textContent = '';
+    });
+  }
+
+  function applyPatientErrors(errors) {
+    if (!errors) return;
+
+    const map = {
+      full_name: 'patient_full_name',
+      gender: 'patient_gender',
+      birth_date: 'patient_birth_date',
+      phone: 'patient_phone',
+      email: 'patient_email',
+      guardian_name: 'patient_guardian_name',
+      guardian_relationship: 'patient_guardian_relationship',
+      guardian_phone: 'patient_guardian_phone',
+      guardian_email: 'patient_guardian_email',
+      address: 'patient_address',
+      allergy_notes: 'patient_allergy_notes',
+      medical_notes: 'patient_medical_notes'
+    };
+
+    Object.keys(errors).forEach(function(key) {
+      const fieldId = map[key];
+      if (!fieldId) return;
+
+      const input = document.getElementById(fieldId);
+      const errorEl = document.getElementById('error_' + fieldId);
+
+      if (input) input.classList.add('input-error');
+      if (errorEl) errorEl.textContent = errors[key];
+    });
+  }
+
+  function closePatientModal() {
+    patientSubmitInFlight = false;
+
+    setModalProcessingState('patientModal', false, {
+      primaryButtonId: 'patientSubmitBtn',
+      idleText: patientFormMode === 'edit' ? 'Update' : 'Simpan'
+    });
+
+    const modal = document.getElementById('patientModal');
+    if (modal) {
+      modal.classList.add('hidden');
+      modal.style.display = 'none';
+    }
+
+    clearPatientErrors();
+    setPatientGuardianSectionExpanded(false);
+  }
+
+  function submitPatient(e) {
+    e.preventDefault();
+
+    if (patientSubmitInFlight) return;
+
+    clearPatientErrors();
+
+    const payload = {
+      patient_id: document.getElementById('patient_id_hidden').value,
+      full_name: document.getElementById('patient_full_name').value.trim(),
+      gender: document.getElementById('patient_gender').value,
+      birth_date: document.getElementById('patient_birth_date').value.trim(),
+      phone: document.getElementById('patient_phone').value.trim(),
+      email: document.getElementById('patient_email').value.trim(),
+
+      guardian_name: document.getElementById('patient_guardian_name').value.trim(),
+      guardian_relationship: document.getElementById('patient_guardian_relationship').value.trim(),
+      guardian_phone: document.getElementById('patient_guardian_phone').value.trim(),
+      guardian_email: document.getElementById('patient_guardian_email').value.trim(),
+
+      address: document.getElementById('patient_address').value.trim(),
+      allergy_notes: document.getElementById('patient_allergy_notes').value.trim(),
+      medical_notes: document.getElementById('patient_medical_notes').value.trim()
+    };
+
+    const action = patientFormMode === 'edit' ? 'updatePatient' : 'createPatient';
+    const successMessage = patientFormMode === 'edit'
+      ? 'Data pasien berhasil diperbarui'
+      : 'Pasien berhasil ditambahkan';
+
+    patientSubmitInFlight = true;
+
+    setModalProcessingState('patientModal', true, {
+      primaryButtonId: 'patientSubmitBtn',
+      loadingText: patientFormMode === 'edit' ? 'Updating...' : 'Menyimpan...'
+    });
+
+    google.script.run
+      .withSuccessHandler(function(res) {
+        patientSubmitInFlight = false;
+
+        if (!res || !res.success) {
+          setModalProcessingState('patientModal', false, {
+            primaryButtonId: 'patientSubmitBtn',
+            idleText: patientFormMode === 'edit' ? 'Update' : 'Simpan'
+          });
+
+          applyPatientErrors(res && res.errors ? res.errors : null);
+          showToast((res && res.message) || 'Gagal menyimpan pasien', 'error');
+          return;
+        }
+
+        clearPatientDetailFrontendCache(payload.patient_id);
+
+        closePatientModal();
+        patientFormMode = 'create';
+
+        clearPatientForm();
+        clearPatientErrors();
+
+        if (typeof loadPatients === 'function') {
+          loadPatients();
+        }
+
+        showToast(successMessage, 'success');
+      })
+      .withFailureHandler(function(err) {
+        patientSubmitInFlight = false;
+
+        setModalProcessingState('patientModal', false, {
+          primaryButtonId: 'patientSubmitBtn',
+          idleText: patientFormMode === 'edit' ? 'Update' : 'Simpan'
+        });
+
+        showToast('Error: ' + (err && err.message ? err.message : err), 'error');
+      })[action](payload);
+  }
+
+  function clearPatientForm() {
+    document.getElementById('patient_id_hidden').value = '';
+    document.getElementById('patient_full_name').value = '';
+    document.getElementById('patient_gender').value = '';
+    document.getElementById('patient_birth_date').value = '';
+    document.getElementById('patient_phone').value = '';
+    document.getElementById('patient_email').value = '';
+    document.getElementById('patient_guardian_name').value = '';
+    document.getElementById('patient_guardian_relationship').value = '';
+    document.getElementById('patient_guardian_phone').value = '';
+    document.getElementById('patient_guardian_email').value = '';
+    document.getElementById('patient_address').value = '';
+    document.getElementById('patient_allergy_notes').value = '';
+    document.getElementById('patient_medical_notes').value = '';
+    setPatientGuardianSectionExpanded(false);
+  }
+
+  function formatDateForInput(value) {
+    if (!value) return '';
+    const s = String(value);
+    if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+    if (/^\d{4}-\d{2}-\d{2}\s/.test(s)) return s.slice(0, 10);
+    return s;
+  }
+
+  function getTodayYmd() {
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const day = String(now.getDate()).padStart(2, '0');
+    return year + '-' + month + '-' + day;
+  }
+
+  function formatBirthDateInput(input) {
+    let value = String(input.value || '').replace(/\D/g, '').slice(0, 8);
+
+    if (value.length >= 5) {
+      input.value = value.slice(0, 2) + '-' + value.slice(2, 4) + '-' + value.slice(4);
+    } else if (value.length >= 3) {
+      input.value = value.slice(0, 2) + '-' + value.slice(2);
+    } else {
+      input.value = value;
+    }
+
+    if (input && input.id === 'patient_birth_date') {
+      if (isPatientMinorFromForm()) {
+        setPatientGuardianSectionExpanded(true);
+      } else {
+        updatePatientGuardianRuleText();
+      }
+    }
+  }
+
+  function formatPatientNameInput(input) {
+    let value = String(input.value || '');
+
+    // hanya izinkan huruf, spasi, titik, apostrof
+    value = value.replace(/[^A-Za-zÀ-ÿ.\s']/g, '');
+
+    // rapikan spasi
+    value = value.replace(/\s+/g, ' ').trimStart();
+
+    // title case
+    value = value.split(' ').map(function(word) {
+      if (!word) return '';
+      return word.charAt(0).toUpperCase() + word.slice(1).toLowerCase();
+    }).join(' ');
+
+    input.value = value;
+  }
+
+  function convertYmdToDmy(value) {
+    if (!value) return '';
+
+    const s = String(value).trim();
+    const match = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+
+    if (!match) return s;
+
+    return match[3] + '-' + match[2] + '-' + match[1];
+  }
+
+  function getPatientAgeFromBirthDateInput(value) {
+  const s = String(value || '').trim();
+  const match = s.match(/^(\d{2})-(\d{2})-(\d{4})$/);
+
+  if (!match) return null;
+
+  const day = Number(match[1]);
+  const month = Number(match[2]);
+  const year = Number(match[3]);
+
+  const birth = new Date(year, month - 1, day);
+
+  if (
+    birth.getFullYear() !== year ||
+    birth.getMonth() !== month - 1 ||
+    birth.getDate() !== day
+  ) {
+    return null;
+  }
+
+  const today = new Date();
+
+  let age = today.getFullYear() - year;
+  const monthDiff = today.getMonth() - (month - 1);
+
+  if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < day)) {
+    age--;
+  }
+
+  return age;
+}
+
+function isPatientMinorFromForm() {
+  const birthInput = document.getElementById('patient_birth_date');
+  const age = getPatientAgeFromBirthDateInput(birthInput ? birthInput.value : '');
+  return age !== null && age < 17;
+}
+
+function hasGuardianDataInPatientForm() {
+  const ids = [
+    'patient_guardian_name',
+    'patient_guardian_relationship',
+    'patient_guardian_phone',
+    'patient_guardian_email'
+  ];
+
+  return ids.some(function(id) {
+    const el = document.getElementById(id);
+    return !!(el && String(el.value || '').trim());
+  });
+}
+
+function updatePatientGuardianRuleText() {
+  const wrap = document.getElementById('patientGuardianSectionWrap');
+  const text = document.getElementById('patientGuardianRuleText');
+
+  if (!wrap || !text) return;
+
+  const isOpen = wrap.style.display !== 'none';
+
+  if (!isOpen) {
+    text.style.display = 'none';
+    text.textContent = '';
+    return;
+  }
+
+  if (isPatientMinorFromForm()) {
+    text.style.display = 'block';
+    text.textContent = 'Untuk pasien usia di bawah 17 tahun, Nama Wali, Hubungan Wali, No HP Wali, dan Email Wali wajib diisi.';
+    return;
+  }
+
+  text.style.display = 'block';
+  text.textContent = 'Untuk pasien usia 17 tahun ke atas, data wali opsional.';
+}
+
+function setPatientGuardianSectionExpanded(isExpanded) {
+  const wrap = document.getElementById('patientGuardianSectionWrap');
+  const icon = document.getElementById('patientGuardianToggleIcon');
+
+  if (wrap) {
+    wrap.style.display = isExpanded ? 'block' : 'none';
+  }
+
+  if (icon) {
+    icon.textContent = isExpanded ? '▲' : '▼';
+  }
+
+  updatePatientGuardianRuleText();
+}
+
+function togglePatientGuardianSection() {
+  const wrap = document.getElementById('patientGuardianSectionWrap');
+  if (!wrap) return;
+
+  const isOpen = wrap.style.display !== 'none';
+  setPatientGuardianSectionExpanded(!isOpen);
+}
+
+  function setActiveMenu(menuId) {
+    const menus = document.querySelectorAll('.sidebar-menu');
+    menus.forEach(function(btn) {
+      btn.classList.remove('active');
+    });
+
+    const active = document.getElementById(menuId);
+    if (active) {
+      active.classList.add('active');
+    }
+  }
+
+</script>

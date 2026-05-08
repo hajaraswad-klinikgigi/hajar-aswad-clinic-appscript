@@ -1,0 +1,482 @@
+<style>
+  /* =========================================================
+     RECALL PAGE VARIABLES
+     ========================================================= */
+  :root {
+    --recall-col-install-width: 145px;
+    --recall-col-controls-width: 95px;
+    --recall-col-date-width: 145px;
+    --recall-col-status-width: 150px;
+    --recall-action-col-width: 160px;
+    --recall-action-width: 130px;
+  }
+
+
+  /* =========================================================
+     RECALL TOOLBAR
+     Diseragamkan dengan pola toolbar Patients/Appointments
+     ========================================================= */
+  .recall-toolbar {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+
+  .recall-toolbar-main {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    gap: 16px;
+    flex-wrap: wrap;
+  }
+
+  .recall-search-wrap {
+    flex: 1;
+    min-width: 280px;
+  }
+
+  .recall-search-wrap .search-box {
+    width: 320px;
+    max-width: 100%;
+    margin-bottom: 0;
+  }
+
+  .recall-toolbar-actions {
+    min-width: 220px;
+    min-height: 62px;
+    display: flex;
+    align-items: flex-end;
+    justify-content: flex-end;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+
+
+  /* =========================================================
+     RECALL FILTER CHIP
+     ========================================================= */
+  .recall-filter-chip {
+    min-height: 42px;
+    margin-bottom: 0;
+    padding: 0 14px;
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    color: #475569;
+    background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
+    border: 1px solid #dbe3ee;
+    border-radius: 999px;
+    box-shadow: 0 6px 16px rgba(15, 23, 42, 0.06);
+    font-size: 14px;
+    font-weight: 700;
+    line-height: 1;
+    transition:
+      transform 0.18s ease,
+      box-shadow 0.18s ease,
+      border-color 0.18s ease,
+      background 0.18s ease,
+      color 0.18s ease;
+  }
+
+  .recall-filter-chip:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 10px 20px rgba(15, 23, 42, 0.09);
+  }
+
+  .recall-filter-chip:active {
+    transform: translateY(0);
+  }
+
+  .recall-filter-chip.active {
+    color: #0f766e;
+    border-color: #99f6e4;
+    background: linear-gradient(135deg, #f0fdfa 0%, #ecfeff 100%);
+    box-shadow: 0 8px 18px rgba(15, 118, 110, 0.10);
+  }
+
+  .recall-filter-chip svg {
+    width: 16px;
+    height: 16px;
+    stroke: currentColor;
+    flex-shrink: 0;
+  }
+
+  .recall-filter-chip-label {
+    white-space: nowrap;
+  }
+
+  .recall-filter-chip-count {
+    min-width: 22px;
+    height: 22px;
+    padding: 0 7px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    color: #ffffff;
+    background: #0f766e;
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: 800;
+    line-height: 1;
+  }
+
+
+  /* =========================================================
+     RECALL RESET FILTER
+     ========================================================= */
+  .recall-reset-link {
+    margin-bottom: 0;
+    padding: 0;
+    display: inline-flex;
+    align-items: center;
+    color: #64748b;
+    background: transparent;
+    border: none;
+    box-shadow: none;
+    font-size: 14px;
+    font-weight: 700;
+    line-height: 1.2;
+    text-decoration: none;
+  }
+
+  .recall-reset-link:hover {
+    color: #0f172a;
+    text-decoration: underline;
+    transform: none;
+  }
+
+  .recall-reset-link:active {
+    transform: none;
+  }
+
+
+  /* =========================================================
+     RECALL FILTER PANEL
+     ========================================================= */
+  .recall-filter-panel {
+    max-height: 0;
+    overflow: hidden;
+    opacity: 0;
+    transform: translateY(-4px);
+    padding-top: 0;
+    margin-top: 0;
+    transition:
+      max-height 0.25s ease,
+      opacity 0.2s ease,
+      transform 0.2s ease,
+      padding 0.25s ease,
+      margin 0.25s ease;
+  }
+
+  .recall-filter-panel.show {
+    max-height: 260px;
+    opacity: 1;
+    transform: translateY(0);
+    padding-top: 4px;
+    margin-top: 2px;
+  }
+
+  .recall-filter-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 16px;
+    align-items: flex-end;
+  }
+
+  .recall-filter-wrap {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .recall-filter-wrap select {
+    width: 100%;
+    margin-bottom: 0;
+  }
+
+
+  /* =========================================================
+    RECALL TABLE
+    ========================================================= */
+  .recall-table {
+    width: 100%;
+    min-width: 900px;
+    table-layout: fixed;
+  }
+
+  .recall-table th,
+  .recall-table td {
+    vertical-align: top;
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+  }
+
+  .recall-table th:nth-child(1),
+  .recall-table td:nth-child(1) {
+    width: auto;
+  }
+
+  .recall-table th:nth-child(2),
+  .recall-table td:nth-child(2) {
+    width: var(--recall-col-install-width);
+  }
+
+  .recall-table th:nth-child(3),
+  .recall-table td:nth-child(3) {
+    width: var(--recall-col-controls-width);
+    text-align: center;
+  }
+
+  .recall-table th:nth-child(4),
+  .recall-table td:nth-child(4) {
+    width: var(--recall-col-date-width);
+  }
+
+  .recall-table th:nth-child(5),
+  .recall-table td:nth-child(5) {
+    width: var(--recall-col-status-width);
+  }
+
+  .recall-table th:nth-child(6),
+  .recall-table td:nth-child(6) {
+    width: var(--recall-action-col-width);
+    min-width: var(--recall-action-col-width);
+    max-width: var(--recall-action-col-width);
+  }
+
+  .recall-patient-name {
+    display: block;
+    margin-bottom: 6px;
+    color: #0f172a;
+    font-weight: 400;
+    line-height: 1.5;
+  }
+
+  .recall-patient-subid {
+    display: block;
+    color: #64748b;
+    font-size: 12px;
+    line-height: 1.4;
+  }
+
+
+  /* =========================================================
+     RECALL ACTION COLUMN
+     ========================================================= */
+  .recall-action-col {
+    width: var(--recall-action-col-width);
+    min-width: var(--recall-action-col-width);
+    max-width: var(--recall-action-col-width);
+    padding-left: 12px !important;
+    padding-right: 12px !important;
+  }
+
+  .recall-table thead .recall-action-col {
+    text-align: center;
+  }
+
+  .recall-action-stack {
+    width: var(--recall-action-width);
+    min-width: var(--recall-action-width);
+    max-width: var(--recall-action-width);
+    margin-left: auto;
+    margin-right: 0;
+  }
+
+  .recall-icon-actions {
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 8px;
+    flex-wrap: nowrap;
+  }
+
+  .recall-icon-actions .icon-btn {
+    flex-shrink: 0;
+    margin: 0;
+  }
+
+  .recall-expand-trigger-btn.active .expand-chevron {
+    transform: rotate(180deg);
+  }
+
+
+  /* =========================================================
+    RECALL EXPAND ROWS
+    ========================================================= */
+  .recall-expand-row,
+  .recall-cta-row {
+    display: table-row;
+    background: transparent !important;
+  }
+
+  .recall-expand-row:hover,
+  .recall-cta-row:hover {
+    background: transparent !important;
+  }
+
+  .recall-expand-row td,
+  .recall-cta-row td {
+    padding-top: 0 !important;
+    padding-bottom: 0 !important;
+    border: none !important;
+    background: transparent !important;
+  }
+
+  .recall-cta-row td:not(.recall-action-col) {
+    padding: 0 !important;
+  }
+
+  .recall-expand-box {
+    max-height: 0;
+    overflow: hidden;
+    opacity: 0;
+    transform: translateY(-6px);
+    padding: 0 20px;
+    margin: 0;
+    box-sizing: border-box;
+    background: #f8fafc;
+    border: 0 solid transparent;
+    border-radius: 18px;
+    transition:
+      max-height 0.28s ease,
+      opacity 0.22s ease,
+      transform 0.22s ease,
+      padding 0.28s ease,
+      margin 0.28s ease,
+      border-color 0.22s ease;
+  }
+
+  .recall-expand-row.open td {
+    padding-top: 10px !important;
+    padding-bottom: 14px !important;
+  }
+
+  .recall-expand-row.open .recall-expand-box {
+    max-height: 520px;
+    opacity: 1;
+    transform: translateY(0);
+    padding: 18px 20px;
+    margin: 0;
+    border: 1px solid #e5e7eb;
+  }
+
+  .recall-expand-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 18px 28px;
+  }
+
+  .recall-expand-item {
+    min-width: 0;
+  }
+
+  .recall-expand-label {
+    margin-bottom: 4px;
+    color: #475569;
+    font-size: 13px;
+    font-weight: 600;
+  }
+
+  .recall-expand-value {
+    color: #111827;
+    font-size: 14px;
+    line-height: 1.5;
+    word-break: break-word;
+  }
+
+  .recall-cta-row .recall-program-actions {
+    max-height: 0;
+    overflow: hidden;
+    opacity: 0;
+    transform: translateY(-6px);
+    margin-top: 0;
+    transition:
+      max-height 0.28s ease,
+      opacity 0.22s ease,
+      transform 0.22s ease,
+      margin 0.28s ease;
+  }
+
+  .recall-cta-row.open td {
+    padding-top: 12px !important;
+    padding-bottom: 0 !important;
+  }
+
+  .recall-cta-row.open .recall-program-actions {
+    max-height: 180px;
+    opacity: 1;
+    transform: translateY(0);
+    margin-top: 0;
+  }
+
+
+  /* =========================================================
+     RECALL CREATE APPOINTMENT BUTTON
+     ========================================================= */
+  .recall-create-btn {
+    width: var(--recall-action-width) !important;
+    min-width: var(--recall-action-width) !important;
+    max-width: var(--recall-action-width) !important;
+    height: 38px !important;
+    min-height: 38px !important;
+    margin: 0 !important;
+    padding: 8px 12px !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    gap: 0 !important;
+    box-sizing: border-box !important;
+    border-radius: 12px !important;
+    font-size: 12px !important;
+    font-weight: 700 !important;
+    line-height: 1 !important;
+    text-align: center !important;
+    white-space: nowrap !important;
+  }
+
+  .recall-create-btn svg {
+    display: none !important;
+  }
+
+  .recall-create-btn span {
+    display: inline-block;
+    margin: 0;
+    line-height: 1;
+    white-space: nowrap;
+  }
+
+
+  /* =========================================================
+     RECALL PROGRAM ACTION BUTTONS
+     ========================================================= */
+  .recall-program-actions {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+  }
+
+  .recall-program-actions .mini-btn {
+    width: var(--recall-action-width) !important;
+    min-width: var(--recall-action-width) !important;
+    max-width: var(--recall-action-width) !important;
+    height: 38px !important;
+    min-height: 38px !important;
+    margin: 0 !important;
+    white-space: nowrap !important;
+  }
+
+  .recall-program-complete-btn,
+  .recall-program-cancel-btn {
+    border-radius: 12px !important;
+    font-size: 12px !important;
+  }
+
+  .recall-program-actions button:disabled,
+  .recall-icon-actions button:disabled,
+  .recall-create-btn:disabled {
+    opacity: 0.72;
+    cursor: not-allowed;
+    transform: none !important;
+  }
+</style>

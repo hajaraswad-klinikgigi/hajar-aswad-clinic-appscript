@@ -1,0 +1,654 @@
+<style>
+  /* ===== Shared modal base ===== */
+  .modal {
+    position: fixed;
+    inset: 0;
+    z-index: 1100;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+    background: rgba(15, 23, 42, 0.42);
+  }
+
+  .modal.hidden {
+    display: none;
+  }
+
+  .modal-box {
+    width: 560px;
+    max-width: 100%;
+    max-height: 90vh;
+    overflow-y: auto;
+    scroll-behavior: smooth;
+    padding: 24px;
+    background: #fff;
+    border: 1px solid #eef2f7;
+    border-radius: 20px;
+    box-shadow: 0 20px 50px rgba(15, 23, 42, 0.16);
+  }
+
+  .modal-box-sticky {
+    display: flex;
+    flex-direction: column;
+    padding: 0;
+    overflow: hidden;
+  }
+
+  .modal-form-scroll {
+    overflow-y: auto;
+    padding: 20px 24px 24px;
+    scroll-behavior: smooth;
+  }
+
+  .modal-actions {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+
+  .modal-actions button {
+    margin-bottom: 0;
+  }
+
+  .modal-actions.modal-actions-right {
+    justify-content: flex-end;
+  }
+
+  .modal-actions.modal-actions-right .btn {
+    width: auto;
+  }
+
+  .field-error {
+    margin-top: -8px;
+    margin-bottom: 10px;
+    font-size: 12px;
+    color: #b91c1c;
+  }
+
+  .input-error {
+    border-color: #dc2626 !important;
+    background: #fef2f2;
+  }
+
+  .confirm-text {
+    margin-bottom: 16px;
+    color: #374151;
+    line-height: 1.5;
+  }
+
+  .secondary-btn {
+    background: #6b7280;
+  }
+
+  /* ===== Shared detail helpers ===== */
+  .detail-grid {
+    display: grid;
+    grid-template-columns: 160px 1fr;
+    gap: 10px 16px;
+  }
+
+  .detail-label {
+    font-weight: 700;
+    color: #374151;
+  }
+
+  .detail-value {
+    color: #111827;
+    word-break: break-word;
+  }
+
+  /* ===== Sticky detail modal shared ===== */
+  .detail-modal-box-sticky {
+    width: 92%;
+    max-width: 900px;
+    max-height: 90vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    padding: 0;
+  }
+
+  .detail-modal-box-appointment {
+    max-width: 560px;
+  }
+
+  .detail-modal-header-sticky {
+    position: sticky;
+    top: 0;
+    z-index: 5;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 20px 24px 16px;
+    background: #ffffff;
+    border-bottom: 1px solid #eef2f7;
+  }
+
+  .detail-modal-title-sticky {
+    margin: 0;
+    font-size: 20px;
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    color: #0f172a;
+  }
+
+  .detail-modal-content-scroll {
+    overflow-y: auto;
+    padding: 20px 24px 24px;
+  }
+
+  .detail-close-btn {
+    width: 38px;
+    height: 38px;
+    min-width: 38px;
+    margin-bottom: 0;
+    padding: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    color: #dc2626;
+    background: linear-gradient(135deg, #ffffff 0%, #fef2f2 100%);
+    border: 1px solid #fecaca;
+    border-radius: 12px;
+    box-shadow: 0 8px 18px rgba(220, 38, 38, 0.10);
+    transition: transform 0.18s ease, box-shadow 0.18s ease, background 0.18s ease;
+  }
+
+  .detail-close-btn:hover {
+    transform: translateY(-1px);
+    background: linear-gradient(135deg, #fff5f5 0%, #fee2e2 100%);
+    box-shadow: 0 12px 22px rgba(220, 38, 38, 0.16);
+  }
+
+  .detail-close-btn:active {
+    transform: translateY(0);
+  }
+
+  .detail-close-btn svg {
+    width: 18px;
+    height: 18px;
+    stroke: currentColor;
+  }
+
+  /* ===== Appointment modals ===== */
+  .appointment-modal-box {
+    width: 680px;
+    max-width: 100%;
+  }
+
+  .appointment-detail-modal-box {
+    width: 640px;
+    max-width: 100%;
+  }
+
+  .appointment-modal-box h2,
+  .appointment-detail-modal-box h2 {
+    margin-top: 0;
+    margin-bottom: 18px;
+    font-size: 24px;
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    color: #0f172a;
+  }
+
+  .appointment-modal-box .modal-actions {
+    justify-content: flex-end;
+    gap: 12px;
+  }
+
+  .appointment-modal-box .modal-actions button {
+    width: auto;
+    min-width: 140px;
+    padding: 10px 18px;
+    border-radius: 10px;
+  }
+
+  .appointment-modal-box .modal-actions .btn {
+    width: auto;
+  }
+
+  .appointment-modal-box .secondary-btn {
+    background: #6b7280;
+  }
+
+  .appointment-modal-box button[type="submit"] {
+    background: #0f766e;
+  }
+
+  #appointment_patient_warning {
+    margin-top: -4px;
+    margin-bottom: 12px;
+    padding: 10px 12px;
+    color: #9a3412;
+    background: #fff7ed;
+    border: 1px solid #fed7aa;
+    border-radius: 12px;
+  }
+
+  #appointmentDetailContent .detail-label {
+    font-weight: 700;
+    color: #475569;
+  }
+
+  #appointmentDetailContent .detail-value {
+    color: #111827;
+  }
+
+  /* ===== Patient modals ===== */
+  .patient-modal-box {
+    width: 680px;
+    max-width: 100%;
+  }
+
+  .patient-detail-modal-box {
+    width: 92%;
+    max-width: 900px;
+    max-height: 90vh;
+    overflow-y: auto;
+    padding: 20px 24px;
+  }
+
+  .patient-modal-box h2,
+  .patient-detail-modal-box h2 {
+    margin-top: 0;
+    margin-bottom: 18px;
+    font-size: 24px;
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    color: #0f172a;
+  }
+
+  .patient-modal-box .modal-actions {
+    justify-content: flex-end;
+  }
+
+  .patient-modal-box .modal-actions .btn {
+    width: auto;
+  }
+
+  /* ===== Treatment modal ===== */
+  .treatment-modal-box {
+    width: 720px;
+    max-width: 100%;
+    max-height: 90vh;
+    overflow-y: auto;
+    padding: 22px 24px;
+  }
+
+  .treatment-modal-box h2 {
+    margin-top: 0;
+    margin-bottom: 18px;
+    font-size: 24px;
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    color: #0f172a;
+  }
+
+  .treatment-modal-box h3 {
+    font-size: 18px;
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    color: #0f172a;
+  }
+
+  .treatment-modal-box .modal-actions {
+    justify-content: flex-end;
+  }
+
+  .treatment-modal-box .modal-actions .btn {
+    width: auto;
+  }
+
+  .treatment-modal-box .table-wrapper {
+    overflow: hidden;
+    border: 1px solid #eef2f7;
+    border-radius: 16px;
+  }
+
+  .treatment-modal-box .table {
+    min-width: 620px;
+    margin-top: 0;
+  }
+
+  .treatment-modal-box .table th {
+    background: #f8fafc;
+  }
+
+  .treatment-modal-box .table td,
+  .treatment-modal-box .table th {
+    padding: 10px 12px;
+  }
+
+  .treatment-row-select,
+  .treatment-row-input {
+    margin-bottom: 0;
+    border-radius: 10px;
+  }
+
+  .treatment-remove-btn {
+    width: auto;
+    margin-bottom: 0;
+    padding: 6px 10px;
+    font-size: 12px;
+    background: #dc2626;
+    border-radius: 10px;
+  }
+
+  .treatment-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 12px;
+    flex-wrap: wrap;
+    margin-top: 20px;
+  }
+
+  .treatment-actions button {
+    width: auto;
+    min-width: 170px;
+    margin-bottom: 0;
+    padding: 10px 18px;
+    border-radius: 10px;
+  }
+
+  .treatment-btn-primary {
+    color: #fff;
+    background: #0f766e;
+    box-shadow: 0 6px 16px rgba(15, 118, 110, 0.25);
+  }
+
+  .treatment-btn-secondary {
+    color: #374151;
+    background: #e5e7eb;
+  }
+
+  .treatment-btn-top {
+    width: auto;
+    min-width: 170px;
+    margin-bottom: 0;
+    padding: 10px 18px;
+    border-radius: 10px;
+  }
+
+  .treatment-summary-muted {
+    margin-top: 4px;
+    font-size: 12px;
+    color: #6b7280;
+  }
+
+  #treatmentTotalCost {
+    color: #0f766e;
+    font-weight: 700;
+  }
+
+  /* ===== Patient photo upload / preview ===== */
+  .patient-photo-upload-modal-box {
+    width: 92%;
+    max-width: 640px;
+  }
+
+  .patient-photo-preview-modal-box {
+    width: 94%;
+    max-width: 980px;
+    max-height: 92vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    padding: 0;
+  }
+
+  .patient-photo-preview-content {
+    overflow-y: auto;
+    padding: 20px 24px 24px;
+    background: #fff;
+  }
+
+  .patient-photo-preview-content img {
+    display: block;
+    width: 100%;
+    max-height: 72vh;
+    object-fit: contain;
+    background: #f8fafc;
+    border: 1px solid #e5e7eb;
+    border-radius: 16px;
+  }
+
+  .patient-photo-preview-note {
+    margin-top: 14px;
+    font-size: 14px;
+    line-height: 1.6;
+    color: #475569;
+  }
+  
+  #photo_treatment_warning {
+    margin-top: -4px;
+    margin-bottom: 12px;
+    padding: 10px 12px;
+    color: #9a3412;
+    background: #fff7ed;
+    border: 1px solid #fed7aa;
+    border-radius: 12px;
+  }
+
+  /* ===== Patient photo gallery ===== */
+  .patient-photo-treatment-card {
+    border: 1px solid #e5e7eb;
+    border-radius: 16px;
+    padding: 16px;
+    background: linear-gradient(180deg, #ffffff 0%, #fbfdff 100%);
+    box-shadow: 0 8px 24px rgba(15, 23, 42, 0.04);
+  }
+
+  .patient-photo-treatment-header {
+    margin-bottom: 14px;
+  }
+
+  .patient-photo-treatment-title-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+
+  .patient-photo-treatment-title {
+    font-size: 14px;
+    font-weight: 800;
+    color: #0f172a;
+    margin-bottom: 4px;
+  }
+
+  .patient-photo-treatment-subtitle {
+    font-size: 13px;
+    color: #64748b;
+    line-height: 1.5;
+  }
+
+  .patient-photo-columns {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    align-items: start;
+  }
+
+  .patient-photo-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 12px;
+  }
+
+  .patient-photo-card {
+    position: relative;
+    border: 1px solid #e5e7eb;
+    border-radius: 14px;
+    overflow: hidden;
+    background: #fff;
+    box-shadow: 0 8px 18px rgba(15, 23, 42, 0.04);
+    transition: transform 0.18s ease, box-shadow 0.18s ease;
+  }
+
+  .patient-photo-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 14px 28px rgba(15, 23, 42, 0.08);
+  }
+
+  .patient-photo-thumb-btn {
+    display: block;
+    width: 100%;
+    padding: 0;
+    margin: 0;
+    border: none;
+    background: transparent;
+    box-shadow: none;
+    border-radius: 0;
+  }
+
+  .patient-photo-thumb-btn:hover {
+    transform: none;
+    opacity: 1;
+  }
+
+  .patient-photo-thumb-wrap {
+    aspect-ratio: 4 / 3;
+    background: #f8fafc;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+  }
+
+  .patient-photo-thumb-wrap img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+  }
+
+  .patient-photo-meta {
+    padding: 10px 12px;
+  }
+
+  .patient-photo-file-name {
+    font-size: 13px;
+    font-weight: 700;
+    color: #0f172a;
+    margin-bottom: 4px;
+    line-height: 1.4;
+    word-break: break-word;
+  }
+
+  .patient-photo-note {
+    font-size: 12px;
+    color: #64748b;
+    line-height: 1.5;
+    word-break: break-word;
+  }
+
+  .patient-photo-empty {
+    font-size: 13px;
+    color: #64748b;
+    padding: 12px;
+    border: 1px dashed #dbe3ee;
+    border-radius: 12px;
+    background: #f8fafc;
+  }
+
+  .patient-photo-type-badge {
+    position: absolute;
+    top: 10px;
+    left: 10px;
+    z-index: 3;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 68px;
+    height: 30px;
+    padding: 0 10px;
+    border-radius: 999px;
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+    box-shadow: 0 8px 18px rgba(15, 23, 42, 0.10);
+    backdrop-filter: blur(6px);
+  }
+
+  .patient-photo-type-badge.before {
+    background: rgba(239, 246, 255, 0.94);
+    color: #1d4ed8;
+    border: 1px solid #dbeafe;
+  }
+
+  .patient-photo-type-badge.after {
+    background: rgba(240, 253, 244, 0.94);
+    color: #166534;
+    border: 1px solid #dcfce7;
+  }
+
+  .patient-photo-delete-btn {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    z-index: 3;
+    width: 38px;
+    height: 38px;
+    min-width: 38px;
+    padding: 0;
+    margin: 0;
+    border-radius: 12px;
+    border: 1px solid rgba(254, 202, 202, 0.95);
+    background: rgba(255, 255, 255, 0.92);
+    color: #dc2626;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 8px 18px rgba(15, 23, 42, 0.10);
+    backdrop-filter: blur(6px);
+    transition: transform 0.18s ease, background 0.18s ease, box-shadow 0.18s ease, opacity 0.18s ease;
+  }
+
+  .patient-photo-delete-btn:hover {
+    background: #fee2e2;
+    color: #b91c1c;
+    transform: translateY(-1px);
+  }
+
+  .patient-photo-delete-btn:active {
+    transform: translateY(0);
+  }
+
+  .patient-photo-delete-btn svg {
+    width: 18px;
+    height: 18px;
+    stroke: currentColor;
+  }
+
+  .patient-photo-delete-btn.is-locked {
+    opacity: 0.72;
+    background: rgba(248, 250, 252, 0.95);
+    color: #94a3b8;
+    border-color: #e2e8f0;
+  }
+
+  .patient-photo-delete-btn.is-locked:hover {
+    background: #f8fafc;
+    color: #64748b;
+    transform: translateY(-1px);
+  }
+
+    .modal-is-processing button:disabled,
+  .modal-is-processing .detail-close-btn:disabled {
+    opacity: 0.68;
+    cursor: not-allowed;
+    transform: none !important;
+  }
+
+  .modal-is-processing input:disabled,
+  .modal-is-processing select:disabled,
+  .modal-is-processing textarea:disabled {
+    background: #f8fafc;
+    color: #64748b;
+    cursor: not-allowed;
+  }
+</style>

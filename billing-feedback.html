@@ -1,0 +1,1119 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <meta name="theme-color" content="#070b12">
+
+  <script>
+    (function markFeedbackDevice() {
+      function getViewportWidth() {
+        var widths = [];
+
+        if (window.visualViewport && window.visualViewport.width) {
+          widths.push(window.visualViewport.width);
+        }
+
+        if (window.innerWidth) {
+          widths.push(window.innerWidth);
+        }
+
+        if (document.documentElement && document.documentElement.clientWidth) {
+          widths.push(document.documentElement.clientWidth);
+        }
+
+        widths = widths
+          .map(function(value) {
+            return Number(value || 0);
+          })
+          .filter(function(value) {
+            return value > 0;
+          });
+
+        return widths.length ? Math.min.apply(Math, widths) : 1024;
+      }
+
+      function applyFeedbackDeviceClass() {
+        var ua = String(navigator.userAgent || '').toLowerCase();
+        var width = getViewportWidth();
+
+        var isMobileUa = /android|iphone|ipod|mobile|blackberry|iemobile|opera mini/i.test(ua);
+
+        var isCoarsePointer = false;
+        try {
+          isCoarsePointer = window.matchMedia && window.matchMedia('(pointer: coarse)').matches;
+        } catch (err) {
+          isCoarsePointer = false;
+        }
+
+        var root = document.documentElement;
+
+        root.classList.remove('fb-device-phone', 'fb-device-desktop');
+
+        if (width <= 820 || (isMobileUa && width <= 960) || (isCoarsePointer && width <= 900)) {
+          root.classList.add('fb-device-phone');
+        } else {
+          root.classList.add('fb-device-desktop');
+        }
+
+        root.setAttribute('data-feedback-width', Math.round(width || 0));
+      }
+
+      applyFeedbackDeviceClass();
+
+      window.addEventListener('resize', applyFeedbackDeviceClass);
+      window.addEventListener('orientationchange', function() {
+        setTimeout(applyFeedbackDeviceClass, 250);
+      });
+
+      if (window.visualViewport) {
+        window.visualViewport.addEventListener('resize', applyFeedbackDeviceClass);
+      }
+    })();
+  </script>
+
+  <style>
+    :root {
+      --fb-bg: #070b12;
+      --fb-card: #0b1019;
+      --fb-soft: #101827;
+      --fb-border: rgba(148, 163, 184, 0.20);
+      --fb-border-strong: rgba(148, 163, 184, 0.34);
+      --fb-text: #f8fafc;
+      --fb-muted: #b8c4d8;
+      --fb-muted-soft: #8b98ad;
+      --fb-primary: #14b8a6;
+      --fb-primary-dark: #0f766e;
+      --fb-success: #86efac;
+      --fb-danger: #fecaca;
+
+      --fb-title-size: 19.5px;
+      --fb-subtitle-size: 12.5px;
+      --fb-section-size: 13.5px;
+      --fb-label-size: 13px;
+      --fb-field-size: 14.5px;
+      --fb-help-size: 11px;
+      --fb-small-size: 11px;
+      --fb-button-size: 13px;
+
+      --fb-field-height: 38px;
+      --fb-rating-height: 32px;
+      --fb-button-height: 40px;
+    }
+
+    * {
+      box-sizing: border-box;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    html {
+      width: 100%;
+      max-width: 100%;
+      min-height: 100%;
+      margin: 0;
+      padding: 0;
+      background: var(--fb-bg);
+      color: var(--fb-text);
+      -webkit-text-size-adjust: 100%;
+      text-size-adjust: 100%;
+    }
+
+    body.feedback-public-page {
+      width: 100%;
+      max-width: 100%;
+      min-height: 100vh;
+      min-height: 100svh;
+      margin: 0;
+      padding: 0;
+      padding-bottom: max(12px, env(safe-area-inset-bottom));
+      background:
+        radial-gradient(circle at 0% 0%, rgba(20, 184, 166, 0.15), transparent 34%),
+        radial-gradient(circle at 100% 100%, rgba(37, 99, 235, 0.10), transparent 38%),
+        var(--fb-bg);
+      color: var(--fb-text);
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+      font-size: var(--fb-field-size);
+      line-height: 1.5;
+      overflow-x: hidden;
+    }
+
+    .feedback-scale,
+    .feedback-page,
+    .feedback-card,
+    .feedback-header,
+    .feedback-body,
+    #feedbackContent,
+    form {
+      width: 100%;
+      max-width: 100%;
+      min-width: 0;
+      margin-left: 0;
+      margin-right: 0;
+      transform: none;
+    }
+
+    .feedback-scale,
+    .feedback-page {
+      margin: 0;
+      padding: 0;
+    }
+
+    button,
+    select,
+    textarea {
+      font: inherit;
+      max-width: 100%;
+    }
+
+    button {
+      cursor: pointer;
+    }
+
+    .feedback-card {
+      min-height: 100vh;
+      min-height: 100svh;
+      overflow: hidden;
+      border-top: 1px solid var(--fb-border);
+      border-bottom: 1px solid var(--fb-border);
+      border-left: 0;
+      border-right: 0;
+      border-radius: 0;
+      background: rgba(11, 16, 25, 0.97);
+      box-shadow: none;
+    }
+
+    .feedback-header {
+      padding: 11px 10px 11px;
+      border-bottom: 1px solid var(--fb-border);
+      background: linear-gradient(180deg, rgba(255, 255, 255, 0.045), rgba(255, 255, 255, 0.012));
+    }
+
+    .feedback-eyebrow {
+      margin: 0 0 4px;
+      color: var(--fb-primary);
+      font-size: 9px;
+      line-height: 1.2;
+      font-weight: 900;
+      letter-spacing: 0.085em;
+      text-transform: uppercase;
+    }
+
+    .feedback-title {
+      margin: 0 0 5px;
+      color: var(--fb-text);
+      font-size: var(--fb-title-size);
+      line-height: 1.12;
+      font-weight: 900;
+      letter-spacing: -0.04em;
+      overflow-wrap: anywhere;
+      word-break: break-word;
+    }
+
+    .feedback-subtitle {
+      margin: 0;
+      color: var(--fb-muted);
+      font-size: var(--fb-subtitle-size);
+      line-height: 1.35;
+      font-weight: 550;
+      overflow-wrap: anywhere;
+      word-break: break-word;
+    }
+
+    .feedback-body {
+      padding: 8px 6px 12px;
+    }
+
+    .state-box {
+      width: 100%;
+      max-width: 100%;
+      min-width: 0;
+      padding: 12px;
+      border: 1px solid var(--fb-border);
+      border-radius: 12px;
+      background: var(--fb-soft);
+      color: var(--fb-muted);
+      font-size: 13.5px;
+      line-height: 1.45;
+      font-weight: 650;
+      overflow-wrap: anywhere;
+      word-break: break-word;
+    }
+
+    .state-box.success {
+      background: rgba(22, 101, 52, 0.18);
+      border-color: rgba(134, 239, 172, 0.30);
+      color: var(--fb-success);
+    }
+
+    .state-box.error {
+      background: rgba(127, 29, 29, 0.20);
+      border-color: rgba(248, 113, 113, 0.34);
+      color: var(--fb-danger);
+    }
+
+    .feedback-alert {
+      display: none;
+      width: 100%;
+      max-width: 100%;
+      margin: 0 0 10px;
+      padding: 10px 11px;
+      border: 1px solid var(--fb-border);
+      border-radius: 11px;
+      font-size: 12.5px;
+      line-height: 1.4;
+      font-weight: 750;
+      overflow-wrap: anywhere;
+      word-break: break-word;
+    }
+
+    .feedback-alert.show {
+      display: block;
+    }
+
+    .feedback-alert.error {
+      background: rgba(127, 29, 29, 0.20);
+      border-color: rgba(248, 113, 113, 0.34);
+      color: #fecaca;
+    }
+
+    .feedback-alert.info {
+      background: rgba(30, 64, 175, 0.16);
+      border-color: rgba(96, 165, 250, 0.28);
+      color: #bfdbfe;
+    }
+
+    .feedback-invoice-box {
+      width: 100%;
+      max-width: 100%;
+      min-width: 0;
+      margin: 0 0 13px;
+      padding: 7px;
+      border: 1px solid var(--fb-border);
+      border-radius: 11px;
+      background: rgba(15, 22, 35, 0.84);
+    }
+
+    .feedback-invoice-top {
+      display: grid;
+      grid-template-columns: 1fr;
+      width: 100%;
+      max-width: 100%;
+      min-width: 0;
+      gap: 5px;
+      padding-bottom: 7px;
+      margin-bottom: 7px;
+      border-bottom: 1px solid var(--fb-border);
+    }
+
+    .feedback-invoice-label {
+      margin: 0 0 3px;
+      color: var(--fb-muted-soft);
+      font-size: 9px;
+      line-height: 1.2;
+      font-weight: 900;
+      letter-spacing: 0.065em;
+      text-transform: uppercase;
+    }
+
+    .feedback-invoice-number,
+    .feedback-invoice-value {
+      color: var(--fb-text);
+      font-size: 12.5px;
+      line-height: 1.25;
+      font-weight: 850;
+      white-space: normal;
+      overflow-wrap: anywhere;
+      word-break: break-word;
+    }
+
+    .feedback-invoice-total-value {
+      color: var(--fb-primary);
+      font-size: 13px;
+      line-height: 1.25;
+      font-weight: 950;
+      white-space: normal;
+      overflow-wrap: anywhere;
+      word-break: break-word;
+    }
+
+    .feedback-invoice-grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      width: 100%;
+      max-width: 100%;
+      min-width: 0;
+      gap: 6px;
+    }
+
+    .feedback-invoice-item {
+      width: 100%;
+      max-width: 100%;
+      min-width: 0;
+      padding: 7px 8px;
+      border: 1px solid var(--fb-border);
+      border-radius: 10px;
+      background: rgba(7, 11, 18, 0.56);
+    }
+
+    .feedback-section {
+      width: 100%;
+      max-width: 100%;
+      min-width: 0;
+      margin-top: 14px;
+    }
+
+    .feedback-section-title {
+      margin: 0 0 6px;
+      color: var(--fb-text);
+      font-size: var(--fb-section-size);
+      line-height: 1.3;
+      font-weight: 900;
+      letter-spacing: -0.015em;
+      overflow-wrap: anywhere;
+      word-break: break-word;
+    }
+
+    .feedback-field-grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      width: 100%;
+      max-width: 100%;
+      min-width: 0;
+      gap: 9px;
+    }
+
+    .feedback-field {
+      width: 100%;
+      max-width: 100%;
+      min-width: 0;
+    }
+
+    .feedback-field label,
+    .feedback-comment-label {
+      display: block;
+      margin: 0 0 4px;
+      color: #dce6f5;
+      font-size: var(--fb-label-size);
+      line-height: 1.3;
+      font-weight: 850;
+      overflow-wrap: anywhere;
+      word-break: break-word;
+    }
+
+    .feedback-field select,
+    .feedback-comment-textarea {
+      width: 100%;
+      max-width: 100%;
+      min-width: 0;
+      border: 1px solid var(--fb-border-strong);
+      border-radius: 10px;
+      background-color: rgba(7, 11, 18, 0.82);
+      color: var(--fb-text);
+      font-family: inherit;
+      font-size: var(--fb-field-size);
+      line-height: 1.3;
+      font-weight: 650;
+      outline: none;
+      box-shadow: none;
+    }
+
+    .feedback-field select {
+      height: var(--fb-field-height);
+      min-height: var(--fb-field-height);
+      padding: 0 34px 0 10px;
+      -webkit-appearance: none;
+      appearance: none;
+      background-image:
+        linear-gradient(45deg, transparent 50%, rgba(248, 250, 252, 0.88) 50%),
+        linear-gradient(135deg, rgba(248, 250, 252, 0.88) 50%, transparent 50%);
+      background-position:
+        calc(100% - 17px) calc(50% + 1px),
+        calc(100% - 11px) calc(50% + 1px);
+      background-size: 6px 6px, 6px 6px;
+      background-repeat: no-repeat;
+    }
+
+    .feedback-comment-textarea {
+      min-height: 82px;
+      padding: 9px;
+      resize: vertical;
+    }
+
+    .feedback-field select:focus,
+    .feedback-comment-textarea:focus {
+      border-color: rgba(20, 184, 166, 0.92);
+      box-shadow: 0 0 0 3px rgba(20, 184, 166, 0.14);
+    }
+
+    .feedback-comment-textarea::placeholder {
+      color: rgba(182, 194, 212, 0.64);
+    }
+
+    .field-error {
+      min-height: 10px;
+      margin-top: 3px;
+      color: #fecaca;
+      font-size: var(--fb-small-size);
+      line-height: 1.35;
+      font-weight: 750;
+      overflow-wrap: anywhere;
+      word-break: break-word;
+    }
+
+    .rating-row {
+      display: grid;
+      grid-template-columns: repeat(5, minmax(0, 1fr));
+      width: 100%;
+      max-width: 100%;
+      min-width: 0;
+      gap: 3px;
+    }
+
+    .rating-btn {
+      width: 100%;
+      max-width: 100%;
+      min-width: 0;
+      height: var(--fb-rating-height);
+      min-height: var(--fb-rating-height);
+      padding: 0;
+      border: 1px solid var(--fb-border-strong);
+      border-radius: 8px;
+      background: rgba(7, 11, 18, 0.74);
+      color: #d2dbe8;
+      font-family: inherit;
+      font-size: var(--fb-button-size);
+      line-height: 1;
+      font-weight: 950;
+      box-shadow: none;
+    }
+
+    .rating-btn.active {
+      border-color: rgba(45, 212, 191, 0.78);
+      background: linear-gradient(135deg, rgba(20, 184, 166, 0.96), rgba(15, 118, 110, 0.98));
+      color: #ffffff;
+      box-shadow: 0 8px 18px rgba(20, 184, 166, 0.18);
+    }
+
+    .rating-help {
+      margin: 5px 0 0;
+      color: var(--fb-muted-soft);
+      font-size: var(--fb-help-size);
+      line-height: 1.35;
+      font-weight: 650;
+      white-space: normal;
+      overflow-wrap: anywhere;
+      word-break: break-word;
+    }
+
+    .feedback-actions {
+      width: 100%;
+      max-width: 100%;
+      min-width: 0;
+      margin-top: 14px;
+      padding-top: 11px;
+      border-top: 1px solid var(--fb-border);
+    }
+
+    .submit-btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 100%;
+      max-width: 100%;
+      min-width: 0;
+      height: var(--fb-button-height);
+      min-height: var(--fb-button-height);
+      padding: 0 14px;
+      border: none;
+      border-radius: 10px;
+      background: linear-gradient(135deg, #14b8a6 0%, #0f766e 100%);
+      color: #ffffff;
+      font-family: inherit;
+      font-size: var(--fb-button-size);
+      line-height: 1.15;
+      font-weight: 950;
+      box-shadow: 0 10px 24px rgba(20, 184, 166, 0.22);
+    }
+
+    .submit-btn:disabled {
+      opacity: 0.68;
+      cursor: not-allowed;
+      box-shadow: none;
+    }
+
+    @media (max-width: 360px) {
+      :root {
+        --fb-title-size: 18.5px;
+        --fb-subtitle-size: 12px;
+        --fb-section-size: 13px;
+        --fb-label-size: 12.5px;
+        --fb-field-size: 14px;
+        --fb-help-size: 10.5px;
+        --fb-small-size: 10.5px;
+        --fb-button-size: 12.5px;
+
+        --fb-field-height: 36px;
+        --fb-rating-height: 30px;
+        --fb-button-height: 38px;
+      }
+
+      .feedback-header {
+        padding: 10px 8px 10px;
+      }
+
+      .feedback-body {
+        padding-left: 5px;
+        padding-right: 5px;
+      }
+
+      .feedback-invoice-box {
+        padding: 6px;
+      }
+
+      .feedback-invoice-item {
+        padding: 6px 7px;
+      }
+
+      .rating-row {
+        gap: 2px;
+      }
+    }
+
+    @media (min-width: 960px) {
+      html.fb-device-desktop body.feedback-public-page {
+        --fb-title-size: 24px;
+        --fb-subtitle-size: 14px;
+        --fb-section-size: 14.5px;
+        --fb-label-size: 13.5px;
+        --fb-field-size: 14px;
+        --fb-help-size: 12.5px;
+        --fb-small-size: 12px;
+        --fb-button-size: 14px;
+
+        --fb-field-height: 44px;
+        --fb-rating-height: 44px;
+        --fb-button-height: 46px;
+
+        padding: 22px;
+        background:
+          radial-gradient(circle at 0% 0%, rgba(20, 184, 166, 0.18), transparent 34%),
+          radial-gradient(circle at 100% 100%, rgba(37, 99, 235, 0.12), transparent 38%),
+          var(--fb-bg);
+      }
+
+      html.fb-device-desktop .feedback-scale {
+        width: 100%;
+        max-width: 100%;
+        transform: none;
+      }
+
+      html.fb-device-desktop .feedback-page {
+        max-width: 680px;
+        margin: 0 auto;
+      }
+
+      html.fb-device-desktop .feedback-card {
+        min-height: 0;
+        border: 1px solid var(--fb-border);
+        border-radius: 22px;
+        box-shadow: 0 22px 60px rgba(0, 0, 0, 0.30);
+      }
+
+      html.fb-device-desktop .feedback-header {
+        padding: 22px 24px 24px;
+      }
+
+      html.fb-device-desktop .feedback-eyebrow {
+        margin-bottom: 7px;
+        font-size: 11px;
+        letter-spacing: 0.11em;
+      }
+
+      html.fb-device-desktop .feedback-title {
+        margin-bottom: 9px;
+        line-height: 1.14;
+      }
+
+      html.fb-device-desktop .feedback-subtitle {
+        max-width: 590px;
+        line-height: 1.55;
+      }
+
+      html.fb-device-desktop .feedback-body {
+        padding: 24px;
+      }
+
+      html.fb-device-desktop .feedback-invoice-box {
+        margin-bottom: 22px;
+        padding: 16px;
+        border-radius: 18px;
+      }
+
+      html.fb-device-desktop .feedback-invoice-top {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 14px;
+        padding-bottom: 13px;
+        margin-bottom: 13px;
+      }
+
+      html.fb-device-desktop .feedback-invoice-total {
+        text-align: right;
+        flex-shrink: 0;
+      }
+
+      html.fb-device-desktop .feedback-invoice-label {
+        margin-bottom: 5px;
+        font-size: 11px;
+      }
+
+      html.fb-device-desktop .feedback-invoice-number,
+      html.fb-device-desktop .feedback-invoice-value {
+        font-size: 14.5px;
+        line-height: 1.35;
+      }
+
+      html.fb-device-desktop .feedback-invoice-total-value {
+        font-size: 15.5px;
+        line-height: 1.35;
+      }
+
+      html.fb-device-desktop .feedback-invoice-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 12px;
+      }
+
+      html.fb-device-desktop .feedback-invoice-item {
+        padding: 12px 13px;
+        border-radius: 15px;
+      }
+
+      html.fb-device-desktop .feedback-section {
+        margin-top: 24px;
+      }
+
+      html.fb-device-desktop .feedback-section-title {
+        margin-bottom: 12px;
+      }
+
+      html.fb-device-desktop .feedback-field-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 16px 14px;
+      }
+
+      html.fb-device-desktop .feedback-field label,
+      html.fb-device-desktop .feedback-comment-label {
+        margin-bottom: 7px;
+      }
+
+      html.fb-device-desktop .feedback-field select {
+        border-radius: 14px;
+        padding-left: 13px;
+      }
+
+      html.fb-device-desktop .feedback-comment-textarea {
+        min-height: 118px;
+        padding: 13px;
+        border-radius: 14px;
+      }
+
+      html.fb-device-desktop .rating-row {
+        grid-template-columns: repeat(5, minmax(0, 1fr));
+        gap: 9px;
+      }
+
+      html.fb-device-desktop .rating-btn {
+        height: var(--fb-rating-height);
+        min-height: var(--fb-rating-height);
+        border-radius: 14px;
+        font-size: var(--fb-button-size);
+      }
+
+      html.fb-device-desktop .rating-help {
+        margin-top: 8px;
+      }
+
+      html.fb-device-desktop .field-error {
+        min-height: 17px;
+        margin-top: 5px;
+      }
+
+      html.fb-device-desktop .feedback-actions {
+        display: flex;
+        justify-content: flex-end;
+        margin-top: 24px;
+        padding-top: 20px;
+      }
+
+      html.fb-device-desktop .submit-btn {
+        width: auto;
+        min-width: 160px;
+        padding-left: 20px;
+        padding-right: 20px;
+        border-radius: 14px;
+      }
+    }
+  </style>
+</head>
+
+<body class="feedback-public-page">
+  <div class="feedback-scale">
+    <div class="feedback-page">
+      <div class="feedback-card">
+        <div class="feedback-header">
+          <div class="feedback-eyebrow">Hajar Aswad Dental Clinic</div>
+          <h1 class="feedback-title">Feedback Kepuasan Layanan</h1>
+          <p class="feedback-subtitle">
+            Terima kasih telah mempercayakan layanan klinik kepada kami. Mohon luangkan waktu sebentar untuk memberikan penilaian.
+          </p>
+        </div>
+
+        <div class="feedback-body">
+          <div id="feedbackContent">
+            <div class="state-box">Memuat formulir feedback...</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const FEEDBACK_TOKEN = '<?= feedbackToken ?>';
+    let selectedRating = 0;
+
+    function escapeHtml(value) {
+      return String(value || '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+    }
+
+    function formatRupiah(value) {
+      const num = Number(value || 0);
+      return 'Rp ' + num.toLocaleString('id-ID');
+    }
+
+    function formatDateDmy(value) {
+      const s = String(value || '').trim();
+
+      if (!s) return '-';
+
+      if (/^\d{4}-\d{2}-\d{2}/.test(s)) {
+        const parts = s.slice(0, 10).split('-');
+        return parts[2] + '-' + parts[1] + '-' + parts[0];
+      }
+
+      return s;
+    }
+
+    function renderError(message) {
+      const content = document.getElementById('feedbackContent');
+      if (!content) return;
+
+      content.innerHTML =
+        '<div class="state-box error">' +
+          escapeHtml(message || 'Terjadi kesalahan') +
+        '</div>';
+    }
+
+    function renderSuccess(message) {
+      const content = document.getElementById('feedbackContent');
+      if (!content) return;
+
+      content.innerHTML =
+        '<div class="state-box success">' +
+          escapeHtml(message || 'Terima kasih, feedback Anda berhasil dikirim.') +
+        '</div>';
+    }
+
+    function showFormAlert(message, type) {
+      const alertEl = document.getElementById('feedbackFormAlert');
+      if (!alertEl) return;
+
+      alertEl.className = 'feedback-alert show ' + (type || 'error');
+      alertEl.textContent = message || 'Terjadi kesalahan.';
+    }
+
+    function clearFormAlert() {
+      const alertEl = document.getElementById('feedbackFormAlert');
+      if (!alertEl) return;
+
+      alertEl.className = 'feedback-alert';
+      alertEl.textContent = '';
+    }
+
+    function getOptionHtml() {
+      return `
+        <option value="">Pilih penilaian</option>
+        <option value="very_satisfied">Sangat Puas</option>
+        <option value="satisfied">Puas</option>
+        <option value="neutral">Cukup</option>
+        <option value="not_satisfied">Kurang Puas</option>
+      `;
+    }
+
+    function renderFeedbackForm(data) {
+      const content = document.getElementById('feedbackContent');
+      if (!content) return;
+
+      const billing = data.billing || {};
+      const alreadySubmitted = !!data.already_submitted;
+
+      selectedRating = 0;
+
+      if (alreadySubmitted) {
+        renderSuccess('Feedback untuk invoice ini sudah pernah dikirim. Terima kasih.');
+        return;
+      }
+
+      content.innerHTML = `
+        <div id="feedbackFormAlert" class="feedback-alert"></div>
+
+        <div class="feedback-invoice-box">
+          <div class="feedback-invoice-top">
+            <div>
+              <div class="feedback-invoice-label">Invoice</div>
+              <div class="feedback-invoice-number">
+                ${escapeHtml(billing.billing_number || billing.billing_id || '-')}
+              </div>
+            </div>
+
+            <div class="feedback-invoice-total">
+              <div class="feedback-invoice-label">Total</div>
+              <div class="feedback-invoice-total-value">
+                ${formatRupiah(billing.grand_total || 0)}
+              </div>
+            </div>
+          </div>
+
+          <div class="feedback-invoice-grid">
+            <div class="feedback-invoice-item">
+              <div class="feedback-invoice-label">Pasien</div>
+              <div class="feedback-invoice-value">
+                ${escapeHtml(billing.patient_name || '-')}
+              </div>
+            </div>
+
+            <div class="feedback-invoice-item">
+              <div class="feedback-invoice-label">Tanggal Billing</div>
+              <div class="feedback-invoice-value">
+                ${formatDateDmy(billing.billing_date || '')}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <form onsubmit="submitFeedback(event)" novalidate>
+          <div class="feedback-section">
+            <div class="feedback-section-title">Rating keseluruhan</div>
+
+            <div class="rating-row" role="radiogroup" aria-label="Rating keseluruhan">
+              ${[1, 2, 3, 4, 5].map(function(num) {
+                return `
+                  <button
+                    type="button"
+                    class="rating-btn"
+                    id="ratingBtn${num}"
+                    onclick="setRating(${num})"
+                    aria-pressed="false"
+                    aria-label="Rating ${num}"
+                  >
+                    ${num}
+                  </button>
+                `;
+              }).join('')}
+            </div>
+
+            <div class="rating-help">Pilih angka 1 sampai 5. Semakin besar angkanya, semakin puas penilaian Anda.</div>
+            <div id="error_rating" class="field-error"></div>
+          </div>
+
+          <div class="feedback-section">
+            <div class="feedback-section-title">Penilaian layanan</div>
+
+            <div class="feedback-field-grid">
+              <div class="feedback-field">
+                <label for="service_quality">Kualitas layanan</label>
+                <select id="service_quality" onchange="clearFieldError('service_quality')">${getOptionHtml()}</select>
+                <div id="error_service_quality" class="field-error"></div>
+              </div>
+
+              <div class="feedback-field">
+                <label for="staff_friendliness">Keramahan staf</label>
+                <select id="staff_friendliness" onchange="clearFieldError('staff_friendliness')">${getOptionHtml()}</select>
+                <div id="error_staff_friendliness" class="field-error"></div>
+              </div>
+
+              <div class="feedback-field">
+                <label for="clinic_cleanliness">Kebersihan klinik</label>
+                <select id="clinic_cleanliness" onchange="clearFieldError('clinic_cleanliness')">${getOptionHtml()}</select>
+                <div id="error_clinic_cleanliness" class="field-error"></div>
+              </div>
+
+              <div class="feedback-field">
+                <label for="waiting_time">Waktu tunggu</label>
+                <select id="waiting_time" onchange="clearFieldError('waiting_time')">${getOptionHtml()}</select>
+                <div id="error_waiting_time" class="field-error"></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="feedback-section">
+            <label for="comment" class="feedback-comment-label">Komentar / saran</label>
+            <textarea
+              id="comment"
+              class="feedback-comment-textarea"
+              maxlength="1000"
+              oninput="clearFieldError('comment')"
+              placeholder="Tulis pengalaman, kritik, atau saran Anda..."
+            ></textarea>
+            <div id="error_comment" class="field-error"></div>
+          </div>
+
+          <div class="feedback-actions">
+            <button type="submit" class="submit-btn" id="feedbackSubmitBtn">
+              Kirim Feedback
+            </button>
+          </div>
+        </form>
+      `;
+    }
+
+    function setRating(value) {
+      selectedRating = Number(value || 0);
+      clearFormAlert();
+
+      [1, 2, 3, 4, 5].forEach(function(num) {
+        const btn = document.getElementById('ratingBtn' + num);
+        if (!btn) return;
+
+        const active = num === selectedRating;
+        btn.classList.toggle('active', active);
+        btn.setAttribute('aria-pressed', active ? 'true' : 'false');
+      });
+
+      clearFieldError('rating');
+    }
+
+    function clearFieldError(key) {
+      const el = document.getElementById('error_' + key);
+      if (el) el.textContent = '';
+      clearFormAlert();
+    }
+
+    function clearErrors() {
+      [
+        'rating',
+        'service_quality',
+        'staff_friendliness',
+        'clinic_cleanliness',
+        'waiting_time',
+        'comment'
+      ].forEach(function(key) {
+        const el = document.getElementById('error_' + key);
+        if (el) el.textContent = '';
+      });
+
+      clearFormAlert();
+    }
+
+    function applyErrors(errors) {
+      if (!errors) return;
+
+      Object.keys(errors).forEach(function(key) {
+        const el = document.getElementById('error_' + key);
+        if (el) el.textContent = errors[key];
+      });
+    }
+
+    function setSubmitButtonLoading(isLoading) {
+      const btn = document.getElementById('feedbackSubmitBtn');
+      if (!btn) return;
+
+      btn.disabled = !!isLoading;
+      btn.textContent = isLoading ? 'Mengirim...' : 'Kirim Feedback';
+    }
+
+    function submitFeedback(e) {
+      e.preventDefault();
+
+      clearErrors();
+
+      const serviceQualityEl = document.getElementById('service_quality');
+      const staffFriendlinessEl = document.getElementById('staff_friendliness');
+      const clinicCleanlinessEl = document.getElementById('clinic_cleanliness');
+      const waitingTimeEl = document.getElementById('waiting_time');
+      const commentEl = document.getElementById('comment');
+
+      const payload = {
+        feedback_token: FEEDBACK_TOKEN,
+        rating: selectedRating,
+        service_quality: serviceQualityEl ? serviceQualityEl.value : '',
+        staff_friendliness: staffFriendlinessEl ? staffFriendlinessEl.value : '',
+        clinic_cleanliness: clinicCleanlinessEl ? clinicCleanlinessEl.value : '',
+        waiting_time: waitingTimeEl ? waitingTimeEl.value : '',
+        comment: commentEl ? commentEl.value.trim() : ''
+      };
+
+      const localErrors = {};
+
+      if (!payload.rating) localErrors.rating = 'Rating wajib dipilih';
+      if (!payload.service_quality) localErrors.service_quality = 'Kualitas layanan wajib dipilih';
+      if (!payload.staff_friendliness) localErrors.staff_friendliness = 'Keramahan staf wajib dipilih';
+      if (!payload.clinic_cleanliness) localErrors.clinic_cleanliness = 'Kebersihan klinik wajib dipilih';
+      if (!payload.waiting_time) localErrors.waiting_time = 'Waktu tunggu wajib dipilih';
+
+      if (Object.keys(localErrors).length) {
+        applyErrors(localErrors);
+        showFormAlert('Mohon lengkapi penilaian yang masih kosong.', 'error');
+        return;
+      }
+
+      setSubmitButtonLoading(true);
+
+      google.script.run
+        .withSuccessHandler(function(res) {
+          setSubmitButtonLoading(false);
+
+          if (!res || !res.success) {
+            applyErrors(res && res.errors ? res.errors : null);
+            showFormAlert((res && res.message) || 'Gagal mengirim feedback', 'error');
+            return;
+          }
+
+          renderSuccess(res.message || 'Terima kasih, feedback Anda berhasil dikirim.');
+        })
+        .withFailureHandler(function(err) {
+          setSubmitButtonLoading(false);
+          showFormAlert('Error: ' + (err && err.message ? err.message : err), 'error');
+        })
+        .submitBillingFeedback(payload);
+    }
+
+    function loadFeedbackPage() {
+      if (!FEEDBACK_TOKEN) {
+        renderError('Token feedback tidak ditemukan.');
+        return;
+      }
+
+      google.script.run
+        .withSuccessHandler(function(res) {
+          if (!res || !res.success) {
+            renderError((res && res.message) || 'Gagal memuat feedback');
+            return;
+          }
+
+          renderFeedbackForm(res.data || {});
+        })
+        .withFailureHandler(function(err) {
+          renderError('Error: ' + (err && err.message ? err.message : err));
+        })
+        .getBillingFeedbackPageData(FEEDBACK_TOKEN);
+    }
+
+    loadFeedbackPage();
+  </script>
+</body>
+</html>

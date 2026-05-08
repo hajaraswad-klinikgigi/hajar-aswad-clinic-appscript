@@ -1,0 +1,2176 @@
+<script>
+  let showInactivePatients = false;
+  let currentPatientDetailId = '';
+  let currentPatientDetailTreatments = [];
+  let currentPatientDetailPhotoGroups = [];
+  let patientDetailRequestToken = 0;
+  let patientDetailFrontendCache = {
+    patient_id: '',
+    primary: null,
+    secondary: null
+  };
+  let patientSearchDebounce = null;
+  let pendingDeletePatientPhotoId = '';
+  let pendingDeletePatientPhotoLabel = '';
+  let photoSelectedTreatmentLocked = false;
+  let photoSelectedTreatmentLockMessage = '';
+
+  let patientPhotoUploadInFlight = false;
+  let deactivatePatientInFlight = false;
+  let deletePatientPhotoInFlight = false;
+  let patientDetailCreateAppointmentInFlight = false;
+  let patientDetailOrthoRecallCache = {};
+
+  function showPatientsPage() {
+    setActiveMenu('menuPatients');
+
+    const contentArea = document.getElementById('contentArea');
+
+    contentArea.innerHTML = `
+      <div class="patients-shell">
+
+        <!-- HEADER -->
+        <div class="patients-header">
+          <div>
+            <div class="patients-eyebrow">Patient Management</div>
+            <h1 class="patients-title">Patients</h1>
+            <div class="patients-subtitle">
+              Kelola data pasien, identitas, dan informasi klinis
+            </div>
+          </div>
+
+          <button type="button" class="action-btn patients-create-btn" onclick="openCreatePatientModal()">
+            Tambah Pasien
+          </button>
+        </div>
+
+        <!-- TOOLBAR -->
+        <div class="content-card patients-toolbar-card">
+          <div class="patients-toolbar">
+            <div class="patients-search-wrap">
+              <label class="patients-toolbar-label">Pencarian</label>
+              <input
+                type="text"
+                id="patientSearchInput"
+                class="search-box"
+                placeholder="Cari nama, nomor HP, email..."
+                oninput="handlePatientSearch()"
+              >
+            </div>
+
+            <div class="patients-toggle-wrap">
+              <label class="patients-toolbar-label">Filter</label>
+              <label class="inline-toggle patients-inline-toggle">
+                <input
+                  type="checkbox"
+                  id="showInactivePatients"
+                  onchange="handleToggleInactivePatients()"
+                >
+                <span>Tampilkan nonaktif</span>
+              </label>
+            </div>
+          </div>
+        </div>
+
+        <!-- TABLE -->
+        <div class="content-card">
+          <div class="patients-table-head">
+            <div>
+              <h3 class="patients-section-title">Daftar Pasien</h3>
+              <div class="patients-section-subtitle">Data pasien terdaftar</div>
+            </div>
+          </div>
+
+          <div class="table-wrapper">
+            <table class="table patients-table">
+              <thead>
+                <tr>
+                  <th>Nama</th>
+                  <th>Gender</th>
+                  <th>Telepon</th>
+                  <th>Alamat</th>
+                  <th>Status</th>
+                  <th>Action</th>
+                </tr>
+              </thead>
+              <tbody id="patientsTableBody">
+                <tr>
+                  <td colspan="6">Memuat data...</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div class="pagination">
+            <button type="button" onclick="prevPatientPage()">Prev</button>
+            <div id="patientPaginationInfo" class="pagination-info">Halaman 1 dari 1</div>
+            <button type="button" onclick="nextPatientPage()">Next</button>
+          </div>
+        </div>
+
+      </div>
+    `;
+
+    const toggle = document.getElementById('showInactivePatients');
+    if (toggle) toggle.checked = showInactivePatients;
+
+    loadPatients();
+  }
+
+  function loadPatients() {
+    google.script.run
+      .withSuccessHandler(function(rows) {
+        allPatients = (rows || []).map(function(row) {
+          const searchText = [
+            row.patient_code || '',
+            row.full_name || '',
+            row.phone || '',
+            row.email || '',
+            row.guardian_name || '',
+            row.guardian_relationship || '',
+            row.guardian_phone || '',
+            row.guardian_email || '',
+            row.address || ''
+          ].join(' ').toLowerCase();
+
+          row._search_text = searchText;
+          return row;
+        });
+
+        filteredPatients = [...allPatients];
+        patientCurrentPage = 1;
+        renderPatientsTable();
+      })
+      .withFailureHandler(function(err) {
+        const tbody = document.getElementById('patientsTableBody');
+        if (tbody) {
+          tbody.innerHTML = `<tr><td colspan="6">Error: ${err.message}</td></tr>`;
+        }
+      })
+      .getPatients(showInactivePatients);
+  }
+
+  function handleToggleInactivePatients() {
+    const toggle = document.getElementById('showInactivePatients');
+    showInactivePatients = !!(toggle && toggle.checked);
+    loadPatients();
+  }
+
+  function handlePatientSearch() {
+    if (patientSearchDebounce) {
+      clearTimeout(patientSearchDebounce);
+    }
+
+    patientSearchDebounce = setTimeout(function() {
+      const input = document.getElementById('patientSearchInput');
+      const keyword = input ? input.value.trim().toLowerCase() : '';
+
+      if (!keyword) {
+        filteredPatients = [...allPatients];
+      } else {
+        filteredPatients = allPatients.filter(function(row) {
+          return String(row._search_text || '').includes(keyword);
+        });
+      }
+
+      patientCurrentPage = 1;
+      renderPatientsTable();
+    }, 220);
+  }
+
+  function renderPatientsTable() {
+    const tbody = document.getElementById('patientsTableBody');
+    const info = document.getElementById('patientPaginationInfo');
+
+    if (!tbody || !info) return;
+
+    if (!filteredPatients || filteredPatients.length === 0) {
+      tbody.innerHTML = `
+        <tr>
+          <td colspan="6">
+            <div class="patients-empty-state">
+              <div class="patients-empty-title">Data pasien tidak ditemukan</div>
+              <div class="patients-empty-subtitle">Coba ubah kata kunci pencarian</div>
+            </div>
+          </td>
+        </tr>
+      `;
+      info.innerText = 'Halaman 0 dari 0';
+      return;
+    }
+
+    const totalPages = Math.ceil(filteredPatients.length / patientPageSize);
+    if (patientCurrentPage > totalPages) {
+      patientCurrentPage = totalPages;
+    }
+
+    const startIndex = (patientCurrentPage - 1) * patientPageSize;
+    const endIndex = startIndex + patientPageSize;
+    const pageRows = filteredPatients.slice(startIndex, endIndex);
+
+    tbody.innerHTML = pageRows.map(function(row) {
+      const isActive = isPatientActiveClient(row.is_active);
+
+      const patientId = row.patient_id || '-';
+      const patientCode = row.patient_code || '-';
+      const fullName = row.full_name || '-';
+      const gender = row.gender || '-';
+      const phone = row.phone || '-';
+      const fullAddress = row.address || '-';
+      const birthDate = convertYmdToDmy(formatDateForInput(row.birth_date || '')) || '-';
+      const email = row.email || '-';
+      const allergyNotes = row.allergy_notes || '-';
+      const medicalNotes = row.medical_notes || '-';
+
+      const safePatientId = String(row.patient_id || '').replace(/'/g, "\\'");
+
+      return `
+        <tr id="patient-row-${row.patient_id}" class="patient-main-row">
+          <td>
+            <div class="patient-cell-primary">
+              <span class="patient-name-text-static" title="${escapeHtml(fullName)}">${escapeHtml(fullName)}</span>
+            </div>
+            <div class="patient-cell-secondary">${escapeHtml(patientCode)}</div>
+          </td>
+
+          <td>${escapeHtml(gender)}</td>
+
+          <td>${escapeHtml(phone)}</td>
+
+          <td>
+            <span class="patient-address-text-static" title="${escapeHtml(fullAddress)}">${escapeHtml(fullAddress)}</span>
+          </td>
+
+          <td>
+            ${
+              isActive
+                ? '<span class="status-badge completed">Aktif</span>'
+                : '<span class="status-badge cancelled">Nonaktif</span>'
+            }
+          </td>
+
+          <td>
+            <div class="inline-actions patient-icon-actions">
+              <button
+                class="icon-btn detail"
+                type="button"
+                title="Detail pasien"
+                aria-label="Detail pasien"
+                onclick="openPatientDetail('${safePatientId}')"
+              >
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z"></path>
+                  <circle cx="12" cy="12" r="3"></circle>
+                </svg>
+              </button>
+
+              <button
+                class="icon-btn edit"
+                type="button"
+                title="Edit pasien"
+                aria-label="Edit pasien"
+                onclick="openEditPatientModal('${safePatientId}')"
+              >
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M12 20h9"></path>
+                  <path d="M16.5 3.5a2.12 2.12 0 1 1 3 3L7 19l-4 1 1-4 12.5-12.5z"></path>
+                </svg>
+              </button>
+
+              <button
+                class="icon-btn expand patient-expand-trigger-btn"
+                id="patient-expand-btn-${row.patient_id}"
+                type="button"
+                title="Tampilkan ringkasan pasien"
+                aria-label="Tampilkan ringkasan pasien"
+                onclick="togglePatientExpand('${safePatientId}')"
+              >
+                <svg class="expand-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M6 9l6 6 6-6"></path>
+                </svg>
+              </button>
+            </div>
+          </td>
+        </tr>
+
+        <tr id="patient-expand-${row.patient_id}" class="patient-expand-row">
+          <td colspan="6">
+            <div class="patient-expand-box">
+
+              <div class="patient-expand-name-block">
+                <div class="patient-expand-label">Nama Lengkap</div>
+                <div class="patient-expand-value patient-expand-name-value">${escapeHtml(fullName)}</div>
+              </div>
+
+              <div class="patient-expand-meta-grid">
+                <div class="patient-expand-item">
+                  <div class="patient-expand-label">Patient ID</div>
+                  <div class="patient-expand-value">${escapeHtml(patientId)}</div>
+                </div>
+
+                <div class="patient-expand-item">
+                  <div class="patient-expand-label">Patient Code</div>
+                  <div class="patient-expand-value">${escapeHtml(patientCode)}</div>
+                </div>
+
+                <div class="patient-expand-item">
+                  <div class="patient-expand-label">Tanggal Lahir</div>
+                  <div class="patient-expand-value">${escapeHtml(birthDate)}</div>
+                </div>
+
+                <div class="patient-expand-item">
+                  <div class="patient-expand-label">Email</div>
+                  <div class="patient-expand-value">${escapeHtml(email)}</div>
+                </div>
+              </div>
+
+              <div class="patient-expand-notes-grid">
+                <div class="patient-expand-item">
+                  <div class="patient-expand-label">Catatan Alergi</div>
+                  <div class="patient-expand-value">${escapeHtml(allergyNotes)}</div>
+                </div>
+
+                <div class="patient-expand-item">
+                  <div class="patient-expand-label">Catatan Medis</div>
+                  <div class="patient-expand-value">${escapeHtml(medicalNotes)}</div>
+                </div>
+              </div>
+
+              <div class="patient-expand-address-block">
+                <div class="patient-expand-label">Alamat Lengkap</div>
+                <div class="patient-expand-value patient-expand-address-value">${escapeHtml(fullAddress)}</div>
+              </div>
+
+            </div>
+          </td>
+        </tr>
+      `;
+    }).join('');
+
+    info.innerText = 'Halaman ' + patientCurrentPage + ' dari ' + totalPages;
+  }
+
+  function isPatientActiveClient(value) {
+    if (value === false) return false;
+    if (value === true) return true;
+    if (value === '' || value === null || value === undefined) return true;
+
+    return String(value).trim().toLowerCase() !== 'false';
+  }
+
+  function togglePatientExpand(patientId) {
+    const targetRow = document.getElementById('patient-expand-' + patientId);
+    const targetMainRow = document.getElementById('patient-row-' + patientId);
+    const targetBtn = document.getElementById('patient-expand-btn-' + patientId);
+
+    if (!targetRow || !targetMainRow) return;
+
+    const isOpen = targetRow.classList.contains('open');
+
+    document.querySelectorAll('.patient-expand-row').forEach(function(row) {
+      row.classList.remove('open');
+    });
+
+    document.querySelectorAll('.patient-main-row').forEach(function(row) {
+      row.classList.remove('active-expand-row');
+    });
+
+    document.querySelectorAll('.patient-expand-trigger-btn').forEach(function(btn) {
+      btn.classList.remove('active');
+    });
+
+    if (!isOpen) {
+      targetRow.classList.add('open');
+      targetMainRow.classList.add('active-expand-row');
+
+      if (targetBtn) {
+        targetBtn.classList.add('active');
+      }
+
+      setTimeout(function() {
+        targetRow.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      }, 120);
+    }
+  }
+
+  function resetPatientExpandState() {
+    document.querySelectorAll('.patient-expand-row').forEach(function(row) {
+      row.classList.remove('open');
+    });
+
+    document.querySelectorAll('.patient-main-row').forEach(function(row) {
+      row.classList.remove('active-expand-row');
+    });
+
+    document.querySelectorAll('.patient-expand-trigger-btn').forEach(function(btn) {
+      btn.classList.remove('active');
+    });
+  }
+
+  function prevPatientPage() {
+    if (patientCurrentPage > 1) {
+      patientCurrentPage--;
+      renderPatientsTable();
+    }
+  }
+
+  function nextPatientPage() {
+    const totalPages = Math.ceil(filteredPatients.length / patientPageSize);
+    if (patientCurrentPage < totalPages) {
+      patientCurrentPage++;
+      renderPatientsTable();
+    }
+  }
+  
+  function getLocalPatientById(patientId) {
+    return (allPatients || []).find(function(row) {
+      return String(row.patient_id || '') === String(patientId || '');
+    }) || null;
+  }
+
+  function fillPatientFormFromRow(p) {
+    document.getElementById('patient_id_hidden').value = p.patient_id || '';
+    document.getElementById('patient_full_name').value = p.full_name || '';
+    document.getElementById('patient_gender').value = p.gender || '';
+    document.getElementById('patient_birth_date').value = convertYmdToDmy(formatDateForInput(p.birth_date || ''));
+    document.getElementById('patient_phone').value = p.phone || '';
+    document.getElementById('patient_email').value = p.email || '';
+    document.getElementById('patient_guardian_name').value = p.guardian_name || '';
+    document.getElementById('patient_guardian_relationship').value = p.guardian_relationship || '';
+    document.getElementById('patient_guardian_phone').value = p.guardian_phone || '';
+    document.getElementById('patient_guardian_email').value = p.guardian_email || '';
+    document.getElementById('patient_address').value = p.address || '';
+    document.getElementById('patient_allergy_notes').value = p.allergy_notes || '';
+    document.getElementById('patient_medical_notes').value = p.medical_notes || '';
+
+    const hasGuardianData =
+      !!String(p.guardian_name || '').trim() ||
+      !!String(p.guardian_relationship || '').trim() ||
+      !!String(p.guardian_phone || '').trim() ||
+      !!String(p.guardian_email || '').trim();
+
+    const birthValue = document.getElementById('patient_birth_date').value;
+    const age = getPatientAgeFromBirthDateInput(birthValue);
+
+    setPatientGuardianSectionExpanded(
+      hasGuardianData || (age !== null && age < 17)
+    );
+  }
+
+  function openPatientModalShell() {
+    const modal = document.getElementById('patientModal');
+    if (modal) {
+      modal.style.display = 'flex';
+      modal.classList.remove('hidden');
+    }
+  }
+
+  function openCreatePatientModal() {
+    patientFormMode = 'create';
+
+    document.getElementById('patientModalTitle').innerText = 'Tambah Pasien';
+    document.getElementById('patientSubmitBtn').innerText = 'Simpan';
+
+    clearPatientForm();
+    clearPatientErrors();
+    setPatientGuardianSectionExpanded(false);
+
+    const modal = document.getElementById('patientModal');
+    if (modal) {
+      modal.style.display = 'flex';
+      modal.classList.remove('hidden');
+    }
+  }
+  
+  function openEditPatientModal(patientId) {
+    patientFormMode = 'edit';
+
+    document.getElementById('patientModalTitle').innerText = 'Edit Pasien';
+    document.getElementById('patientSubmitBtn').innerText = 'Update';
+
+    clearPatientErrors();
+
+    const localPatient = getLocalPatientById(patientId);
+
+    // Optimasi: buka instan dari data lokal
+    if (localPatient) {
+      fillPatientFormFromRow(localPatient);
+      openPatientModalShell();
+      return;
+    }
+
+    // Fallback: kalau data lokal tidak ada, baru ambil ke server
+    google.script.run
+      .withSuccessHandler(function(res) {
+        if (!res.success) {
+          showToast(res.message || 'Gagal mengambil data pasien', 'error');
+          return;
+        }
+
+        fillPatientFormFromRow(res.data || {});
+        openPatientModalShell();
+      })
+      .withFailureHandler(function(err) {
+        showToast('Error: ' + err.message, 'error');
+      })
+      .getPatientById(patientId);
+  }
+
+  function formatRupiah(value) {
+    const num = Number(value || 0);
+    return 'Rp ' + num.toLocaleString('id-ID');
+  }
+
+  function escapeHtml(value) {
+    return String(value || '')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#039;');
+  }
+
+  function formatDateDmy(value) {
+    const s = String(value || '').trim();
+    if (!s) return '-';
+
+    if (/^\d{4}-\d{2}-\d{2}$/.test(s)) {
+      const parts = s.split('-');
+      return parts[2] + '-' + parts[1] + '-' + parts[0];
+    }
+
+    if (/^\d{4}-\d{2}-\d{2}\s/.test(s)) {
+      const datePart = s.slice(0, 10);
+      const parts = datePart.split('-');
+      return parts[2] + '-' + parts[1] + '-' + parts[0];
+    }
+
+    return s;
+  }
+  
+  function getEmptyPatientOrthoRecallSummary() {
+    return {
+      has_recall: false,
+      has_active_program: false,
+      total_records: 0,
+      current: null
+    };
+  }
+
+  function getPatientRecallProgramBadgeHtml(status) {
+    const value = String(status || '').trim().toLowerCase();
+
+    if (value === 'active') {
+      return '<span class="status-badge completed">Active</span>';
+    }
+
+    if (value === 'completed') {
+      return '<span class="status-badge scheduled">Completed</span>';
+    }
+
+    if (value === 'cancelled') {
+      return '<span class="status-badge cancelled">Cancelled</span>';
+    }
+
+    return '<span class="status-badge default">Unknown</span>';
+  }
+
+  function getPatientRecallFollowupBadgeHtml(status) {
+    const value = String(status || '').trim().toLowerCase();
+
+    if (value === 'due') {
+      return '<span class="status-badge scheduled">Due</span>';
+    }
+
+    if (value === 'overdue') {
+      return '<span class="status-badge cancelled">Overdue</span>';
+    }
+
+    if (value === 'reached_target') {
+      return '<span class="status-badge completed">Reached Target</span>';
+    }
+
+    if (value === 'done') {
+      return '<span class="status-badge default">Done</span>';
+    }
+
+    return '<span class="status-badge default">Upcoming</span>';
+  }
+
+  function getPatientRecallContactBadgeHtml(lastContactDate) {
+    const value = String(lastContactDate || '').trim();
+
+    if (value) {
+      return '<span class="status-badge completed">Contacted</span>';
+    }
+
+    return '<span class="status-badge default">Not Contacted</span>';
+  }
+
+  function renderPatientOrthoRecallSection(orthoRecallSummary) {
+    const summary = orthoRecallSummary || getEmptyPatientOrthoRecallSummary();
+    const current = summary.current || null;
+
+    if (!summary.has_recall || !current) {
+      return `
+        <div class="content-card patient-ortho-recall-card">
+          <h3 class="patient-ortho-recall-title">Orthodontic Recall</h3>
+          <div class="patient-ortho-recall-empty">
+            Pasien ini belum memiliki program recall ortho.
+          </div>
+        </div>
+      `;
+    }
+
+    rememberPatientDetailOrthoRecall(current);
+
+    const programStatus = String(current.program_status || '').trim().toLowerCase();
+    const canUseRecallActions = programStatus === 'active';
+
+    const safePatientId = String(current.patient_id || '').replace(/'/g, "\\'");
+    const safeRecallId = String(current.ortho_recall_id || '').replace(/'/g, "\\'");
+
+    return `
+      <div class="content-card patient-ortho-recall-card">
+        <div class="patient-ortho-recall-header">
+          <div class="patient-ortho-recall-title-wrap">
+            <h3 class="patient-ortho-recall-title">Orthodontic Recall</h3>
+            <div class="patient-ortho-recall-subtitle">
+              ${Number(summary.total_records || 0)} record recall
+            </div>
+          </div>
+
+          <div class="patient-ortho-recall-badges">
+            ${getPatientRecallProgramBadgeHtml(current.program_status)}
+            ${getPatientRecallFollowupBadgeHtml(current.followup_status)}
+          </div>
+        </div>
+
+        <div class="patient-ortho-recall-grid">
+          <div class="patient-ortho-recall-item">
+            <div class="patient-ortho-recall-label">Install Date</div>
+            <div class="patient-ortho-recall-value">${formatDateDmy(current.install_date || '-')}</div>
+          </div>
+
+          <div class="patient-ortho-recall-item">
+            <div class="patient-ortho-recall-label">Last Control</div>
+            <div class="patient-ortho-recall-value">${formatDateDmy(current.last_control_date || '-')}</div>
+          </div>
+
+          <div class="patient-ortho-recall-item">
+            <div class="patient-ortho-recall-label">Next Due</div>
+            <div class="patient-ortho-recall-value">${formatDateDmy(current.next_due_date || '-')}</div>
+          </div>
+
+          <div class="patient-ortho-recall-item">
+            <div class="patient-ortho-recall-label">Controls</div>
+            <div class="patient-ortho-recall-value">${escapeHtml(current.control_count || 0)}</div>
+          </div>
+
+          <div class="patient-ortho-recall-item">
+            <div class="patient-ortho-recall-label">Contact Status</div>
+            <div class="patient-ortho-recall-value">${getPatientRecallContactBadgeHtml(current.last_contact_date)}</div>
+          </div>
+
+          <div class="patient-ortho-recall-item">
+            <div class="patient-ortho-recall-label">Last Contact Date</div>
+            <div class="patient-ortho-recall-value">${formatDateDmy(current.last_contact_date || '-')}</div>
+          </div>
+
+          <div class="patient-ortho-recall-item full">
+            <div class="patient-ortho-recall-label">Last Contact Note</div>
+            <div class="patient-ortho-recall-value">${escapeHtml(current.last_contact_note || '-')}</div>
+          </div>
+
+          <div class="patient-ortho-recall-item full">
+            <div class="patient-ortho-recall-label">Notes</div>
+            <div class="patient-ortho-recall-value">${escapeHtml(current.notes || '-')}</div>
+          </div>
+        </div>
+
+        ${
+          canUseRecallActions
+            ? `
+              <div class="patient-ortho-recall-actions">
+                <button
+                  type="button"
+                  class="btn btn-secondary"
+                  onclick="openRecallPageForPatient('${safePatientId}')"
+                >
+                  Open Recall
+                </button>
+
+                <button
+                  type="button"
+                  class="btn btn-primary"
+                  onclick="createAppointmentFromPatientDetailRecall('${safeRecallId}', this)"
+                >
+                  + Appointment
+                </button>
+              </div>
+            `
+            : ''
+        }
+      </div>
+    `;
+  }
+
+  function rememberPatientDetailOrthoRecall(row) {
+    const recallId = String((row && row.ortho_recall_id) || '').trim();
+    if (!recallId) return;
+
+    patientDetailOrthoRecallCache[recallId] = Object.assign({}, row);
+  }
+
+  function getPatientDetailOrthoRecallFromCache(orthoRecallId) {
+    const recallId = String(orthoRecallId || '').trim();
+    if (!recallId) return null;
+
+    return patientDetailOrthoRecallCache[recallId] || null;
+  }
+
+  function setPatientDetailAppointmentButtonState(button, isLoading) {
+    if (!button) return;
+
+    if (isLoading) {
+      button.disabled = true;
+
+      if (!button.dataset.idleHtml) {
+        button.dataset.idleHtml = button.innerHTML;
+      }
+
+      button.innerHTML = '<span>Checking...</span>';
+      return;
+    }
+
+    button.disabled = false;
+
+    if (button.dataset.idleHtml) {
+      button.innerHTML = button.dataset.idleHtml;
+      delete button.dataset.idleHtml;
+    }
+  }
+
+  function openRecallPageForPatient(patientId) {
+    const keyword = String(patientId || '').trim();
+    if (!keyword) {
+      showToast('Patient ID tidak ditemukan', 'error');
+      return;
+    }
+
+    closePatientDetailModal();
+    showRecallPage();
+
+    setTimeout(function() {
+      const input = document.getElementById('recallSearchInput');
+      if (!input) return;
+
+      input.value = keyword;
+      if (typeof applyRecallFilters === 'function') {
+        applyRecallFilters(false);
+      }
+    }, 120);
+  }
+
+  function getRecallSuggestedAppointmentDateFromPatient(row) {
+    const today = typeof getTodayYmd === 'function' ? getTodayYmd() : '';
+    const nextDueDate = String((row && row.next_due_date) || '').trim();
+
+    if (/^\d{4}-\d{2}-\d{2}$/.test(nextDueDate) && nextDueDate >= today) {
+      return nextDueDate;
+    }
+
+    return today;
+  }
+
+  function openAppointmentModalFromPatientRecallRow(row) {
+    if (typeof openCreateAppointmentModal !== 'function') {
+      showToast('Fitur appointment belum tersedia', 'error');
+      return;
+    }
+
+    closePatientDetailModal();
+    openCreateAppointmentModal();
+
+    const patientIdEl = document.getElementById('appointment_patient_id');
+    const patientSearchEl = document.getElementById('appointment_patient_search');
+    const dateEl = document.getElementById('appointment_date');
+    const timeEl = document.getElementById('appointment_time');
+    const complaintEl = document.getElementById('appointment_complaint');
+    const statusEl = document.getElementById('appointment_status');
+    const resultsEl = document.getElementById('appointment_patient_results');
+
+    if (patientIdEl) patientIdEl.value = row.patient_id || '';
+    if (patientSearchEl) patientSearchEl.value = row.patient_name || '';
+    if (dateEl) dateEl.value = getRecallSuggestedAppointmentDateFromPatient(row);
+    if (timeEl) timeEl.value = '';
+    if (complaintEl) complaintEl.value = 'Kontrol behel rutin';
+    if (statusEl) statusEl.value = 'scheduled';
+
+    if (typeof setSelectedAppointmentPatientCard === 'function') {
+      setSelectedAppointmentPatientCard(row.patient_name || '', '', row.phone || '', false);
+    }
+
+    if (typeof setAppointmentPatientWarning === 'function') {
+      setAppointmentPatientWarning('');
+    }
+
+    if (typeof clearAppointmentErrors === 'function') {
+      clearAppointmentErrors();
+    }
+
+    if (resultsEl) {
+      resultsEl.style.display = 'none';
+      resultsEl.innerHTML = '';
+    }
+
+    if (typeof checkSelectedAppointmentPatientOpenStatus === 'function') {
+      checkSelectedAppointmentPatientOpenStatus(row.patient_id || '', '');
+    }
+
+    if (timeEl) {
+      setTimeout(function() {
+        timeEl.focus();
+      }, 80);
+    }
+  }
+
+  function createAppointmentFromPatientDetailRecall(orthoRecallId, button) {
+    const normalizedId = String(orthoRecallId || '').trim();
+
+    if (!normalizedId) {
+      showToast('Recall ID tidak ditemukan', 'error');
+      return;
+    }
+
+    if (patientDetailCreateAppointmentInFlight) return;
+
+    const row = getPatientDetailOrthoRecallFromCache(normalizedId);
+
+    if (!row) {
+      showToast('Data recall belum siap. Tutup dan buka kembali detail pasien.', 'error');
+      return;
+    }
+
+    if (String(row.program_status || '').trim().toLowerCase() !== 'active') {
+      showToast('Hanya recall aktif yang bisa dibuat appointment', 'error');
+      return;
+    }
+
+    patientDetailCreateAppointmentInFlight = true;
+    setPatientDetailAppointmentButtonState(button, true);
+    showToast('Memeriksa appointment aktif pasien...', 'info');
+
+    google.script.run
+      .withSuccessHandler(function(checkRes) {
+        patientDetailCreateAppointmentInFlight = false;
+        setPatientDetailAppointmentButtonState(button, false);
+
+        if (!checkRes || !checkRes.success) {
+          showToast((checkRes && checkRes.message) || 'Gagal memeriksa appointment pasien', 'error');
+          return;
+        }
+
+        if (checkRes.hasOpenAppointment) {
+          showToast('Pasien ini masih memiliki appointment aktif. Selesaikan dulu appointment sebelumnya.', 'error');
+          return;
+        }
+
+        openAppointmentModalFromPatientRecallRow(row);
+      })
+      .withFailureHandler(function(err) {
+        patientDetailCreateAppointmentInFlight = false;
+        setPatientDetailAppointmentButtonState(button, false);
+
+        showToast('Error: ' + (err && err.message ? err.message : err), 'error');
+      })
+      .checkPatientOpenAppointment(row.patient_id || '', '');
+  }
+
+  function formatPatientPhotoVisitDateTime(value) {
+    const raw = String(value || '').trim();
+    if (!raw) return '-';
+
+    const dayNames = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
+    const monthNames = [
+      'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
+      'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'
+    ];
+
+    let dateObj = null;
+    let hasExplicitTime = false;
+
+    if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) {
+      const parts = raw.split('-');
+      dateObj = new Date(
+        Number(parts[0]),
+        Number(parts[1]) - 1,
+        Number(parts[2]),
+        0,
+        0,
+        0
+      );
+      hasExplicitTime = false;
+    } else if (/^\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}/.test(raw)) {
+      const normalized = raw.replace(' ', 'T');
+      dateObj = new Date(normalized);
+
+      const timeMatch = raw.match(/\b(\d{2}):(\d{2})/);
+      if (timeMatch) {
+        const hh = Number(timeMatch[1]);
+        const mm = Number(timeMatch[2]);
+        hasExplicitTime = !(hh === 0 && mm === 0);
+      }
+    } else {
+      dateObj = new Date(raw);
+
+      const timeMatch = raw.match(/\b(\d{2}):(\d{2})(?::\d{2})?\b/);
+      if (timeMatch) {
+        const hh = Number(timeMatch[1]);
+        const mm = Number(timeMatch[2]);
+        hasExplicitTime = !(hh === 0 && mm === 0);
+      } else {
+        hasExplicitTime = false;
+      }
+    }
+
+    if (!dateObj || isNaN(dateObj.getTime())) {
+      return raw;
+    }
+
+    const dayName = dayNames[dateObj.getDay()];
+    const day = dateObj.getDate();
+    const monthName = monthNames[dateObj.getMonth()];
+    const year = dateObj.getFullYear();
+    const hour = String(dateObj.getHours()).padStart(2, '0');
+    const minute = String(dateObj.getMinutes()).padStart(2, '0');
+
+    if (hasExplicitTime) {
+      return 'Hari: ' + dayName + ', Tanggal: ' + day + ' ' + monthName + ' ' + year + ', Jam: ' + hour + ':' + minute;
+    }
+
+    return 'Hari: ' + dayName + ', Tanggal: ' + day + ' ' + monthName + ' ' + year;
+  }
+
+  function renderPatientDetailLoadingState() {
+    return `
+      <div style="display:grid; grid-template-columns: 320px 1fr; gap:16px; align-items:start;">
+        <div style="display:flex; flex-direction:column; gap:16px;">
+          <div class="content-card" style="min-height:260px;">
+            <h3 style="margin-top:0; margin-bottom:16px;">Profil Pasien</h3>
+            <div style="color:#64748b;">Memuat profil pasien...</div>
+          </div>
+
+          <div class="content-card" style="min-height:220px;">
+            <h3 style="margin-top:0; margin-bottom:16px;">Orthodontic Recall</h3>
+            <div style="color:#64748b;">Memuat data recall...</div>
+          </div>
+        </div>
+
+        <div class="content-card" style="min-height:260px;">
+          <h3 style="margin-top:0; margin-bottom:16px;">Riwayat Rekam Medis</h3>
+          <div style="color:#64748b;">Memuat rekam medis...</div>
+        </div>
+      </div>
+
+      <div id="patientDetailSecondaryWrap" style="margin-top:16px;">
+        <div class="content-card">
+          <h3 style="margin-top:0; margin-bottom:16px;">Riwayat Treatment</h3>
+          <div style="color:#64748b;">Memuat riwayat treatment...</div>
+        </div>
+
+        <div style="margin-top:16px;">
+          <div class="content-card">
+            <div style="display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap; margin-bottom:16px;">
+              <h3 style="margin:0;">Foto Before / After</h3>
+            </div>
+            <div style="color:#64748b;">Memuat dokumentasi foto...</div>
+          </div>
+        </div>
+      </div>
+    `;
+  }
+
+  function renderPatientPrimarySection(patient, medicalRecords, orthoRecallSummary) {
+    const p = patient || {};
+    const records = Array.isArray(medicalRecords) ? medicalRecords : [];
+    const orthoRecall = orthoRecallSummary || getEmptyPatientOrthoRecallSummary();
+
+    const profileHtml = `
+      <div class="content-card" style="height:100%;">
+        <h3 style="margin-top:0; margin-bottom:16px;">Profil Pasien</h3>
+
+        <div style="margin-bottom:10px;">
+          <strong>Patient ID</strong><br>
+          <div>${escapeHtml(p.patient_id || '-')}</div>
+        </div>
+
+        <div style="margin-bottom:10px;">
+          <strong>Patient Code</strong><br>
+          <div>${escapeHtml(p.patient_code || '-')}</div>
+        </div>
+
+        <div style="margin-bottom:10px;">
+          <strong>Nama Lengkap</strong><br>
+          <div>${escapeHtml(p.full_name || '-')}</div>
+        </div>
+
+        <div style="margin-bottom:10px;">
+          <strong>Gender</strong><br>
+          <div>${escapeHtml(p.gender || '-')}</div>
+        </div>
+
+        <div style="margin-bottom:10px;">
+          <strong>Tanggal Lahir</strong><br>
+          <div>${formatDateDmy(p.birth_date || '-')}</div>
+        </div>
+
+        <div style="margin-bottom:10px;">
+          <strong>No HP</strong><br>
+          <div>${escapeHtml(p.phone || '-')}</div>
+        </div>
+
+        <div style="margin-bottom:10px;">
+          <strong>Email</strong><br>
+          <div>${escapeHtml(p.email || '-')}</div>
+        </div>
+
+        <div style="margin-bottom:10px;">
+          <strong>Nama Wali</strong><br>
+          <div>${escapeHtml(p.guardian_name || '-')}</div>
+        </div>
+
+        <div style="margin-bottom:10px;">
+          <strong>Hubungan Wali</strong><br>
+          <div>${escapeHtml(p.guardian_relationship || '-')}</div>
+        </div>
+
+        <div style="margin-bottom:10px;">
+          <strong>No HP Wali</strong><br>
+          <div>${escapeHtml(p.guardian_phone || '-')}</div>
+        </div>
+
+        <div style="margin-bottom:10px;">
+          <strong>Email Wali</strong><br>
+          <div>${escapeHtml(p.guardian_email || '-')}</div>
+        </div>
+
+        <div style="margin-bottom:10px;">
+          <strong>Alamat</strong><br>
+          <div>${escapeHtml(p.address || '-')}</div>
+        </div>
+
+        <div style="margin-bottom:10px;">
+          <strong>Catatan Alergi</strong><br>
+          <div>${escapeHtml(p.allergy_notes || '-')}</div>
+        </div>
+
+        <div>
+          <strong>Catatan Medis</strong><br>
+          <div>${escapeHtml(p.medical_notes || '-')}</div>
+        </div>
+      </div>
+    `;
+
+    const medicalHtml = `
+      <div class="content-card" style="height:100%;">
+        <h3 style="margin-top:0; margin-bottom:16px;">Riwayat Rekam Medis</h3>
+        ${
+          records.length
+            ? records.map(function(r, idx) {
+                return `
+                  <div style="border:1px solid #e5e7eb; border-radius:12px; padding:14px; margin-bottom:${idx === records.length - 1 ? '0' : '12px'}; background:#fff;">
+                    <div style="margin-bottom:8px;">
+                      <strong>Tanggal Kunjungan</strong><br>
+                      <div>${formatDateDmy(r.visit_date || '-')}</div>
+                    </div>
+
+                    <div style="margin-bottom:8px;">
+                      <strong>Dokter</strong><br>
+                      <div>${escapeHtml(r.doctor_name || '-')}</div>
+                    </div>
+
+                    <div style="margin-bottom:8px;">
+                      <strong>Keluhan Utama</strong><br>
+                      <div>${escapeHtml(r.chief_complaint || '-')}</div>
+                    </div>
+
+                    <div style="margin-bottom:8px;">
+                      <strong>Diagnosis</strong><br>
+                      <div>${escapeHtml(r.diagnosis || '-')}</div>
+                    </div>
+
+                    <div>
+                      <strong>Catatan Klinis</strong><br>
+                      <div>${escapeHtml(r.clinical_notes || '-')}</div>
+                    </div>
+                  </div>
+                `;
+              }).join('')
+            : '<div>Belum ada riwayat rekam medis</div>'
+        }
+      </div>
+    `;
+
+    const orthoRecallHtml = renderPatientOrthoRecallSection(orthoRecall);
+
+    return `
+      <div style="display:grid; grid-template-columns: 320px 1fr; gap:16px; align-items:start;">
+        <div class="patient-detail-left-stack">
+          ${profileHtml}
+          ${orthoRecallHtml}
+        </div>
+
+        ${medicalHtml}
+      </div>
+
+      <div id="patientDetailSecondaryWrap" style="margin-top:16px;">
+        <div class="content-card">
+          <h3 style="margin-top:0; margin-bottom:16px;">Riwayat Treatment</h3>
+          <div style="color:#64748b;">Memuat riwayat treatment...</div>
+        </div>
+
+        <div style="margin-top:16px;">
+          <div class="content-card">
+            <div style="display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap; margin-bottom:16px;">
+              <h3 style="margin:0;">Foto Before / After</h3>
+            </div>
+            <div style="color:#64748b;">Memuat dokumentasi foto...</div>
+          </div>
+        </div>
+      </div>
+    `;
+  }
+
+  function renderPatientSecondarySection(treatments, photoGroups) {
+    const treatmentHtml = `
+      <div class="content-card">
+        <h3 style="margin-top:0; margin-bottom:16px;">Riwayat Treatment</h3>
+        ${
+          treatments.length
+            ? treatments.map(function(t, idx) {
+                const items = Array.isArray(t.items) ? t.items : [];
+
+                const itemsHtml = items.length
+                  ? `
+                    <div style="margin-top:12px;">
+                      <strong>Daftar Tindakan</strong>
+                      <div style="margin-top:8px; border:1px solid #e5e7eb; border-radius:10px; overflow:hidden;">
+                        <table style="width:100%; border-collapse:collapse; font-size:14px;">
+                          <thead>
+                            <tr style="background:#f9fafb;">
+                              <th style="text-align:left; padding:10px; border-bottom:1px solid #e5e7eb;">Tindakan</th>
+                              <th style="text-align:center; padding:10px; border-bottom:1px solid #e5e7eb;">Qty</th>
+                              <th style="text-align:right; padding:10px; border-bottom:1px solid #e5e7eb;">Harga</th>
+                              <th style="text-align:right; padding:10px; border-bottom:1px solid #e5e7eb;">Subtotal</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            ${items.map(function(item) {
+                              return `
+                                <tr>
+                                  <td style="padding:10px; border-bottom:1px solid #f3f4f6;">${escapeHtml(item.service_name || '-')}</td>
+                                  <td style="padding:10px; text-align:center; border-bottom:1px solid #f3f4f6;">${escapeHtml(item.qty || 0)}</td>
+                                  <td style="padding:10px; text-align:right; border-bottom:1px solid #f3f4f6;">${formatRupiah(item.unit_price || 0)}</td>
+                                  <td style="padding:10px; text-align:right; border-bottom:1px solid #f3f4f6;">${formatRupiah(item.subtotal || 0)}</td>
+                                </tr>
+                              `;
+                            }).join('')}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  `
+                  : '<div style="margin-top:12px;">Tidak ada item tindakan</div>';
+
+                return `
+                  <div style="border:1px solid #e5e7eb; border-radius:12px; padding:14px; margin-bottom:${idx === treatments.length - 1 ? '0' : '12px'}; background:#fff;">
+                    <div style="margin-bottom:8px;">
+                      <strong>Tanggal Treatment</strong><br>
+                      <div>${formatDateDmy(t.treatment_date || '-')}</div>
+                    </div>
+
+                    <div style="margin-bottom:8px;">
+                      <strong>Dokter</strong><br>
+                      <div>${escapeHtml(t.doctor_name || '-')}</div>
+                    </div>
+
+                    <div style="margin-bottom:8px;">
+                      <strong>Keluhan</strong><br>
+                      <div>${escapeHtml(t.chief_complaint || '-')}</div>
+                    </div>
+
+                    <div style="margin-bottom:8px;">
+                      <strong>Diagnosis</strong><br>
+                      <div>${escapeHtml(t.diagnosis || '-')}</div>
+                    </div>
+
+                    <div style="margin-bottom:8px;">
+                      <strong>Catatan</strong><br>
+                      <div>${escapeHtml(t.notes || '-')}</div>
+                    </div>
+
+                    <div style="margin-bottom:8px;">
+                      <strong>Total Biaya</strong><br>
+                      <div>${formatRupiah(t.total_cost || 0)}</div>
+                    </div>
+
+                    ${itemsHtml}
+                  </div>
+                `;
+              }).join('')
+            : '<div>Belum ada riwayat treatment</div>'
+        }
+      </div>
+    `;
+
+    const photoHtml = renderPatientPhotoSection(photoGroups);
+
+    return `
+      ${treatmentHtml}
+      <div style="margin-top:16px;">
+        ${photoHtml}
+      </div>
+    `;
+  }
+
+  function setPatientDetailFrontendCache(patientId, primaryData, secondaryData) {
+    patientDetailFrontendCache = {
+      patient_id: String(patientId || '').trim(),
+      primary: primaryData || null,
+      secondary: secondaryData || null
+    };
+  }
+
+  function clearPatientDetailFrontendCache(patientId) {
+    const normalizedPatientId = String(patientId || '').trim();
+
+    if (!normalizedPatientId) {
+      patientDetailFrontendCache = {
+        patient_id: '',
+        primary: null,
+        secondary: null
+      };
+      return;
+    }
+
+    if (String(patientDetailFrontendCache.patient_id || '') === normalizedPatientId) {
+      patientDetailFrontendCache = {
+        patient_id: '',
+        primary: null,
+        secondary: null
+      };
+    }
+  }
+
+  function hasPatientDetailFrontendCache(patientId) {
+    return String(patientDetailFrontendCache.patient_id || '') === String(patientId || '').trim();
+  }
+
+  function handleLockedPhotoDelete(message) {
+    showToast(
+      message || 'Foto pada treatment ini hanya bisa dihapus dalam 1 x 24 jam sejak foto pertama ditambahkan.',
+      'info'
+    );
+  }
+
+  function renderPatientPhotoDeleteButton(photo) {
+    const lockedMessage =
+      String(photo.delete_lock_message || '').trim() ||
+      'Foto pada treatment ini hanya bisa dihapus dalam 1 x 24 jam sejak foto pertama ditambahkan.';
+
+    const safePhotoId = String(photo.photo_id || '').replace(/'/g, "\\'");
+    const safeFileName = String(photo.file_name || 'Foto Pasien').replace(/'/g, "\\'");
+
+    const iconHtml = `
+      <svg viewBox="0 0 24 24" fill="none" stroke-width="2">
+        <path d="M3 6h18"></path>
+        <path d="M8 6V4h8v2"></path>
+        <path d="M19 6l-1 14H6L5 6"></path>
+        <path d="M10 11v6"></path>
+        <path d="M14 11v6"></path>
+      </svg>
+    `;
+
+    if (photo.delete_allowed) {
+      return `
+        <button
+          type="button"
+          class="patient-photo-delete-btn"
+          title="Hapus foto"
+          aria-label="Hapus foto"
+          onclick="confirmDeletePatientPhoto('${safePhotoId}', '${safeFileName}')"
+        >
+          ${iconHtml}
+        </button>
+      `;
+    }
+
+    return `
+      <button
+        type="button"
+        class="patient-photo-delete-btn is-locked"
+        title="Batas waktu hapus sudah lewat"
+        aria-label="Batas waktu hapus sudah lewat"
+        onclick="handleLockedPhotoDelete('${lockedMessage.replace(/'/g, "\\'")}')"
+      >
+        ${iconHtml}
+      </button>
+    `;
+  }
+
+  function renderPatientPhotoCard(photo) {
+    const safeUrl = escapeHtml(photo.file_url || '');
+    const safeName = escapeHtml(photo.file_name || 'Foto Pasien');
+    const safeNote = escapeHtml(photo.photo_note || '-');
+    const photoType = String(photo.photo_type || '').toLowerCase();
+
+    const typeClass = photoType === 'after'
+      ? 'patient-photo-type-badge after'
+      : 'patient-photo-type-badge before';
+
+    const typeLabel = photoType === 'after' ? 'After' : 'Before';
+
+    return `
+      <div class="patient-photo-card">
+        <div class="${typeClass}">${typeLabel}</div>
+
+        ${renderPatientPhotoDeleteButton(photo)}
+
+        <button
+          type="button"
+          class="patient-photo-thumb-btn"
+          onclick="openPatientPhotoPreview('${safeUrl}', '${safeName.replace(/'/g, "\\'")}', '${safeNote.replace(/'/g, "\\'")}')"
+        >
+          <div class="patient-photo-thumb-wrap">
+            <img src="${safeUrl}" alt="${safeName}">
+          </div>
+        </button>
+
+        <div class="patient-photo-meta">
+          <div class="patient-photo-file-name">${safeName}</div>
+          <div class="patient-photo-note">${safeNote}</div>
+        </div>
+      </div>
+    `;
+  }
+
+  function renderPatientPhotoSection(groups) {
+    if (!Array.isArray(groups) || !groups.length) {
+      return `
+        <div class="content-card">
+          <div style="display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap; margin-bottom:16px;">
+            <h3 style="margin:0;">Foto Before / After</h3>
+            <button type="button" class="btn btn-primary" onclick="openPatientPhotoUploadModal()">Tambah Foto</button>
+          </div>
+          <div class="patient-photo-empty">Belum ada dokumentasi foto</div>
+        </div>
+      `;
+    }
+
+    return `
+      <div class="content-card">
+        <div style="display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap; margin-bottom:16px;">
+          <h3 style="margin:0;">Foto Before / After</h3>
+          <button type="button" class="btn btn-primary" onclick="openPatientPhotoUploadModal()">Tambah Foto</button>
+        </div>
+
+        ${groups.map(function(group, idx) {
+          const beforePhotos = Array.isArray(group.before) ? group.before : [];
+          const afterPhotos = Array.isArray(group.after) ? group.after : [];
+
+          return `
+            <div class="patient-photo-treatment-card" style="margin-bottom:${idx === groups.length - 1 ? '0' : '14px'};">
+              <div class="patient-photo-treatment-header">
+                <div class="patient-photo-treatment-title">
+                  Treatment ${escapeHtml(group.treatment_id || '-')}
+                </div>
+                <div class="patient-photo-treatment-subtitle">
+                  ${escapeHtml(group.visit_date_text || '-')}
+                </div>
+              </div>
+
+              <div class="patient-photo-columns">
+                <div>
+                  ${
+                    beforePhotos.length
+                      ? `<div class="patient-photo-grid">${beforePhotos.map(renderPatientPhotoCard).join('')}</div>`
+                      : `<div class="patient-photo-empty">Belum ada foto before</div>`
+                  }
+                </div>
+
+                <div>
+                  ${
+                    afterPhotos.length
+                      ? `<div class="patient-photo-grid">${afterPhotos.map(renderPatientPhotoCard).join('')}</div>`
+                      : `<div class="patient-photo-empty">Belum ada foto after</div>`
+                  }
+                </div>
+              </div>
+            </div>
+          `;
+        }).join('')}
+      </div>
+    `;
+  }
+
+  function openPatientDetail(patientId) {
+    const modal = document.getElementById('patientDetailModal');
+    const content = document.getElementById('patientDetailContent');
+
+    if (!modal || !content) {
+      showToast('Elemen detail pasien tidak ditemukan', 'error');
+      return;
+    }
+
+    const requestToken = ++patientDetailRequestToken;
+    currentPatientDetailId = patientId;
+
+    modal.style.display = 'flex';
+    modal.classList.remove('hidden');
+
+    const hasCache = hasPatientDetailFrontendCache(patientId);
+
+    if (hasCache && patientDetailFrontendCache.primary) {
+      const primary = patientDetailFrontendCache.primary || {};
+      const patient = primary.patient || {};
+      const medicalRecords = Array.isArray(primary.medical_records)
+        ? primary.medical_records
+        : [];
+      const orthoRecall = primary.ortho_recall || getEmptyPatientOrthoRecallSummary();
+
+      content.innerHTML = renderPatientPrimarySection(patient, medicalRecords, orthoRecall);
+
+      if (patientDetailFrontendCache.secondary) {
+        const secondary = patientDetailFrontendCache.secondary || {};
+        const treatments = Array.isArray(secondary.treatments)
+          ? secondary.treatments
+          : [];
+        const photoGroups = Array.isArray(secondary.photo_groups)
+          ? secondary.photo_groups
+          : [];
+
+        currentPatientDetailTreatments = treatments;
+        currentPatientDetailPhotoGroups = photoGroups;
+
+        const wrap = document.getElementById('patientDetailSecondaryWrap');
+        if (wrap) {
+          wrap.innerHTML = renderPatientSecondarySection(treatments, photoGroups);
+        }
+      }
+    } else {
+      content.innerHTML = renderPatientDetailLoadingState();
+    }
+
+    let primarySuccess = false;
+    let secondarySuccess = false;
+
+    let primaryPatient = null;
+    let primaryMedicalRecords = [];
+    let primaryOrthoRecall = getEmptyPatientOrthoRecallSummary();
+    let secondaryTreatments = [];
+    let secondaryPhotoGroups = [];
+
+    function renderPrimaryNow() {
+      if (!primarySuccess) return;
+
+      content.innerHTML = renderPatientPrimarySection(
+        primaryPatient || {},
+        primaryMedicalRecords || [],
+        primaryOrthoRecall || getEmptyPatientOrthoRecallSummary()
+      );
+    }
+
+    function renderSecondaryNow() {
+      const wrap = document.getElementById('patientDetailSecondaryWrap');
+      if (!wrap) return;
+
+      wrap.innerHTML = renderPatientSecondarySection(
+        secondaryTreatments || [],
+        secondaryPhotoGroups || []
+      );
+    }
+
+    function updateFrontendCache() {
+      if (!primarySuccess) return;
+
+      setPatientDetailFrontendCache(
+        patientId,
+        {
+          patient: primaryPatient || {},
+          medical_records: primaryMedicalRecords || [],
+          ortho_recall: primaryOrthoRecall || getEmptyPatientOrthoRecallSummary()
+        },
+        secondarySuccess
+          ? {
+              treatments: secondaryTreatments || [],
+              photo_groups: secondaryPhotoGroups || []
+            }
+          : (hasCache ? patientDetailFrontendCache.secondary : null)
+      );
+    }
+
+    function renderFromFullBundle(bundle) {
+      const p = bundle.patient || {};
+      const orthoRecall = bundle.ortho_recall || getEmptyPatientOrthoRecallSummary();
+      const medicalRecords = Array.isArray(bundle.medical_records)
+        ? bundle.medical_records
+        : [];
+      const treatments = Array.isArray(bundle.treatments)
+        ? bundle.treatments
+        : [];
+      const photoGroups = Array.isArray(bundle.photo_groups)
+        ? bundle.photo_groups
+        : [];
+
+      currentPatientDetailTreatments = treatments;
+      currentPatientDetailPhotoGroups = photoGroups;
+
+      content.innerHTML = renderPatientPrimarySection(p, medicalRecords, orthoRecall);
+
+      const wrap = document.getElementById('patientDetailSecondaryWrap');
+      if (wrap) {
+        wrap.innerHTML = renderPatientSecondarySection(treatments, photoGroups);
+      }
+
+      setPatientDetailFrontendCache(
+        patientId,
+        {
+          patient: p,
+          medical_records: medicalRecords,
+          ortho_recall: orthoRecall
+        },
+        {
+          treatments: treatments,
+          photo_groups: photoGroups
+        }
+      );
+    }
+
+    function fallbackToFullBundle() {
+      google.script.run
+        .withSuccessHandler(function(fullRes) {
+          if (requestToken !== patientDetailRequestToken) return;
+
+          if (!fullRes || !fullRes.success) {
+            content.innerHTML = `
+              <div class="content-card">
+                <h3 style="margin-top:0; margin-bottom:12px;">Detail Pasien</h3>
+                <div style="color:#b91c1c;">${escapeHtml((fullRes && fullRes.message) || 'Gagal mengambil detail pasien')}</div>
+              </div>
+            `;
+            showToast((fullRes && fullRes.message) || 'Gagal mengambil detail pasien', 'error');
+            return;
+          }
+
+          renderFromFullBundle(fullRes.data || {});
+        })
+        .withFailureHandler(function(err) {
+          if (requestToken !== patientDetailRequestToken) return;
+
+          content.innerHTML = `
+            <div class="content-card">
+              <h3 style="margin-top:0; margin-bottom:12px;">Detail Pasien</h3>
+              <div style="color:#b91c1c;">Error: ${escapeHtml(err && err.message ? err.message : err)}</div>
+            </div>
+          `;
+          showToast('Error: ' + (err && err.message ? err.message : err), 'error');
+        })
+        .getPatientDetailBundle(patientId);
+    }
+
+    google.script.run
+      .withSuccessHandler(function(res) {
+        if (requestToken !== patientDetailRequestToken) return;
+
+        if (!res || !res.success) {
+          fallbackToFullBundle();
+          return;
+        }
+
+        primarySuccess = true;
+
+        const primaryBundle = res.data || {};
+        primaryPatient = primaryBundle.patient || {};
+        primaryMedicalRecords = Array.isArray(primaryBundle.medical_records)
+          ? primaryBundle.medical_records
+          : [];
+        primaryOrthoRecall = primaryBundle.ortho_recall || getEmptyPatientOrthoRecallSummary();
+
+        renderPrimaryNow();
+        updateFrontendCache();
+
+        if (secondarySuccess) {
+          renderSecondaryNow();
+        }
+      })
+      .withFailureHandler(function() {
+        if (requestToken !== patientDetailRequestToken) return;
+        fallbackToFullBundle();
+      })
+      .getPatientDetailPrimary(patientId);
+
+    google.script.run
+      .withSuccessHandler(function(res) {
+        if (requestToken !== patientDetailRequestToken) return;
+
+        if (!res || !res.success) {
+          fallbackToFullBundle();
+          return;
+        }
+
+        secondarySuccess = true;
+
+        const secondaryBundle = res.data || {};
+        secondaryTreatments = Array.isArray(secondaryBundle.treatments)
+          ? secondaryBundle.treatments
+          : [];
+        secondaryPhotoGroups = Array.isArray(secondaryBundle.photo_groups)
+          ? secondaryBundle.photo_groups
+          : [];
+
+        currentPatientDetailTreatments = secondaryTreatments;
+        currentPatientDetailPhotoGroups = secondaryPhotoGroups;
+
+        if (primarySuccess) {
+          renderSecondaryNow();
+        }
+
+        updateFrontendCache();
+      })
+      .withFailureHandler(function() {
+        if (requestToken !== patientDetailRequestToken) return;
+        fallbackToFullBundle();
+      })
+      .getPatientDetailSecondary(patientId);
+  }
+
+  function closePatientDetailModal() {
+    const modal = document.getElementById('patientDetailModal');
+    if (modal) {
+      modal.classList.add('hidden');
+      modal.style.display = 'none';
+    }
+
+    patientDetailRequestToken++;
+  }
+
+  function buildTreatmentPhotoPolicyMap() {
+    const groups = Array.isArray(currentPatientDetailPhotoGroups)
+      ? currentPatientDetailPhotoGroups
+      : [];
+
+    const map = {};
+
+    groups.forEach(function(group) {
+      const treatmentId = String(group.treatment_id || '').trim();
+      if (!treatmentId) return;
+
+      map[treatmentId] = {
+        has_photos: true,
+        upload_allowed: !!group.upload_allowed,
+        upload_lock_message: String(group.upload_lock_message || '').trim()
+      };
+    });
+
+    return map;
+  }
+
+  
+  function getTreatmentPhotoUploadPolicyById(treatmentId) {
+    const normalizedTreatmentId = String(treatmentId || '').trim();
+    if (!normalizedTreatmentId) return null;
+
+    const policyMap = buildTreatmentPhotoPolicyMap();
+    return policyMap[normalizedTreatmentId] || null;
+  }
+
+  function getTreatmentPhotoOptionStatusText(treatmentId) {
+    const policy = getTreatmentPhotoUploadPolicyById(treatmentId);
+
+    if (!policy) {
+      return 'Belum ada foto';
+    }
+
+    if (policy.upload_allowed) {
+      return 'Masih bisa tambah foto';
+    }
+
+    return 'Upload terkunci';
+  }
+
+  function setPatientPhotoTreatmentWarning(message) {
+    const el = document.getElementById('photo_treatment_warning');
+    if (!el) return;
+
+    if (!message) {
+      el.style.display = 'none';
+      el.textContent = '';
+      return;
+    }
+
+    el.style.display = 'block';
+    el.textContent = message;
+  }
+
+  function handlePatientPhotoTreatmentChange() {
+    const select = document.getElementById('photo_treatment_id');
+    const treatmentId = select ? String(select.value || '').trim() : '';
+
+    photoSelectedTreatmentLocked = false;
+    photoSelectedTreatmentLockMessage = '';
+    setPatientPhotoTreatmentWarning('');
+
+    if (!treatmentId) {
+      return;
+    }
+
+    const policy = getTreatmentPhotoUploadPolicyById(treatmentId);
+
+    // treatment belum punya foto sama sekali → normal
+    if (!policy) {
+      return;
+    }
+
+    // treatment sudah punya foto, tapi masih dalam 1 x 24 jam → normal
+    if (policy.upload_allowed) {
+      return;
+    }
+
+    // treatment sudah punya foto pertama & lewat 1 x 24 jam → warning merah
+    photoSelectedTreatmentLocked = true;
+    photoSelectedTreatmentLockMessage =
+      String(policy.upload_lock_message || '').trim() ||
+      'Foto baru tidak bisa ditambahkan karena sudah lewat 1 x 24 jam sejak foto pertama dibuat.';
+
+    setPatientPhotoTreatmentWarning(photoSelectedTreatmentLockMessage);
+  }
+
+  function openPatientPhotoUploadModal() {
+    const patientId = String(currentPatientDetailId || '').trim();
+
+    if (!patientId) {
+      showToast('Patient ID tidak ditemukan', 'error');
+      return;
+    }
+
+    const treatments = Array.isArray(currentPatientDetailTreatments)
+      ? currentPatientDetailTreatments
+      : [];
+
+    if (!treatments.length) {
+      showToast('Belum ada treatment untuk pasien ini', 'error');
+      return;
+    }
+
+    const select = document.getElementById('photo_treatment_id');
+    const modal = document.getElementById('patientPhotoUploadModal');
+
+    document.getElementById('photo_patient_id_hidden').value = patientId;
+    document.getElementById('photo_type').value = '';
+    document.getElementById('photo_file_input').value = '';
+    document.getElementById('photo_note').value = '';
+
+    photoSelectedTreatmentLocked = false;
+    photoSelectedTreatmentLockMessage = '';
+    setPatientPhotoTreatmentWarning('');
+
+    const previewWrap = document.getElementById('photoPreviewWrap');
+    const previewImage = document.getElementById('photoPreviewImage');
+    if (previewWrap) previewWrap.style.display = 'none';
+    if (previewImage) previewImage.src = '';
+
+    if (select) {
+      select.innerHTML =
+        '<option value="">Pilih treatment</option>' +
+        treatments.map(function(t) {
+          const treatmentId = String(t.treatment_id || '').trim();
+          const statusText = getTreatmentPhotoOptionStatusText(treatmentId);
+
+          return `<option value="${treatmentId}">${formatDateDmy(t.treatment_date || '')} • ${treatmentId} • ${statusText}</option>`;
+        }).join('');
+    }
+
+    clearPatientPhotoUploadErrors();
+
+    if (modal) {
+      modal.style.display = 'flex';
+      modal.classList.remove('hidden');
+    }
+  }
+
+  function closePatientPhotoUploadModal() {
+    patientPhotoUploadInFlight = false;
+
+    setModalProcessingState('patientPhotoUploadModal', false, {
+      primaryButtonId: 'patientPhotoUploadSubmitBtn',
+      idleText: 'Upload'
+    });
+
+    const modal = document.getElementById('patientPhotoUploadModal');
+
+    photoSelectedTreatmentLocked = false;
+    photoSelectedTreatmentLockMessage = '';
+    setPatientPhotoTreatmentWarning('');
+
+    if (modal) {
+      modal.classList.add('hidden');
+      modal.style.display = 'none';
+    }
+  }
+
+  function openPatientPhotoPreview(url, title, note) {
+    const modal = document.getElementById('patientPhotoPreviewModal');
+    const image = document.getElementById('patientPhotoPreviewImage');
+    const titleEl = document.getElementById('patientPhotoPreviewTitle');
+    const noteEl = document.getElementById('patientPhotoPreviewNote');
+
+    if (image) image.src = url || '';
+    if (titleEl) titleEl.textContent = title || 'Preview Foto';
+    if (noteEl) noteEl.textContent = note || '-';
+
+    if (modal) {
+      modal.style.display = 'flex';
+      modal.classList.remove('hidden');
+    }
+  }
+
+  function closePatientPhotoPreviewModal() {
+    const modal = document.getElementById('patientPhotoPreviewModal');
+    const image = document.getElementById('patientPhotoPreviewImage');
+    const titleEl = document.getElementById('patientPhotoPreviewTitle');
+    const noteEl = document.getElementById('patientPhotoPreviewNote');
+
+    if (image) image.src = '';
+    if (titleEl) titleEl.textContent = 'Preview Foto';
+    if (noteEl) noteEl.textContent = '';
+
+    if (modal) {
+      modal.classList.add('hidden');
+      modal.style.display = 'none';
+    }
+  }
+
+  function confirmDeletePatientPhoto(photoId, fileName) {
+    pendingDeletePatientPhotoId = String(photoId || '');
+    pendingDeletePatientPhotoLabel = String(fileName || 'foto ini');
+    deletePatientPhotoInFlight = false;
+
+    setModalProcessingState('confirmDeletePatientPhotoModal', false, {
+      primaryButtonId: 'confirmDeletePatientPhotoSubmitBtn',
+      idleText: 'Hapus Foto'
+    });
+
+    const text = document.getElementById('confirmDeletePatientPhotoText');
+    if (text) {
+      text.innerText = 'Yakin ingin menghapus foto "' + pendingDeletePatientPhotoLabel + '"?';
+    }
+
+    const modal = document.getElementById('confirmDeletePatientPhotoModal');
+    if (modal) {
+      modal.classList.remove('hidden');
+      modal.style.display = 'flex';
+    }
+    }
+  
+  function closeDeletePatientPhotoModal() {
+    deletePatientPhotoInFlight = false;
+
+    setModalProcessingState('confirmDeletePatientPhotoModal', false, {
+      primaryButtonId: 'confirmDeletePatientPhotoSubmitBtn',
+      idleText: 'Hapus Foto'
+    });
+
+    pendingDeletePatientPhotoId = '';
+    pendingDeletePatientPhotoLabel = '';
+
+    const modal = document.getElementById('confirmDeletePatientPhotoModal');
+    if (modal) {
+      modal.classList.add('hidden');
+      modal.style.display = 'none';
+    }
+  }
+  
+  function executeDeletePatientPhoto() {
+    if (!pendingDeletePatientPhotoId || deletePatientPhotoInFlight) return;
+
+    deletePatientPhotoInFlight = true;
+
+    setModalProcessingState('confirmDeletePatientPhotoModal', true, {
+      primaryButtonId: 'confirmDeletePatientPhotoSubmitBtn',
+      loadingText: 'Menghapus...'
+    });
+
+    const targetPhotoId = pendingDeletePatientPhotoId;
+
+    google.script.run
+      .withSuccessHandler(function(res) {
+        deletePatientPhotoInFlight = false;
+
+        if (!res || !res.success) {
+          setModalProcessingState('confirmDeletePatientPhotoModal', false, {
+            primaryButtonId: 'confirmDeletePatientPhotoSubmitBtn',
+            idleText: 'Hapus Foto'
+          });
+
+          showToast((res && res.message) || 'Gagal menghapus foto pasien', 'error');
+          return;
+        }
+
+        closeDeletePatientPhotoModal();
+        clearPatientDetailFrontendCache(currentPatientDetailId);
+        openPatientDetail(currentPatientDetailId);
+        showToast('Foto pasien berhasil dihapus', 'success');
+      })
+      .withFailureHandler(function(err) {
+        deletePatientPhotoInFlight = false;
+
+        setModalProcessingState('confirmDeletePatientPhotoModal', false, {
+          primaryButtonId: 'confirmDeletePatientPhotoSubmitBtn',
+          idleText: 'Hapus Foto'
+        });
+
+        showToast('Error: ' + (err && err.message ? err.message : err), 'error');
+      })
+      .deletePatientPhoto({
+        photo_id: targetPhotoId,
+        actor_role: currentUser ? String(currentUser.role || '').toLowerCase() : ''
+      });
+  }
+
+  function clearPatientPhotoUploadErrors() {
+    const ids = ['photo_treatment_id', 'photo_type', 'photo_file', 'photo_note'];
+    ids.forEach(function(id) {
+      const err = document.getElementById('error_' + id);
+      if (err) err.textContent = '';
+    });
+  }
+
+  function applyPatientPhotoUploadErrors(errors) {
+    if (!errors) return;
+
+    if (errors.treatment_id) {
+      const el = document.getElementById('error_photo_treatment_id');
+      if (el) el.textContent = errors.treatment_id;
+    }
+
+    if (errors.photo_type) {
+      const el = document.getElementById('error_photo_type');
+      if (el) el.textContent = errors.photo_type;
+    }
+
+    if (errors.file || errors.file_name || errors.file_url || errors.file_drive_id || errors.mime_type) {
+      const el = document.getElementById('error_photo_file');
+      if (el) el.textContent = errors.file || errors.file_name || errors.file_url || errors.file_drive_id || errors.mime_type;
+    }
+
+    if (errors.photo_note) {
+      const el = document.getElementById('error_photo_note');
+      if (el) el.textContent = errors.photo_note;
+    }
+  }
+
+  function previewPatientPhotoFile(input) {
+    const file = input && input.files ? input.files[0] : null;
+    const previewWrap = document.getElementById('photoPreviewWrap');
+    const previewImage = document.getElementById('photoPreviewImage');
+
+    clearPatientPhotoUploadErrors();
+
+    if (!file) {
+      if (previewWrap) previewWrap.style.display = 'none';
+      if (previewImage) previewImage.src = '';
+      return;
+    }
+
+    const allowedTypes = ['image/jpeg', 'image/png', 'image/webp'];
+    const maxBytes = 5 * 1024 * 1024;
+
+    if (allowedTypes.indexOf(file.type) === -1) {
+      applyPatientPhotoUploadErrors({ file: 'Format file harus JPG, PNG, atau WEBP' });
+      input.value = '';
+      if (previewWrap) previewWrap.style.display = 'none';
+      if (previewImage) previewImage.src = '';
+      return;
+    }
+
+    if (file.size > maxBytes) {
+      applyPatientPhotoUploadErrors({ file: 'Ukuran file maksimal 5 MB' });
+      input.value = '';
+      if (previewWrap) previewWrap.style.display = 'none';
+      if (previewImage) previewImage.src = '';
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = function(e) {
+      if (previewImage) previewImage.src = e.target.result;
+      if (previewWrap) previewWrap.style.display = 'block';
+    };
+    reader.readAsDataURL(file);
+  }
+
+  
+  function submitPatientPhotoUpload(e) {
+    e.preventDefault();
+
+    if (patientPhotoUploadInFlight) return;
+
+    clearPatientPhotoUploadErrors();
+
+    const treatmentId = String(document.getElementById('photo_treatment_id').value || '').trim();
+    const selectedPolicy = getTreatmentPhotoUploadPolicyById(treatmentId);
+
+    if (selectedPolicy && !selectedPolicy.upload_allowed) {
+      photoSelectedTreatmentLocked = true;
+      photoSelectedTreatmentLockMessage =
+        String(selectedPolicy.upload_lock_message || '').trim() ||
+        'Foto baru tidak bisa ditambahkan karena sudah lewat 1 x 24 jam sejak foto pertama dibuat.';
+
+      setPatientPhotoTreatmentWarning(photoSelectedTreatmentLockMessage);
+
+      applyPatientPhotoUploadErrors({
+        treatment_id: 'Treatment ini sudah melewati batas upload 1 x 24 jam'
+      });
+
+      showToast(photoSelectedTreatmentLockMessage, 'error');
+      return;
+    }
+
+    const fileInput = document.getElementById('photo_file_input');
+    const file = fileInput && fileInput.files ? fileInput.files[0] : null;
+
+    if (!file) {
+      applyPatientPhotoUploadErrors({ file: 'File foto wajib dipilih' });
+      showToast('Validasi gagal', 'error');
+      return;
+    }
+
+    patientPhotoUploadInFlight = true;
+
+    setModalProcessingState('patientPhotoUploadModal', true, {
+      primaryButtonId: 'patientPhotoUploadSubmitBtn',
+      loadingText: 'Uploading...'
+    });
+
+    const reader = new FileReader();
+    reader.onload = function(evt) {
+      const dataUrl = String(evt.target.result || '');
+      const base64Data = dataUrl.split(',')[1] || '';
+
+      const payload = {
+        patient_id: document.getElementById('photo_patient_id_hidden').value,
+        treatment_id: treatmentId,
+        photo_type: document.getElementById('photo_type').value,
+        file_name: file.name,
+        mime_type: file.type,
+        base64_data: base64Data,
+        photo_note: document.getElementById('photo_note').value.trim(),
+        photo_group: '',
+        sort_order: 0,
+        actor_role: currentUser ? String(currentUser.role || '').toLowerCase() : ''
+      };
+
+      google.script.run
+        .withSuccessHandler(function(res) {
+          patientPhotoUploadInFlight = false;
+
+          if (!res || !res.success) {
+            setModalProcessingState('patientPhotoUploadModal', false, {
+              primaryButtonId: 'patientPhotoUploadSubmitBtn',
+              idleText: 'Upload'
+            });
+
+            applyPatientPhotoUploadErrors(res && res.errors ? res.errors : null);
+            showToast((res && res.message) || 'Gagal upload foto pasien', 'error');
+            return;
+          }
+
+          closePatientPhotoUploadModal();
+          clearPatientDetailFrontendCache(currentPatientDetailId);
+          openPatientDetail(currentPatientDetailId);
+          showToast('Foto pasien berhasil diupload', 'success');
+        })
+        .withFailureHandler(function(err) {
+          patientPhotoUploadInFlight = false;
+
+          setModalProcessingState('patientPhotoUploadModal', false, {
+            primaryButtonId: 'patientPhotoUploadSubmitBtn',
+            idleText: 'Upload'
+          });
+
+          showToast('Error: ' + (err && err.message ? err.message : err), 'error');
+        })
+        .createPatientPhotoUpload(payload);
+    };
+
+    reader.readAsDataURL(file);
+  }
+
+  function confirmDeactivatePatient(patientId, fullName) {
+    pendingDeactivatePatientId = patientId;
+    pendingDeactivatePatientName = fullName || '';
+    document.getElementById('confirmDeactivateText').innerText =
+      'Yakin ingin menonaktifkan pasien "' + pendingDeactivatePatientName + '"?';
+    document.getElementById('confirmDeactivateModal').classList.remove('hidden');
+  }
+
+  function closeDeactivateModal() {
+    deactivatePatientInFlight = false;
+
+    setModalProcessingState('confirmDeactivateModal', false, {
+      primarySelector: '.btn-danger',
+      idleText: 'Nonaktifkan'
+    });
+
+    pendingDeactivatePatientId = null;
+    pendingDeactivatePatientName = '';
+
+    document.getElementById('confirmDeactivateModal').classList.add('hidden');
+  }
+
+  function executeDeactivatePatient() {
+    if (!pendingDeactivatePatientId || deactivatePatientInFlight) return;
+
+    deactivatePatientInFlight = true;
+
+    setModalProcessingState('confirmDeactivateModal', true, {
+      primarySelector: '.btn-danger',
+      loadingText: 'Menonaktifkan...'
+    });
+
+    const targetPatientId = pendingDeactivatePatientId;
+
+    google.script.run
+      .withSuccessHandler(function(res) {
+        deactivatePatientInFlight = false;
+
+        if (!res || !res.success) {
+          setModalProcessingState('confirmDeactivateModal', false, {
+            primarySelector: '.btn-danger',
+            idleText: 'Nonaktifkan'
+          });
+
+          showToast((res && res.message) || 'Gagal menonaktifkan pasien', 'error');
+          return;
+        }
+
+        closeDeactivateModal();
+        clearPatientDetailFrontendCache(targetPatientId);
+
+        loadPatients();
+        showToast('Pasien berhasil dinonaktifkan', 'success');
+      })
+      .withFailureHandler(function(err) {
+        deactivatePatientInFlight = false;
+
+        setModalProcessingState('confirmDeactivateModal', false, {
+          primarySelector: '.btn-danger',
+          idleText: 'Nonaktifkan'
+        });
+
+        showToast('Error: ' + (err && err.message ? err.message : err), 'error');
+      })
+      .deactivatePatient(targetPatientId);
+  }
+</script>

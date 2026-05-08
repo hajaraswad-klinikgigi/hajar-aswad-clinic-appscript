@@ -1,0 +1,1383 @@
+<style>
+  /* =========================================================
+     1. FINANCE PAGE SHELL & HEADER
+     Struktur utama halaman Finance
+     Header periode mengikuti Dashboard sebagai acuan
+     ========================================================= */
+  .finance-shell {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+  }
+
+  .finance-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: end;
+    gap: 16px;
+    flex-wrap: wrap;
+  }
+
+  .finance-eyebrow {
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+    color: #6b7280;
+    margin-bottom: 6px;
+  }
+
+  .finance-title {
+    margin: 0 0 4px 0;
+    font-size: 32px;
+    font-weight: 900;
+    line-height: 1.1;
+    letter-spacing: -0.03em;
+    color: #0f172a;
+  }
+
+  .finance-subtitle {
+    color: #64748b;
+    font-size: 14px;
+  }
+
+  .finance-period-filter-wrap {
+    min-width: 180px;
+  }
+
+  .finance-period-filter-label {
+    display: block;
+    font-size: 12px;
+    font-weight: 700;
+    color: #6b7280;
+    margin-bottom: 6px;
+  }
+
+  .finance-period-select {
+    width: 180px;
+    max-width: 100%;
+    padding: 10px 12px;
+    border-radius: 14px;
+    border: 1px solid #dbe3ee;
+    background: #fff;
+    font-size: 14px;
+    font-weight: 600;
+    outline: none;
+    box-shadow: 0 2px 8px rgba(15, 23, 42, 0.03);
+  }
+
+  .finance-period-info {
+    color: #6b7280;
+    font-size: 14px;
+  }
+
+  /* =========================================================
+     2. FINANCE KPI CARDS
+     Ringkasan billing, kas masuk, piutang, diskon
+     ========================================================= */
+  .finance-kpi-grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 14px;
+  }
+
+  .finance-kpi-card {
+    background: linear-gradient(180deg, #ffffff 0%, #fbfdff 100%);
+    border-radius: 18px;
+    padding: 18px;
+    box-shadow: 0 10px 26px rgba(15, 23, 42, 0.05);
+    border: 1px solid #eef2f7;
+  }
+
+  .finance-kpi-label {
+    font-size: 13px;
+    color: #6b7280;
+    margin-bottom: 10px;
+  }
+
+  .finance-kpi-value {
+    font-size: 24px;
+    line-height: 1.15;
+    font-weight: 800;
+    color: #0f172a;
+    word-break: break-word;
+  }
+
+  .finance-kpi-neutral {
+    background: linear-gradient(180deg, #ffffff 0%, #fbfdff 100%);
+  }
+
+  .finance-kpi-primary {
+    background: linear-gradient(180deg, #f0fdfa 0%, #ecfeff 100%);
+  }
+
+  .finance-kpi-primary .finance-kpi-value {
+    color: #0f766e;
+  }
+
+  .finance-kpi-success {
+    background: linear-gradient(180deg, #f0fdf4 0%, #f7fee7 100%);
+  }
+
+  .finance-kpi-success .finance-kpi-value {
+    color: #166534;
+  }
+
+  .finance-kpi-danger {
+    background: linear-gradient(180deg, #fff7ed 0%, #fef2f2 100%);
+  }
+
+  .finance-kpi-danger .finance-kpi-value {
+    color: #b91c1c;
+  }
+
+  /* =========================================================
+     3. FINANCE FEEDBACK SUMMARY
+     Ringkasan kepuasan layanan di halaman Finance
+     ========================================================= */
+  .finance-feedback-card {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+
+  .finance-feedback-summary-grid {
+    display: grid;
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+    gap: 12px;
+  }
+
+  .finance-feedback-summary-card {
+    border-radius: 16px;
+    padding: 14px;
+    border: 1px solid #e5e7eb;
+    background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+  }
+
+  .finance-feedback-summary-label {
+    font-size: 12px;
+    color: #64748b;
+    font-weight: 700;
+    margin-bottom: 8px;
+  }
+
+  .finance-feedback-summary-value {
+    font-size: 20px;
+    font-weight: 900;
+    color: #0f172a;
+    line-height: 1.2;
+    word-break: break-word;
+  }
+
+  .finance-feedback-primary {
+    background: linear-gradient(180deg, #f0fdfa 0%, #ecfeff 100%);
+  }
+
+  .finance-feedback-primary .finance-feedback-summary-value {
+    color: #0f766e;
+  }
+
+  .finance-feedback-success {
+    background: linear-gradient(180deg, #f0fdf4 0%, #f7fee7 100%);
+  }
+
+  .finance-feedback-success .finance-feedback-summary-value {
+    color: #166534;
+  }
+
+  .finance-feedback-danger {
+    background: linear-gradient(180deg, #fff7ed 0%, #fef2f2 100%);
+  }
+
+  .finance-feedback-danger .finance-feedback-summary-value {
+    color: #b91c1c;
+  }
+
+  .finance-feedback-neutral {
+    background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+  }
+
+  .finance-feedback-latest-empty {
+    padding: 12px;
+    border: 1px dashed #dbe3ee;
+    border-radius: 14px;
+    color: #64748b;
+    background: #f8fafc;
+    font-size: 13px;
+  }
+
+  .finance-feedback-latest-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .finance-feedback-latest-item {
+    padding: 12px 0;
+    border-bottom: 1px solid #f1f5f9;
+  }
+
+  .finance-feedback-latest-item:last-child {
+    border-bottom: none;
+  }
+
+  .finance-feedback-latest-title {
+    font-size: 15px;
+    font-weight: 800;
+    color: #0f172a;
+    margin-bottom: 4px;
+  }
+
+  .finance-feedback-latest-sub {
+    font-size: 12px;
+    color: #64748b;
+    line-height: 1.4;
+  }
+
+  .finance-feedback-latest-comment {
+    margin-top: 8px;
+    padding: 10px 12px;
+    border-radius: 12px;
+    background: #f8fafc;
+    color: #334155;
+    font-size: 13px;
+    line-height: 1.5;
+  }
+
+  /* =========================================================
+     4. FINANCE RECEIVABLES / LAPORAN PIUTANG
+     Ringkasan dan tabel billing belum lunas
+     ========================================================= */
+  .finance-receivable-card {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  .finance-receivable-summary-grid {
+    display: grid;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: 12px;
+  }
+
+  .finance-receivable-summary-card {
+    border-radius: 16px;
+    padding: 14px;
+    border: 1px solid #e5e7eb;
+    background: #fff;
+  }
+
+  .finance-receivable-summary-label {
+    font-size: 12px;
+    color: #64748b;
+    font-weight: 700;
+    margin-bottom: 8px;
+  }
+
+  .finance-receivable-summary-value {
+    font-size: 18px;
+    font-weight: 900;
+    color: #0f172a;
+    line-height: 1.2;
+    word-break: break-word;
+  }
+
+  .finance-receivable-summary-sub {
+    margin-top: 6px;
+    font-size: 12px;
+    color: #64748b;
+  }
+
+  .finance-receivable-danger {
+    background: linear-gradient(180deg, #fff7ed 0%, #fef2f2 100%);
+  }
+
+  .finance-receivable-danger .finance-receivable-summary-value {
+    color: #b91c1c;
+  }
+
+  .finance-receivable-primary {
+    background: linear-gradient(180deg, #f0fdfa 0%, #ecfeff 100%);
+  }
+
+  .finance-receivable-primary .finance-receivable-summary-value {
+    color: #0f766e;
+  }
+
+  .finance-receivable-success {
+    background: linear-gradient(180deg, #f0fdf4 0%, #f7fee7 100%);
+  }
+
+  .finance-receivable-success .finance-receivable-summary-value {
+    color: #166534;
+  }
+
+  .finance-receivable-neutral {
+    background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+  }
+
+  .finance-receivable-toolbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: end;
+    gap: 16px;
+    flex-wrap: wrap;
+  }
+
+  .finance-receivable-table {
+    min-width: 820px;
+    table-layout: fixed;
+  }
+
+  .finance-receivable-table th,
+  .finance-receivable-table td {
+    vertical-align: top;
+    word-break: break-word;
+  }
+
+  .finance-receivable-table th:nth-child(1),
+  .finance-receivable-table td:nth-child(1) {
+    width: 20%;
+  }
+
+  .finance-receivable-table th:nth-child(2),
+  .finance-receivable-table td:nth-child(2) {
+    width: 22%;
+  }
+
+  .finance-receivable-table th:nth-child(3),
+  .finance-receivable-table td:nth-child(3) {
+    width: 14%;
+  }
+
+  .finance-receivable-table th:nth-child(4),
+  .finance-receivable-table td:nth-child(4) {
+    width: 17%;
+  }
+
+  .finance-receivable-table th:nth-child(5),
+  .finance-receivable-table td:nth-child(5) {
+    width: 17%;
+  }
+
+  .finance-receivable-table th:nth-child(6),
+  .finance-receivable-table td:nth-child(6) {
+    width: 10%;
+  }
+
+  .finance-receivable-amount {
+    color: #b91c1c;
+  }
+
+  /* =========================================================
+     5. FINANCE TOOLBAR & SECTION HEADER
+     Search, filter, dan heading section
+     ========================================================= */
+  .finance-toolbar-card {
+    padding-top: 18px;
+    padding-bottom: 18px;
+  }
+
+  .finance-toolbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: end;
+    gap: 16px;
+    flex-wrap: wrap;
+  }
+
+  .finance-search-wrap {
+    flex: 1;
+    min-width: 280px;
+  }
+
+  .finance-filter-wrap {
+    width: 220px;
+    max-width: 100%;
+  }
+
+  .finance-filter-wrap select {
+    margin-bottom: 0;
+  }
+
+  .finance-table-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 4px;
+    flex-wrap: wrap;
+  }
+
+  .finance-section-title {
+    margin: 0 0 4px 0;
+    font-size: 20px;
+    font-weight: 800;
+    color: #0f172a;
+    letter-spacing: -0.02em;
+  }
+
+  .finance-section-subtitle {
+    color: #64748b;
+    font-size: 14px;
+  }
+
+  /* =========================================================
+     6. FINANCE BILLING TABLE
+     Tabel utama daftar billing
+     ========================================================= */
+  .finance-table {
+    table-layout: fixed;
+  }
+
+  .finance-table th,
+  .finance-table td {
+    vertical-align: top;
+    word-break: break-word;
+  }
+
+  .finance-table th:nth-child(1),
+  .finance-table td:nth-child(1) {
+    width: 20%;
+  }
+
+  .finance-table th:nth-child(2),
+  .finance-table td:nth-child(2) {
+    width: 22%;
+  }
+
+  .finance-table th:nth-child(3),
+  .finance-table td:nth-child(3) {
+    width: 14%;
+  }
+
+  .finance-table th:nth-child(4),
+  .finance-table td:nth-child(4) {
+    width: 20%;
+  }
+
+  .finance-table th:nth-child(5),
+  .finance-table td:nth-child(5) {
+    width: 16%;
+  }
+
+  .finance-table th:nth-child(6),
+  .finance-table td:nth-child(6) {
+    width: 8%;
+  }
+
+  .finance-invoice-main,
+  .finance-patient-main {
+    font-weight: 800;
+    color: #0f172a;
+    line-height: 1.4;
+  }
+
+  .finance-invoice-sub {
+    margin-top: 4px;
+    font-size: 12px;
+    color: #64748b;
+    line-height: 1.4;
+  }
+
+  .finance-paid-note {
+    font-size: 13px;
+    color: #166534;
+    font-weight: 700;
+    margin-bottom: 4px;
+  }
+
+  .finance-outstanding-note {
+    font-size: 13px;
+    color: #b91c1c;
+    font-weight: 700;
+  }
+
+  /* =========================================================
+     7. FINANCE DETAIL MODAL
+     Detail billing, actions, invoice digital, feedback
+     ========================================================= */
+  .finance-detail-modal-box {
+    width: 94%;
+    max-width: 980px;
+  }
+
+  .finance-detail-header-card {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 14px;
+    flex-wrap: wrap;
+    padding: 18px;
+    border: 1px solid #e5e7eb;
+    border-radius: 18px;
+    background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+    margin-bottom: 16px;
+  }
+
+  .finance-detail-label {
+    font-size: 12px;
+    font-weight: 700;
+    color: #64748b;
+    text-transform: uppercase;
+    letter-spacing: .04em;
+    margin-bottom: 6px;
+  }
+
+  .finance-detail-invoice {
+    font-size: 22px;
+    font-weight: 900;
+    color: #0f172a;
+    letter-spacing: -0.02em;
+  }
+
+  .finance-detail-sub {
+    margin-top: 4px;
+    color: #64748b;
+    font-size: 13px;
+  }
+
+  .finance-detail-statuses {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+  }
+
+  .finance-detail-grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 12px;
+    margin-bottom: 16px;
+  }
+
+  .finance-detail-box {
+    border: 1px solid #e5e7eb;
+    border-radius: 16px;
+    padding: 14px;
+    background: #fff;
+  }
+
+  .finance-detail-value {
+    font-size: 15px;
+    font-weight: 700;
+    color: #0f172a;
+    line-height: 1.4;
+    word-break: break-word;
+  }
+
+  .finance-detail-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin-bottom: 18px;
+  }
+
+  .finance-detail-actions .btn {
+    width: auto;
+    min-width: 150px;
+  }
+
+  .finance-detail-section {
+    margin-top: 18px;
+  }
+
+  .finance-detail-section h3 {
+    margin: 0 0 12px;
+    font-size: 18px;
+    font-weight: 800;
+    color: #0f172a;
+  }
+
+  .finance-detail-section-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 12px;
+    flex-wrap: wrap;
+    margin-bottom: 12px;
+  }
+
+  .finance-detail-section-subtitle {
+    margin-top: 4px;
+    color: #64748b;
+    font-size: 13px;
+    line-height: 1.5;
+  }
+
+  .finance-detail-table {
+    min-width: 620px;
+  }
+
+  /* =========================================================
+     8. FINANCE TOTAL STRIP & MINI LIST
+     Ringkasan total dan list payment/adjustment
+     ========================================================= */
+  .finance-total-strip {
+    display: grid;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: 12px;
+    margin-bottom: 16px;
+  }
+
+  .finance-total-strip > div {
+    border: 1px solid #e5e7eb;
+    border-radius: 16px;
+    padding: 14px;
+    background: #fff;
+  }
+
+  .finance-total-label {
+    font-size: 12px;
+    color: #64748b;
+    font-weight: 700;
+    margin-bottom: 6px;
+  }
+
+  .finance-total-value {
+    font-size: 16px;
+    font-weight: 900;
+    color: #0f172a;
+    word-break: break-word;
+  }
+
+  .finance-total-value.primary {
+    color: #0f766e;
+  }
+
+  .finance-total-value.success {
+    color: #166534;
+  }
+
+  .finance-total-value.danger {
+    color: #b91c1c;
+  }
+
+  .finance-mini-list {
+    border: 1px solid #e5e7eb;
+    border-radius: 16px;
+    overflow: hidden;
+    background: #fff;
+  }
+
+  .finance-mini-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 14px;
+    padding: 14px;
+    border-bottom: 1px solid #f1f5f9;
+  }
+
+  .finance-mini-item:last-child {
+    border-bottom: none;
+  }
+
+  .finance-mini-title {
+    font-size: 14px;
+    font-weight: 800;
+    color: #0f172a;
+    margin-bottom: 4px;
+  }
+
+  .finance-mini-sub {
+    font-size: 13px;
+    color: #64748b;
+    line-height: 1.4;
+  }
+
+  .finance-mini-value {
+    font-size: 14px;
+    font-weight: 900;
+    white-space: nowrap;
+  }
+
+  .finance-mini-value.success {
+    color: #166534;
+  }
+
+  .finance-mini-value.danger {
+    color: #b91c1c;
+  }
+
+  /* =========================================================
+     9. FINANCE MODAL COMMON
+     Modal kecil payment, discount, invoice email
+     ========================================================= */
+  .finance-small-modal-box {
+    width: 620px;
+    max-width: 100%;
+  }
+
+  .finance-modal-note {
+    margin: 0 0 16px;
+    padding: 10px 12px;
+    border-radius: 12px;
+    color: #475569;
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    font-size: 13px;
+  }
+
+  .finance-modal-note.invoice-email-fresh {
+    color: #166534;
+    background: #f0fdf4;
+    border-color: #dcfce7;
+  }
+
+  .finance-modal-note.invoice-email-stale,
+  .finance-modal-note.invoice-email-not-generated {
+    color: #9a3412;
+    background: #fff7ed;
+    border-color: #fed7aa;
+  }
+
+  .finance-modal-note.invoice-email-unknown {
+    color: #b91c1c;
+    background: #fef2f2;
+    border-color: #fee2e2;
+  }
+
+  /* =========================================================
+     10. FINANCE INSTALLMENT / CICILAN
+     Jadwal cicilan, editor termin, dan lock policy
+     ========================================================= */
+  .finance-installment-empty-box {
+    padding: 14px;
+    border: 1px dashed #dbe3ee;
+    border-radius: 14px;
+    background: #f8fafc;
+  }
+
+  .finance-installment-summary-grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 12px;
+    margin-bottom: 14px;
+  }
+
+  .finance-installment-summary-card {
+    border: 1px solid #e5e7eb;
+    border-radius: 16px;
+    padding: 14px;
+    background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+  }
+
+  .finance-installment-summary-label {
+    font-size: 12px;
+    color: #64748b;
+    font-weight: 700;
+    margin-bottom: 6px;
+  }
+
+  .finance-installment-summary-value {
+    font-size: 16px;
+    font-weight: 900;
+    color: #0f172a;
+    line-height: 1.25;
+    word-break: break-word;
+  }
+
+  .finance-installment-summary-value.success {
+    color: #166534;
+  }
+
+  .finance-installment-summary-value.danger {
+    color: #b91c1c;
+  }
+
+  .finance-installment-summary-sub {
+    margin-top: 5px;
+    color: #64748b;
+    font-size: 12px;
+  }
+
+  .finance-installment-table {
+    min-width: 820px;
+  }
+
+  .finance-installment-table th,
+  .finance-installment-table td {
+    vertical-align: top;
+  }
+
+  .finance-installment-modal-box {
+    width: 860px;
+    max-width: 100%;
+  }
+
+  .finance-installment-generator {
+    display: grid;
+    grid-template-columns: 1fr auto auto;
+    gap: 10px;
+    align-items: end;
+    margin-bottom: 14px;
+  }
+
+  .finance-installment-generator .btn {
+    margin-bottom: 12px;
+    white-space: nowrap;
+  }
+
+  .finance-installment-editor-table {
+    min-width: 780px;
+  }
+
+  .finance-installment-editor-table input {
+    margin-bottom: 0;
+  }
+
+  .finance-installment-editor-table th:nth-child(1),
+  .finance-installment-editor-table td:nth-child(1) {
+    width: 70px;
+  }
+
+  .finance-installment-editor-table th:nth-child(2),
+  .finance-installment-editor-table td:nth-child(2) {
+    width: 170px;
+  }
+
+  .finance-installment-editor-table th:nth-child(3),
+  .finance-installment-editor-table td:nth-child(3) {
+    width: 180px;
+  }
+
+  .finance-installment-editor-table th:nth-child(5),
+  .finance-installment-editor-table td:nth-child(5) {
+    width: 100px;
+  }
+
+  .finance-installment-editor-total {
+    margin-top: 12px;
+    margin-bottom: 16px;
+    font-size: 13px;
+    line-height: 1.5;
+  }
+
+  .finance-installment-total-ok {
+    padding: 10px 12px;
+    border-radius: 12px;
+    color: #166534;
+    background: #f0fdf4;
+    border: 1px solid #dcfce7;
+  }
+
+  .finance-installment-total-warning {
+    padding: 10px 12px;
+    border-radius: 12px;
+    color: #9a3412;
+    background: #fff7ed;
+    border: 1px solid #fed7aa;
+  }
+
+  .finance-payment-installment-wrap {
+    margin-bottom: 12px;
+    padding: 12px;
+    border: 1px solid #e2e8f0;
+    border-radius: 14px;
+    background: #f8fafc;
+  }
+
+  .finance-payment-installment-wrap select {
+    margin-bottom: 8px;
+  }
+
+  .finance-installment-payment-info {
+    font-size: 12px;
+    line-height: 1.5;
+    color: #64748b;
+  }
+
+  .finance-installment-lock-note {
+    margin: -6px 0 16px;
+    padding: 10px 12px;
+    border-radius: 12px;
+    color: #9a3412;
+    background: #fff7ed;
+    border: 1px solid #fed7aa;
+    font-size: 13px;
+    line-height: 1.5;
+  }
+
+  .finance-installment-lock-note.inline {
+    margin: 0;
+    flex: 1;
+  }
+
+  .finance-installment-plan-actions {
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin-bottom: 12px;
+  }
+
+  .finance-installment-plan-actions .btn {
+    width: auto;
+    min-width: 180px;
+  }
+
+  /* =========================================================
+     11. FINANCE INVOICE DIGITAL
+     Generate PDF dan kirim email invoice
+     ========================================================= */
+  .finance-invoice-digital-card {
+    display: flex;
+    justify-content: space-between;
+    align-items: stretch;
+    gap: 16px;
+    flex-wrap: wrap;
+    padding: 16px;
+    border: 1px solid #e5e7eb;
+    border-radius: 18px;
+    background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+  }
+
+  .finance-invoice-digital-main {
+    flex: 1;
+    min-width: 260px;
+  }
+
+  .finance-invoice-digital-status {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    flex-wrap: wrap;
+    margin-bottom: 14px;
+  }
+
+  .finance-invoice-digital-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 14px 18px;
+  }
+
+  .finance-invoice-digital-label {
+    margin-bottom: 4px;
+    font-size: 12px;
+    color: #64748b;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+
+  .finance-invoice-digital-value {
+    font-size: 14px;
+    color: #0f172a;
+    font-weight: 700;
+    line-height: 1.5;
+    word-break: break-word;
+  }
+
+  .finance-invoice-digital-actions {
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+    gap: 10px;
+    width: 190px;
+    max-width: 100%;
+  }
+
+  .finance-invoice-digital-actions .btn {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .finance-inline-link-btn {
+    width: auto;
+    min-height: 0;
+    margin: 0;
+    padding: 0;
+    color: #2563eb;
+    background: transparent;
+    border: none;
+    box-shadow: none;
+    font-size: 14px;
+    font-weight: 800;
+    text-decoration: underline;
+    cursor: pointer;
+  }
+
+  .finance-inline-link-btn:hover {
+    color: #1d4ed8;
+    background: transparent;
+    box-shadow: none;
+    transform: none;
+  }
+
+  .finance-inline-link-btn:active {
+    transform: none;
+  }
+
+  .finance-invoice-delivery-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 6px 10px;
+    border-radius: 999px;
+    font-size: 11px;
+    font-weight: 800;
+    border: 1px solid transparent;
+    white-space: nowrap;
+  }
+
+  .finance-invoice-delivery-badge.sent {
+    background: #f0fdf4;
+    color: #166534;
+    border-color: #dcfce7;
+  }
+
+  .finance-invoice-delivery-badge.generated {
+    background: #eff6ff;
+    color: #1d4ed8;
+    border-color: #dbeafe;
+  }
+
+  .finance-invoice-delivery-badge.stale {
+    background: #fff7ed;
+    color: #9a3412;
+    border-color: #fed7aa;
+  }
+
+  .finance-invoice-delivery-badge.failed {
+    background: #fef2f2;
+    color: #b91c1c;
+    border-color: #fee2e2;
+  }
+
+  .finance-invoice-delivery-badge.not-generated {
+    background: #f3f4f6;
+    color: #374151;
+    border-color: #e5e7eb;
+  }
+
+  .finance-pdf-freshness-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 6px 10px;
+    border-radius: 999px;
+    font-size: 11px;
+    font-weight: 800;
+    border: 1px solid transparent;
+    white-space: nowrap;
+  }
+
+  .finance-pdf-freshness-badge.fresh {
+    background: #f0fdf4;
+    color: #166534;
+    border-color: #dcfce7;
+  }
+
+  .finance-pdf-freshness-badge.stale {
+    background: #fff7ed;
+    color: #9a3412;
+    border-color: #fed7aa;
+  }
+
+  .finance-pdf-freshness-badge.unknown {
+    background: #fef2f2;
+    color: #b91c1c;
+    border-color: #fee2e2;
+  }
+
+  .finance-pdf-freshness-badge.not-generated {
+    background: #f3f4f6;
+    color: #374151;
+    border-color: #e5e7eb;
+  }
+
+  .finance-invoice-pdf-status-card {
+    margin-bottom: 14px;
+    padding: 12px 14px;
+    border-radius: 14px;
+    border: 1px solid #e5e7eb;
+    background: #f8fafc;
+  }
+
+  .finance-invoice-pdf-status-card.fresh {
+    background: #f0fdf4;
+    border-color: #dcfce7;
+  }
+
+  .finance-invoice-pdf-status-card.stale {
+    background: #fff7ed;
+    border-color: #fed7aa;
+  }
+
+  .finance-invoice-pdf-status-card.unknown {
+    background: #fef2f2;
+    border-color: #fee2e2;
+  }
+
+  .finance-invoice-pdf-status-card.not_generated {
+    background: #f8fafc;
+    border-color: #e2e8f0;
+  }
+
+  .finance-invoice-pdf-status-title {
+    margin-bottom: 4px;
+    font-size: 14px;
+    font-weight: 900;
+    color: #0f172a;
+  }
+
+  .finance-invoice-pdf-status-message {
+    font-size: 13px;
+    color: #475569;
+    line-height: 1.5;
+  }
+
+  .finance-invoice-pdf-status-meta {
+    margin-top: 8px;
+    font-size: 12px;
+    color: #64748b;
+    line-height: 1.5;
+  }
+
+  .finance-invoice-pdf-status-note {
+    margin-top: 10px;
+    padding-top: 10px;
+    border-top: 1px dashed rgba(100, 116, 139, 0.35);
+    font-size: 12px;
+    color: #475569;
+    line-height: 1.5;
+  }
+
+  /* =========================================================
+     12. FINANCE FEEDBACK DETAIL
+     Feedback di modal detail billing
+     ========================================================= */
+  .finance-feedback-detail-empty {
+    padding: 14px;
+    border: 1px dashed #dbe3ee;
+    border-radius: 14px;
+    background: #f8fafc;
+    color: #64748b;
+    font-size: 13px;
+    line-height: 1.5;
+  }
+
+  .finance-feedback-detail-card {
+    border: 1px solid #e5e7eb;
+    border-radius: 16px;
+    padding: 16px;
+    background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+  }
+
+  .finance-feedback-detail-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 12px;
+    flex-wrap: wrap;
+    margin-bottom: 14px;
+  }
+
+  .finance-feedback-detail-title {
+    font-size: 17px;
+    font-weight: 900;
+    color: #0f172a;
+    margin-bottom: 4px;
+  }
+
+  .finance-feedback-detail-sub {
+    font-size: 13px;
+    color: #64748b;
+    line-height: 1.5;
+  }
+
+  .finance-feedback-detail-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 14px 16px;
+  }
+
+  .finance-feedback-detail-item {
+    min-width: 0;
+  }
+
+  .finance-feedback-detail-item.full {
+    grid-column: 1 / -1;
+  }
+
+  .finance-feedback-detail-label {
+    font-size: 12px;
+    font-weight: 700;
+    color: #64748b;
+    margin-bottom: 5px;
+  }
+
+  .finance-feedback-detail-value {
+    font-size: 14px;
+    color: #111827;
+    line-height: 1.5;
+    word-break: break-word;
+  }
+
+  /* =========================================================
+     13. FINANCE EMPTY STATE
+     Tampilan ketika data kosong
+     ========================================================= */
+  .finance-empty-state {
+    padding: 18px 4px;
+  }
+
+  .finance-empty-title {
+    font-size: 15px;
+    font-weight: 700;
+    color: #0f172a;
+    margin-bottom: 4px;
+  }
+
+  .finance-empty-subtitle,
+  .finance-empty {
+    font-size: 13px;
+    color: #64748b;
+    line-height: 1.5;
+  }
+
+  /* =========================================================
+     14. FINANCE UI STATES & PROCESSING
+     Loading state, inline state, modal alert, button processing
+     ========================================================= */
+  .finance-ui-state {
+    padding: 14px;
+    border-radius: 14px;
+    border: 1px solid #e2e8f0;
+    background: #f8fafc;
+    color: #475569;
+    font-size: 13px;
+    line-height: 1.5;
+  }
+
+  .finance-ui-state-head {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .finance-ui-state-title {
+    font-weight: 800;
+    color: #0f172a;
+  }
+
+  .finance-ui-state-message {
+    margin-top: 6px;
+    color: #64748b;
+  }
+
+  .finance-ui-state-loading {
+    background: #f8fafc;
+    border-color: #e2e8f0;
+  }
+
+  .finance-ui-state-info {
+    background: #eff6ff;
+    border-color: #dbeafe;
+  }
+
+  .finance-ui-state-info .finance-ui-state-title {
+    color: #1d4ed8;
+  }
+
+  .finance-ui-state-success {
+    background: #f0fdf4;
+    border-color: #dcfce7;
+  }
+
+  .finance-ui-state-success .finance-ui-state-title {
+    color: #166534;
+  }
+
+  .finance-ui-state-error {
+    background: #fef2f2;
+    border-color: #fee2e2;
+  }
+
+  .finance-ui-state-error .finance-ui-state-title {
+    color: #b91c1c;
+  }
+
+  .finance-loading-spinner {
+    width: 15px;
+    height: 15px;
+    min-width: 15px;
+    border-radius: 999px;
+    border: 2px solid #cbd5e1;
+    border-top-color: #0f766e;
+    animation: financeUiSpin 0.75s linear infinite;
+  }
+
+  @keyframes financeUiSpin {
+    to {
+      transform: rotate(360deg);
+    }
+  }
+
+  .finance-is-loading:disabled,
+  .finance-is-disabled:disabled {
+    opacity: 0.72;
+    cursor: not-allowed;
+    transform: none !important;
+    box-shadow: none;
+  }
+
+  .finance-modal-server-alert {
+    margin: 0 0 14px;
+    padding: 12px 14px;
+    border-radius: 14px;
+    border: 1px solid #e2e8f0;
+    background: #f8fafc;
+    font-size: 13px;
+    line-height: 1.5;
+  }
+
+  .finance-modal-server-alert.hidden {
+    display: none;
+  }
+
+  .finance-modal-server-alert-title {
+    margin-bottom: 4px;
+    font-weight: 900;
+    color: #0f172a;
+  }
+
+  .finance-modal-server-alert-message {
+    color: #475569;
+  }
+
+  .finance-modal-server-alert-error {
+    background: #fef2f2;
+    border-color: #fee2e2;
+  }
+
+  .finance-modal-server-alert-error .finance-modal-server-alert-title {
+    color: #b91c1c;
+  }
+
+  .finance-modal-server-alert-success {
+    background: #f0fdf4;
+    border-color: #dcfce7;
+  }
+
+  .finance-modal-server-alert-success .finance-modal-server-alert-title {
+    color: #166534;
+  }
+
+  .finance-modal-server-alert-info {
+    background: #eff6ff;
+    border-color: #dbeafe;
+  }
+
+  .finance-modal-server-alert-info .finance-modal-server-alert-title {
+    color: #1d4ed8;
+  }
+
+  .finance-summary-grid-state {
+    grid-column: 1 / -1;
+  }
+</style>

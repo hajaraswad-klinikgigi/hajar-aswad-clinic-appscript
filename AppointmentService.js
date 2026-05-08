@@ -1,0 +1,1328 @@
+/* =========================================================
+   PHASE 3I - APPOINTMENT REPOSITORY BRIDGE HELPERS
+   Read-only bridge. Backend tetap Spreadsheet.
+   ========================================================= */
+
+function isAppointmentRepositoryBridgeAvailable_() {
+  return typeof AppointmentRepository !== 'undefined' &&
+    AppointmentRepository &&
+    typeof AppointmentRepository.getAppointmentsRaw === 'function';
+}
+
+function getAppointmentServiceUiReadOptions_(options) {
+  const opts = Object.assign({}, options || {});
+
+  if (opts.backend_mode) {
+    return opts;
+  }
+
+  if (typeof repoBuildUiReadOptions_ === 'function') {
+    return repoBuildUiReadOptions_(opts);
+  }
+
+  return Object.assign({}, opts, {
+    backend_mode: 'spreadsheet',
+    ui_read_supabase_test_enabled: false
+  });
+}
+
+function getAppointmentServiceUiReadBackendMode_(options) {
+  const opts = getAppointmentServiceUiReadOptions_(options);
+  return String(opts.backend_mode || 'spreadsheet').trim().toLowerCase();
+}
+
+function isAppointmentServiceUiReadSupabaseMode_(options) {
+  return getAppointmentServiceUiReadBackendMode_(options) === 'supabase';
+}
+
+function getAppointmentServiceSpreadsheetWriteReadOptions_() {
+  return {
+    backend_mode: 'spreadsheet'
+  };
+}
+
+function getAppointmentsRaw(options) {
+  const opts = getAppointmentServiceUiReadOptions_(options);
+
+  if (
+    isAppointmentRepositoryBridgeAvailable_() &&
+    typeof AppointmentRepository.getAppointmentsRaw === 'function'
+  ) {
+    return AppointmentRepository.getAppointmentsRaw(opts) || [];
+  }
+
+  if (typeof dbFindAll_ === 'function') {
+    return dbFindAll_(REPO_TABLES.APPOINTMENTS || 'Appointments', opts) || [];
+  }
+
+  return getRowsAsObjects('Appointments') || [];
+}
+
+function normalizeAppointmentForClient(row) {
+  const obj = {};
+  Object.keys(row || {}).forEach(function(key) {
+    obj[key] = formatCellValue(row[key]);
+  });
+  return obj;
+}
+
+function sortAppointmentsForClient(rows) {
+  return (rows || []).sort(function(a, b) {
+    const dateCompare = String(b.appointment_date || '').localeCompare(String(a.appointment_date || ''));
+    if (dateCompare !== 0) return dateCompare;
+
+    const timeCompare = String(b.appointment_time || '').localeCompare(String(a.appointment_time || ''));
+    if (timeCompare !== 0) return timeCompare;
+
+    return String(b.appointment_id || '').localeCompare(String(a.appointment_id || ''));
+  });
+}
+
+function getAppointmentsListCacheKey(options) {
+  return buildCacheKey([
+    'appointmentsList',
+    getAppointmentServiceUiReadBackendMode_(options)
+  ]);
+}
+
+function getCachedAppointmentsList(options) {
+  const cached = getCachedJson(getAppointmentsListCacheKey(options));
+  return Array.isArray(cached) ? cached : null;
+}
+
+function getOpenAppointmentsByPatientCacheKey(options) {
+  return buildCacheKey([
+    'openAppointmentsByPatient',
+    getAppointmentServiceUiReadBackendMode_(options)
+  ]);
+}
+
+function getCachedOpenAppointmentsByPatientMap(options) {
+  const cached = getCachedJson(getOpenAppointmentsByPatientCacheKey(options));
+
+  if (cached && typeof cached === 'object' && !Array.isArray(cached)) {
+    return cached;
+  }
+
+  return null;
+}
+
+function buildOpenAppointmentsByPatientMapFromRows(rows) {
+  const map = {};
+
+  (rows || []).forEach(function(row) {
+    const patientId = String(row.patient_id || '').trim();
+    const appointmentId = String(row.appointment_id || '').trim();
+    const status = String(row.status || '').trim().toLowerCase();
+
+    if (!patientId || !appointmentId) return;
+    if (status !== 'scheduled') return;
+
+    if (!map[patientId]) {
+      map[patientId] = [];
+    }
+
+    map[patientId].push(appointmentId);
+  });
+
+  return map;
+}
+
+function getOpenAppointmentsByPatientMap(options) {
+  const opts = getAppointmentServiceUiReadOptions_(options);
+  const cachedMap = getCachedOpenAppointmentsByPatientMap(opts);
+  if (cachedMap) return cachedMap;
+
+  let rows = [];
+
+  const cachedList = getCachedAppointmentsList(opts);
+
+  if (cachedList) {
+    rows = cachedList;
+  } else if (
+    isAppointmentRepositoryBridgeAvailable_() &&
+    typeof AppointmentRepository.getAppointmentsRaw === 'function'
+  ) {
+    rows = AppointmentRepository.getAppointmentsRaw(opts) || [];
+  } else {
+    rows = getAppointmentsRaw(opts);
+  }
+
+  const map = buildOpenAppointmentsByPatientMapFromRows(rows);
+
+  putCachedJson(getOpenAppointmentsByPatientCacheKey(opts), map, 30);
+
+  return map;
+}
+
+/**
+ * Snapshot Appointments:
+ * - sheet
+ * - headers
+ * - values
+ * - rows (object per row)
+ */
+function getAppointmentsSheetSnapshot() {
+  const sheet = getSheet('Appointments');
+  const values = sheet.getDataRange().getValues();
+  const headers = values.length ? values[0] : [];
+
+  const rows = [];
+  for (let r = 1; r < values.length; r++) {
+    const obj = {};
+    headers.forEach(function(header, i) {
+      obj[header] = values[r][i];
+    });
+    rows.push(obj);
+  }
+
+  return {
+    sheet: sheet,
+    headers: headers,
+    values: values,
+    rows: rows
+  };
+}
+
+function findAppointmentRawByIdFromRows(rows, id) {
+  return (rows || []).find(function(r) {
+    return String(r.appointment_id || '') === String(id || '');
+  }) || null;
+}
+
+function hasOpenAppointmentForPatientFromRows(rows, patientId, excludeAppointmentId) {
+  return (rows || []).some(function(row) {
+    const samePatient = String(row.patient_id || '') === String(patientId || '');
+    const notExcluded = !excludeAppointmentId || String(row.appointment_id || '') !== String(excludeAppointmentId || '');
+    const status = String(row.status || '').toLowerCase();
+    const isOpen = status === 'scheduled';
+
+    return samePatient && notExcluded && isOpen;
+  });
+}
+
+function appendAppointmentRowFromSnapshot(snapshot, obj) {
+  const headers = snapshot.headers || [];
+  const sheet = snapshot.sheet;
+
+  if (!headers.length) {
+    throw new Error('Header sheet Appointments tidak ditemukan');
+  }
+
+  const row = headers.map(function(header) {
+    return obj[header] !== undefined ? obj[header] : '';
+  });
+
+  const nextRow = sheet.getLastRow() + 1;
+  sheet.getRange(nextRow, 1, 1, headers.length).setValues([row]);
+}
+
+function updateAppointmentRowFromSnapshot(snapshot, appointmentId, updatedObj) {
+  const headers = snapshot.headers || [];
+  const values = snapshot.values || [];
+  const sheet = snapshot.sheet;
+
+  const idColIndex = headers.indexOf('appointment_id');
+  if (idColIndex === -1) {
+    throw new Error('Kolom appointment_id tidak ditemukan');
+  }
+
+  for (let r = 1; r < values.length; r++) {
+    if (String(values[r][idColIndex] || '') === String(appointmentId || '')) {
+      const updatedRow = headers.map(function(header, i) {
+        return updatedObj[header] !== undefined ? updatedObj[header] : values[r][i];
+      });
+
+      sheet.getRange(r + 1, 1, 1, headers.length).setValues([updatedRow]);
+      return true;
+    }
+  }
+
+  return false;
+}
+
+/**
+ * Mengembalikan SEMUA appointment.
+ * Filter cancelled / non-cancelled ditangani di frontend.
+ */
+function getAppointments(options) {
+  const opts = getAppointmentServiceUiReadOptions_(options);
+  const isSupabaseReadMode = isAppointmentServiceUiReadSupabaseMode_(opts);
+
+  const cacheKey = getAppointmentsListCacheKey(opts);
+
+  if (!isSupabaseReadMode) {
+    const cached = getCachedJson(cacheKey);
+
+    if (cached) {
+      return cached;
+    }
+  }
+
+  const rows = getAppointmentsRaw(opts);
+
+  const normalized = rows.map(function(row) {
+    return normalizeAppointmentForClient(row);
+  });
+
+  const result = sortAppointmentsForClient(normalized);
+
+  // Supabase staging read mode tidak perlu cache list besar,
+  // karena CacheService bisa error: Argument too large: value.
+  if (!isSupabaseReadMode) {
+    putCachedJson(cacheKey, result, 30);
+  }
+
+  return result;
+}
+
+function clearAppointmentsListCache() {
+  const cache = getAppCache();
+
+  [
+    buildCacheKey(['appointmentsList']),
+    buildCacheKey(['openAppointmentsByPatient']),
+
+    buildCacheKey(['appointmentsList', 'spreadsheet']),
+    buildCacheKey(['openAppointmentsByPatient', 'spreadsheet']),
+
+    buildCacheKey(['appointmentsList', 'supabase']),
+    buildCacheKey(['openAppointmentsByPatient', 'supabase'])
+  ].forEach(function(key) {
+    cache.remove(key);
+  });
+}
+
+function findAppointmentRawById(id, options) {
+  const normalizedAppointmentId = String(id || '').trim();
+  const opts = getAppointmentServiceUiReadOptions_(options);
+
+  if (!normalizedAppointmentId) return null;
+
+  const cachedList = getCachedAppointmentsList(opts);
+
+  if (cachedList) {
+    return findAppointmentRawByIdFromRows(cachedList, normalizedAppointmentId);
+  }
+
+  if (
+    isAppointmentRepositoryBridgeAvailable_() &&
+    typeof AppointmentRepository.findAppointmentById === 'function'
+  ) {
+    return AppointmentRepository.findAppointmentById(normalizedAppointmentId, opts) || null;
+  }
+
+  const rows = getAppointmentsRaw(opts);
+  return findAppointmentRawByIdFromRows(rows, normalizedAppointmentId);
+}
+
+function generateNextAppointmentId() {
+  return generateSafeId('APT');
+}
+
+function validateAppointmentData(data) {
+  const errors = {};
+
+  if (!data.patient_id || !String(data.patient_id).trim()) {
+    errors.patient_id = 'Pasien wajib dipilih';
+  }
+
+  if (!data.appointment_date || !String(data.appointment_date).trim()) {
+    errors.appointment_date = 'Tanggal appointment wajib diisi';
+  } else {
+    const normalizedDate = String(data.appointment_date).trim();
+
+    if (!isValidYmdDate(normalizedDate)) {
+      errors.appointment_date = 'Tanggal appointment tidak valid';
+    } else {
+      const today = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd');
+
+      if (normalizedDate < today) {
+        errors.appointment_date = 'Tanggal appointment tidak boleh sebelum hari ini';
+      }
+    }
+  }
+
+  if (!data.appointment_time || !String(data.appointment_time).trim()) {
+    errors.appointment_time = 'Jam appointment wajib diisi';
+  }
+
+  if (!data.complaint || !String(data.complaint).trim()) {
+    errors.complaint = 'Keluhan wajib diisi';
+  }
+
+  if (!data.status || !String(data.status).trim()) {
+    errors.status = 'Status wajib dipilih';
+  } else {
+    const allowedStatuses = ['scheduled', 'cancelled'];
+    const normalizedStatus = String(data.status).trim().toLowerCase();
+
+    if (allowedStatuses.indexOf(normalizedStatus) === -1) {
+      errors.status = 'Status appointment tidak valid';
+    }
+  }
+
+  return errors;
+}
+
+function getAppointmentById(appointmentId, options) {
+  const row = findAppointmentRawById(appointmentId, options);
+
+  if (!row) {
+    return {
+      success: false,
+      message: 'Data appointment tidak ditemukan'
+    };
+  }
+
+  return {
+    success: true,
+    data: normalizeAppointmentForClient(row)
+  };
+}
+
+function hasOpenAppointmentForPatient(patientId, excludeAppointmentId, options) {
+  const normalizedPatientId = String(patientId || '').trim();
+  const normalizedExcludeId = String(excludeAppointmentId || '').trim();
+  const opts = getAppointmentServiceUiReadOptions_(options);
+
+  if (!normalizedPatientId) return false;
+
+  if (
+    isAppointmentRepositoryBridgeAvailable_() &&
+    typeof AppointmentRepository.hasOpenAppointmentForPatient === 'function'
+  ) {
+    return AppointmentRepository.hasOpenAppointmentForPatient(
+      normalizedPatientId,
+      normalizedExcludeId,
+      opts
+    );
+  }
+
+  const map = getOpenAppointmentsByPatientMap(opts);
+  const openAppointmentIds = Array.isArray(map[normalizedPatientId])
+    ? map[normalizedPatientId]
+    : [];
+
+  if (!openAppointmentIds.length) return false;
+
+  if (!normalizedExcludeId) {
+    return true;
+  }
+
+  return openAppointmentIds.some(function(appointmentId) {
+    return String(appointmentId || '').trim() !== normalizedExcludeId;
+  });
+}
+
+function checkPatientOpenAppointment(patientId, excludeAppointmentId, options) {
+  if (!patientId) {
+    return {
+      success: false,
+      hasOpenAppointment: false,
+      message: 'Patient ID tidak ditemukan'
+    };
+  }
+
+  const hasOpen = hasOpenAppointmentForPatient(patientId, excludeAppointmentId, options);
+
+  return {
+    success: true,
+    hasOpenAppointment: hasOpen,
+    message: hasOpen
+      ? 'Pasien ini masih memiliki appointment aktif.'
+      : 'Pasien ini belum memiliki appointment aktif.'
+  };
+}
+
+function createAppointment(data) {
+  const lock = LockService.getScriptLock();
+
+  try {
+    lock.waitLock(5000);
+
+    const errors = validateAppointmentData(data);
+
+    if (Object.keys(errors).length > 0) {
+      return {
+        success: false,
+        message: 'Validasi gagal',
+        errors: errors
+      };
+    }
+
+    const patient = findPatientRawById(
+      data.patient_id,
+      getAppointmentServiceSpreadsheetWriteReadOptions_()
+    );
+
+    if (!patient) {
+      return {
+        success: false,
+        message: 'Data pasien tidak ditemukan'
+      };
+    }
+
+    const snapshot = getAppointmentsSheetSnapshot();
+
+    if (hasOpenAppointmentForPatientFromRows(snapshot.rows, data.patient_id)) {
+      return {
+        success: false,
+        message: 'Pasien ini masih memiliki appointment aktif. Selesaikan dulu appointment sebelumnya.'
+      };
+    }
+
+    const normalizedStatus = String(data.status || '').trim().toLowerCase();
+
+    if (['scheduled', 'cancelled'].indexOf(normalizedStatus) === -1) {
+      return {
+        success: false,
+        message: 'Status appointment tidak valid. Status completed hanya melalui Treatment.'
+      };
+    }
+
+    const appointment = {
+      appointment_id: generateNextAppointmentId(),
+      patient_id: patient.patient_id,
+      patient_name: patient.full_name,
+      appointment_date: String(data.appointment_date || '').trim(),
+      appointment_time: String(data.appointment_time || '').trim(),
+      complaint: String(data.complaint || '').trim(),
+      status: normalizedStatus,
+      created_at: nowIso(),
+      updated_at: nowIso()
+    };
+
+    appendAppointmentRowFromSnapshot(snapshot, appointment);
+
+    clearAppointmentsListCache();
+
+    return {
+      success: true,
+      message: 'Appointment berhasil ditambahkan',
+      data: normalizeAppointmentForClient(appointment)
+    };
+
+  } catch (err) {
+    return {
+      success: false,
+      message: 'Terjadi kesalahan saat membuat appointment'
+    };
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+function updateAppointment(data) {
+  const lock = LockService.getScriptLock();
+
+  try {
+    lock.waitLock(5000);
+
+    if (!data.appointment_id) {
+      return {
+        success: false,
+        message: 'Appointment ID tidak ditemukan'
+      };
+    }
+
+    const errors = validateAppointmentData(data);
+
+    if (Object.keys(errors).length > 0) {
+      return {
+        success: false,
+        message: 'Validasi gagal',
+        errors: errors
+      };
+    }
+
+    const snapshot = getAppointmentsSheetSnapshot();
+    const existing = findAppointmentRawByIdFromRows(snapshot.rows, data.appointment_id);
+
+    if (!existing) {
+      return {
+        success: false,
+        message: 'Data appointment tidak ditemukan'
+      };
+    }
+
+    if (String(existing.status || '').toLowerCase() === 'completed') {
+      return {
+        success: false,
+        message: 'Appointment yang sudah completed tidak bisa diedit'
+      };
+    }
+
+    const patient = findPatientRawById(
+      data.patient_id,
+      getAppointmentServiceSpreadsheetWriteReadOptions_()
+    );
+
+    if (!patient) {
+      return {
+        success: false,
+        message: 'Data pasien tidak ditemukan'
+      };
+    }
+
+    if (hasOpenAppointmentForPatientFromRows(snapshot.rows, data.patient_id, data.appointment_id)) {
+      return {
+        success: false,
+        message: 'Pasien ini masih memiliki appointment aktif. Selesaikan dulu appointment sebelumnya.'
+      };
+    }
+
+    const nextStatus = String(data.status || '').trim().toLowerCase();
+    const allowedStatuses = ['scheduled', 'cancelled'];
+
+    if (allowedStatuses.indexOf(nextStatus) === -1) {
+      return {
+        success: false,
+        message: 'Status appointment tidak valid. Appointment hanya boleh scheduled atau cancelled. Status completed hanya melalui Treatment.'
+      };
+    }
+
+    const updated = {
+      appointment_id: existing.appointment_id,
+      patient_id: patient.patient_id,
+      patient_name: patient.full_name,
+      appointment_date: String(data.appointment_date || '').trim(),
+      appointment_time: String(data.appointment_time || '').trim(),
+      complaint: String(data.complaint || '').trim(),
+      status: nextStatus,
+      created_at: formatCellValue(existing.created_at || ''),
+      updated_at: nowIso()
+    };
+
+    const ok = updateAppointmentRowFromSnapshot(snapshot, data.appointment_id, updated);
+
+    if (!ok) {
+      return {
+        success: false,
+        message: 'Gagal memperbarui data appointment'
+      };
+    }
+
+    clearAppointmentsListCache();
+
+    return {
+      success: true,
+      message: 'Data appointment berhasil diperbarui',
+      data: normalizeAppointmentForClient(updated)
+    };
+
+  } catch (err) {
+    return {
+      success: false,
+      message: 'Terjadi kesalahan saat memperbarui appointment'
+    };
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+function cancelAppointment(id) {
+  const lock = LockService.getScriptLock();
+
+  try {
+    lock.waitLock(5000);
+
+    const snapshot = getAppointmentsSheetSnapshot();
+    const existing = findAppointmentRawByIdFromRows(snapshot.rows, id);
+
+    if (!existing) {
+      return {
+        success: false,
+        message: 'Data appointment tidak ditemukan'
+      };
+    }
+
+    const currentStatus = String(existing.status || '').toLowerCase();
+
+    if (currentStatus === 'cancelled') {
+      return {
+        success: false,
+        message: 'Appointment sudah berstatus cancelled'
+      };
+    }
+
+    if (currentStatus === 'completed') {
+      return {
+        success: false,
+        message: 'Appointment completed tidak bisa dibatalkan'
+      };
+    }
+
+    const ok = updateAppointmentRowFromSnapshot(snapshot, id, {
+      status: 'cancelled',
+      updated_at: nowIso()
+    });
+
+    if (!ok) {
+      return {
+        success: false,
+        message: 'Gagal membatalkan appointment'
+      };
+    }
+
+    clearAppointmentsListCache();
+
+    return {
+      success: true,
+      message: 'Appointment berhasil dibatalkan'
+    };
+
+  } catch (err) {
+    return {
+      success: false,
+      message: 'Terjadi kesalahan saat membatalkan appointment'
+    };
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+function restoreAppointment(id) {
+  const lock = LockService.getScriptLock();
+
+  try {
+    lock.waitLock(5000);
+
+    const snapshot = getAppointmentsSheetSnapshot();
+    const existing = findAppointmentRawByIdFromRows(snapshot.rows, id);
+
+    if (!existing) {
+      return {
+        success: false,
+        message: 'Data appointment tidak ditemukan'
+      };
+    }
+
+    if (String(existing.status || '').toLowerCase() !== 'cancelled') {
+      return {
+        success: false,
+        message: 'Hanya appointment cancelled yang bisa direstore'
+      };
+    }
+
+    if (hasOpenAppointmentForPatientFromRows(snapshot.rows, existing.patient_id, id)) {
+      return {
+        success: false,
+        message: 'Pasien ini sudah punya appointment aktif lain. Restore tidak bisa dilakukan.'
+      };
+    }
+
+    const ok = updateAppointmentRowFromSnapshot(snapshot, id, {
+      status: 'scheduled',
+      updated_at: nowIso()
+    });
+
+    if (!ok) {
+      return {
+        success: false,
+        message: 'Gagal merestore appointment'
+      };
+    }
+
+    clearAppointmentsListCache();
+
+    return {
+      success: true,
+      message: 'Appointment berhasil direstore'
+    };
+
+  } catch (err) {
+    return {
+      success: false,
+      message: 'Terjadi kesalahan saat merestore appointment'
+    };
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+/* =========================================================
+   PHASE 3I MANUAL TESTS
+   AppointmentService read-only -> AppointmentRepository bridge
+   Read-only. Aman dijalankan.
+   ========================================================= */
+
+function testAppointmentServicePhase3IReadOnlyBridge() {
+  const result = {
+    success: true,
+    backend_mode: typeof dbGetBackendMode_ === 'function'
+      ? dbGetBackendMode_()
+      : '',
+    checked_at: typeof nowIso === 'function'
+      ? nowIso()
+      : new Date().toISOString(),
+    issue_count: 0,
+    issues: [],
+    counts: {},
+    sample: {}
+  };
+
+  try {
+    if (
+      typeof AppointmentRepository === 'undefined' ||
+      !AppointmentRepository
+    ) {
+      result.issues.push({
+        issue: 'APPOINTMENT_REPOSITORY_NOT_FOUND'
+      });
+
+      result.issue_count = result.issues.length;
+      result.success = false;
+
+      Logger.log(JSON.stringify(result, null, 2));
+      return result;
+    }
+
+    const wrapperAppointments = getAppointmentsRaw();
+    const repoAppointments = AppointmentRepository.getAppointmentsRaw();
+
+    result.counts.wrapper_appointments = Array.isArray(wrapperAppointments)
+      ? wrapperAppointments.length
+      : -1;
+
+    result.counts.repository_appointments = Array.isArray(repoAppointments)
+      ? repoAppointments.length
+      : -1;
+
+    if (!Array.isArray(wrapperAppointments)) {
+      result.issues.push({
+        issue: 'WRAPPER_APPOINTMENTS_NOT_ARRAY'
+      });
+    }
+
+    if (!Array.isArray(repoAppointments)) {
+      result.issues.push({
+        issue: 'REPOSITORY_APPOINTMENTS_NOT_ARRAY'
+      });
+    }
+
+    if (result.counts.wrapper_appointments !== result.counts.repository_appointments) {
+      result.issues.push({
+        wrapper_count: result.counts.wrapper_appointments,
+        repository_count: result.counts.repository_appointments,
+        issue: 'APPOINTMENT_COUNT_MISMATCH'
+      });
+    }
+
+    const firstAppointment = wrapperAppointments.length
+      ? wrapperAppointments[0]
+      : null;
+
+    const appointmentId = firstAppointment
+      ? String(firstAppointment.appointment_id || '').trim()
+      : '';
+
+    const patientId = firstAppointment
+      ? String(firstAppointment.patient_id || '').trim()
+      : '';
+
+    result.sample.first_appointment_id = appointmentId;
+    result.sample.first_patient_id = patientId;
+
+    if (!appointmentId) {
+      result.sample.skipped = true;
+      result.sample.reason = 'Belum ada appointment untuk sample bridge test';
+
+      result.issue_count = result.issues.length;
+      result.success = result.issue_count === 0;
+
+      Logger.log(JSON.stringify(result, null, 2));
+      return result;
+    }
+
+    const wrapperAppointment = findAppointmentRawById(appointmentId);
+    const repoAppointment = AppointmentRepository.findAppointmentById(appointmentId);
+
+    result.sample.wrapper_find_appointment_ok = !!wrapperAppointment;
+    result.sample.repository_find_appointment_ok = !!repoAppointment;
+
+    if (!wrapperAppointment || !repoAppointment) {
+      result.issues.push({
+        appointment_id: appointmentId,
+        issue: 'FIND_APPOINTMENT_FAILED'
+      });
+    }
+
+    if (patientId) {
+      const wrapperHasOpen = hasOpenAppointmentForPatient(patientId, '');
+      const repoHasOpen = AppointmentRepository.hasOpenAppointmentForPatient(patientId, '');
+
+      result.sample.wrapper_has_open_appointment = !!wrapperHasOpen;
+      result.sample.repository_has_open_appointment = !!repoHasOpen;
+
+      if (!!wrapperHasOpen !== !!repoHasOpen) {
+        result.issues.push({
+          patient_id: patientId,
+          wrapper_has_open: !!wrapperHasOpen,
+          repository_has_open: !!repoHasOpen,
+          issue: 'HAS_OPEN_APPOINTMENT_MISMATCH'
+        });
+      }
+    }
+
+    result.issue_count = result.issues.length;
+    result.success = result.issue_count === 0;
+
+    Logger.log(JSON.stringify(result, null, 2));
+    return result;
+
+  } catch (err) {
+    const errorResult = {
+      success: false,
+      message: err && err.message ? err.message : String(err || 'Unknown error')
+    };
+
+    Logger.log(JSON.stringify(errorResult, null, 2));
+    return errorResult;
+  }
+}
+
+function testAppointmentServicePhase3IEndpointSample() {
+  const result = {
+    success: true,
+    backend_mode: typeof dbGetBackendMode_ === 'function'
+      ? dbGetBackendMode_()
+      : '',
+    checked_at: typeof nowIso === 'function'
+      ? nowIso()
+      : new Date().toISOString(),
+    issue_count: 0,
+    issues: [],
+    sample: {}
+  };
+
+  try {
+    clearAppointmentsListCache();
+
+    const appointments = getAppointments();
+    const firstAppointment = appointments.length ? appointments[0] : null;
+
+    const appointmentId = firstAppointment
+      ? String(firstAppointment.appointment_id || '').trim()
+      : '';
+
+    const patientId = firstAppointment
+      ? String(firstAppointment.patient_id || '').trim()
+      : '';
+
+    result.sample.appointment_count = appointments.length;
+    result.sample.first_appointment_id = appointmentId;
+    result.sample.first_patient_id = patientId;
+
+    if (!appointmentId) {
+      result.sample.skipped = true;
+      result.sample.reason = 'Belum ada appointment untuk endpoint sample test';
+
+      Logger.log(JSON.stringify(result, null, 2));
+      return result;
+    }
+
+    const detailRes = getAppointmentById(appointmentId);
+
+    result.sample.get_appointments_ok = Array.isArray(appointments);
+    result.sample.get_appointment_by_id_ok = !!(
+      detailRes &&
+      detailRes.success &&
+      detailRes.data &&
+      String(detailRes.data.appointment_id || '').trim() === appointmentId
+    );
+
+    if (!result.sample.get_appointments_ok) {
+      result.issues.push({
+        endpoint: 'getAppointments',
+        issue: 'GET_APPOINTMENTS_NOT_ARRAY'
+      });
+    }
+
+    if (!result.sample.get_appointment_by_id_ok) {
+      result.issues.push({
+        appointment_id: appointmentId,
+        endpoint: 'getAppointmentById',
+        issue: 'GET_APPOINTMENT_BY_ID_FAILED'
+      });
+    }
+
+    if (patientId) {
+      const checkRes = checkPatientOpenAppointment(patientId, '');
+
+      result.sample.check_patient_open_appointment_ok = !!(
+        checkRes &&
+        checkRes.success === true &&
+        Object.prototype.hasOwnProperty.call(checkRes, 'hasOpenAppointment')
+      );
+
+      if (!result.sample.check_patient_open_appointment_ok) {
+        result.issues.push({
+          patient_id: patientId,
+          endpoint: 'checkPatientOpenAppointment',
+          issue: 'CHECK_PATIENT_OPEN_APPOINTMENT_FAILED'
+        });
+      }
+    }
+
+    result.issue_count = result.issues.length;
+    result.success = result.issue_count === 0;
+
+    Logger.log(JSON.stringify(result, null, 2));
+    return result;
+
+  } catch (err) {
+    const errorResult = {
+      success: false,
+      message: err && err.message ? err.message : String(err || 'Unknown error')
+    };
+
+    Logger.log(JSON.stringify(errorResult, null, 2));
+    return errorResult;
+  }
+}
+
+function testAppointmentServicePhase3ISearchPatientsForAppointmentSample() {
+  const result = {
+    success: true,
+    backend_mode: typeof dbGetBackendMode_ === 'function'
+      ? dbGetBackendMode_()
+      : '',
+    checked_at: typeof nowIso === 'function'
+      ? nowIso()
+      : new Date().toISOString(),
+    issue_count: 0,
+    issues: [],
+    sample: {}
+  };
+
+  try {
+    if (typeof searchPatientsForAppointment !== 'function') {
+      result.issues.push({
+        issue: 'SEARCH_PATIENTS_FOR_APPOINTMENT_NOT_FOUND'
+      });
+
+      result.issue_count = result.issues.length;
+      result.success = false;
+
+      Logger.log(JSON.stringify(result, null, 2));
+      return result;
+    }
+
+    const patients = typeof getPatientsRaw === 'function'
+      ? getPatientsRaw()
+      : [];
+
+    const samplePatient = patients.find(function(row) {
+      return String(row.full_name || '').trim().length >= 2;
+    }) || null;
+
+    const keyword = samplePatient
+      ? String(samplePatient.full_name || '').trim().slice(0, 3)
+      : '';
+
+    result.sample.patient_count = Array.isArray(patients) ? patients.length : -1;
+    result.sample.keyword = keyword;
+
+    if (!keyword || keyword.length < 2) {
+      result.sample.skipped = true;
+      result.sample.reason = 'Belum ada keyword pasien yang cukup untuk search test';
+
+      Logger.log(JSON.stringify(result, null, 2));
+      return result;
+    }
+
+    const rows = searchPatientsForAppointment(keyword);
+
+    result.sample.search_result_count = Array.isArray(rows) ? rows.length : -1;
+    result.sample.search_result_is_array = Array.isArray(rows);
+
+    if (!Array.isArray(rows)) {
+      result.issues.push({
+        endpoint: 'searchPatientsForAppointment',
+        issue: 'SEARCH_RESULT_NOT_ARRAY'
+      });
+    }
+
+    if (Array.isArray(rows) && rows.length) {
+      const first = rows[0];
+
+      const requiredFields = [
+        'patient_id',
+        'patient_name',
+        'patient_code',
+        'phone',
+        'has_open_appointment'
+      ];
+
+      requiredFields.forEach(function(field) {
+        if (!Object.prototype.hasOwnProperty.call(first, field)) {
+          result.issues.push({
+            endpoint: 'searchPatientsForAppointment',
+            field: field,
+            issue: 'SEARCH_RESULT_FIELD_MISSING'
+          });
+        }
+      });
+    }
+
+    result.issue_count = result.issues.length;
+    result.success = result.issue_count === 0;
+
+    Logger.log(JSON.stringify(result, null, 2));
+    return result;
+
+  } catch (err) {
+    const errorResult = {
+      success: false,
+      message: err && err.message ? err.message : String(err || 'Unknown error')
+    };
+
+    Logger.log(JSON.stringify(errorResult, null, 2));
+    return errorResult;
+  }
+}
+
+function testAppointmentServicePhase3IRegressionPack() {
+  const result = {
+    success: true,
+    backend_mode: typeof dbGetBackendMode_ === 'function'
+      ? dbGetBackendMode_()
+      : '',
+    checked_at: typeof nowIso === 'function'
+      ? nowIso()
+      : new Date().toISOString(),
+    issue_count: 0,
+    issues: [],
+    tests: []
+  };
+
+  try {
+    const testList = [
+      {
+        name: 'testAppointmentRepositoryPhase3HReadOnly',
+        fn: typeof testAppointmentRepositoryPhase3HReadOnly === 'function'
+          ? testAppointmentRepositoryPhase3HReadOnly
+          : null
+      },
+      {
+        name: 'testAppointmentRepositoryPhase3HBuildRawContext',
+        fn: typeof testAppointmentRepositoryPhase3HBuildRawContext === 'function'
+          ? testAppointmentRepositoryPhase3HBuildRawContext
+          : null
+      },
+      {
+        name: 'testAppointmentRepositoryPhase3HFindAppointmentSample',
+        fn: typeof testAppointmentRepositoryPhase3HFindAppointmentSample === 'function'
+          ? testAppointmentRepositoryPhase3HFindAppointmentSample
+          : null
+      },
+      {
+        name: 'testAppointmentRepositoryPhase3HContextFinderSample',
+        fn: typeof testAppointmentRepositoryPhase3HContextFinderSample === 'function'
+          ? testAppointmentRepositoryPhase3HContextFinderSample
+          : null
+      },
+      {
+        name: 'testAppointmentServicePhase3IReadOnlyBridge',
+        fn: typeof testAppointmentServicePhase3IReadOnlyBridge === 'function'
+          ? testAppointmentServicePhase3IReadOnlyBridge
+          : null
+      },
+      {
+        name: 'testAppointmentServicePhase3IEndpointSample',
+        fn: typeof testAppointmentServicePhase3IEndpointSample === 'function'
+          ? testAppointmentServicePhase3IEndpointSample
+          : null
+      },
+      {
+        name: 'testAppointmentServicePhase3ISearchPatientsForAppointmentSample',
+        fn: typeof testAppointmentServicePhase3ISearchPatientsForAppointmentSample === 'function'
+          ? testAppointmentServicePhase3ISearchPatientsForAppointmentSample
+          : null
+      }
+    ];
+
+    testList.forEach(function(item) {
+      if (!item.fn) {
+        result.tests.push({
+          name: item.name,
+          success: false,
+          issue: 'TEST_FUNCTION_NOT_FOUND'
+        });
+
+        result.issues.push({
+          test: item.name,
+          issue: 'TEST_FUNCTION_NOT_FOUND'
+        });
+
+        return;
+      }
+
+      const testResult = item.fn();
+      const success = !!(testResult && testResult.success === true);
+      const issueCount = testResult && testResult.issue_count !== undefined
+        ? Number(testResult.issue_count || 0)
+        : (success ? 0 : 1);
+
+      result.tests.push({
+        name: item.name,
+        success: success,
+        issue_count: issueCount
+      });
+
+      if (!success || issueCount > 0) {
+        result.issues.push({
+          test: item.name,
+          success: success,
+          issue_count: issueCount,
+          issue: 'REGRESSION_TEST_FAILED'
+        });
+      }
+    });
+
+    result.issue_count = result.issues.length;
+    result.success = result.issue_count === 0;
+
+    Logger.log(JSON.stringify(result, null, 2));
+    return result;
+
+  } catch (err) {
+    const errorResult = {
+      success: false,
+      message: err && err.message ? err.message : String(err || 'Unknown error')
+    };
+
+    Logger.log(JSON.stringify(errorResult, null, 2));
+    return errorResult;
+  }
+}
+
+function testAppointmentServicePhase6GUiReadLog() {
+  const result = {
+    success: true,
+    stage: '6G-AppointmentService',
+    checked_at: typeof nowIso === 'function' ? nowIso() : new Date().toISOString(),
+    ui_read_backend_mode: getAppointmentServiceUiReadBackendMode_(),
+    ui_read_supabase_test_enabled: typeof repoIsUiReadSupabaseTestEnabled_ === 'function'
+      ? repoIsUiReadSupabaseTestEnabled_()
+      : false,
+    issue_count: 0,
+    issues: [],
+    probe: {}
+  };
+
+  try {
+    const opts = getAppointmentServiceUiReadOptions_();
+
+    clearAppointmentsListCache();
+
+    const raw = getAppointmentsRaw(opts);
+    const list = getAppointments(opts);
+
+    result.probe.appointment_count = Array.isArray(raw) ? raw.length : -1;
+    result.probe.list_count = Array.isArray(list) ? list.length : -1;
+
+    if (!Array.isArray(raw)) {
+      result.issues.push({ issue: 'APPOINTMENTS_RAW_NOT_ARRAY' });
+    }
+
+    if (!Array.isArray(list)) {
+      result.issues.push({ issue: 'APPOINTMENTS_LIST_NOT_ARRAY' });
+    }
+
+    const firstAppointment = raw.length ? raw[0] : null;
+    const appointmentId = firstAppointment ? String(firstAppointment.appointment_id || '').trim() : '';
+    const patientId = firstAppointment ? String(firstAppointment.patient_id || '').trim() : '';
+
+    result.probe.first_appointment_id = appointmentId;
+    result.probe.first_patient_id = patientId;
+
+    if (!appointmentId) {
+      result.issues.push({ issue: 'NO_APPOINTMENT_SAMPLE_AVAILABLE' });
+    }
+
+    if (appointmentId) {
+      const found = findAppointmentRawById(appointmentId, opts);
+      const detail = getAppointmentById(appointmentId, opts);
+
+      result.probe.find_success = !!found;
+      result.probe.detail_success = !!(detail && detail.success);
+
+      if (!found) {
+        result.issues.push({
+          appointment_id: appointmentId,
+          issue: 'FIND_APPOINTMENT_FAILED'
+        });
+      }
+
+      if (!detail || !detail.success) {
+        result.issues.push({
+          appointment_id: appointmentId,
+          issue: 'GET_APPOINTMENT_BY_ID_FAILED'
+        });
+      }
+    }
+
+    if (patientId) {
+      const hasOpen = hasOpenAppointmentForPatient(patientId, '', opts);
+      const checkRes = checkPatientOpenAppointment(patientId, '', opts);
+
+      result.probe.has_open_appointment = !!hasOpen;
+      result.probe.check_open_success = !!(
+        checkRes &&
+        checkRes.success === true &&
+        Object.prototype.hasOwnProperty.call(checkRes, 'hasOpenAppointment')
+      );
+
+      if (!result.probe.check_open_success) {
+        result.issues.push({
+          patient_id: patientId,
+          issue: 'CHECK_PATIENT_OPEN_APPOINTMENT_FAILED'
+        });
+      }
+    }
+
+    let supabaseWriteBlocked = false;
+    let supabaseWriteMessage = '';
+
+    try {
+      dbInsert_(REPO_TABLES.APPOINTMENTS, {
+        appointment_id: 'TEST-SHOULD-NOT-INSERT'
+      }, {
+        backend_mode: 'supabase'
+      });
+    } catch (errWrite) {
+      supabaseWriteBlocked = true;
+      supabaseWriteMessage = errWrite && errWrite.message ? errWrite.message : String(errWrite || '');
+    }
+
+    if (!supabaseWriteBlocked) {
+      result.issues.push({
+        issue: 'SUPABASE_WRITE_NOT_BLOCKED'
+      });
+    }
+
+    result.supabase_write_guard = {
+      blocked: supabaseWriteBlocked,
+      message: supabaseWriteMessage
+    };
+
+    result.issue_count = result.issues.length;
+    result.success = result.issue_count === 0;
+
+    Logger.log(JSON.stringify(result, null, 2));
+    return result;
+
+  } catch (err) {
+    const errorResult = {
+      success: false,
+      stage: '6G-AppointmentService',
+      checked_at: typeof nowIso === 'function' ? nowIso() : new Date().toISOString(),
+      message: err && err.message ? err.message : String(err || 'Unknown error')
+    };
+
+    Logger.log(JSON.stringify(errorResult, null, 2));
+    return errorResult;
+  }
+}

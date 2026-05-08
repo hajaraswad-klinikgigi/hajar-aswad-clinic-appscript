@@ -1,0 +1,2210 @@
+<script>
+  let appointmentSubmitInFlight = false;  
+  let appointmentSubmitToken = 0;  
+  
+  let allAppointments = [];  
+  let filteredAppointments = [];  
+  let fullscreenAppointments = [];  
+  let isAppointmentsFullscreenMode = false;  
+  
+  let appointmentCurrentPage = 1;  
+  const appointmentPageSize = 5;  
+  
+  let appointmentFormMode = 'create';  
+  let pendingCancelAppointmentId = null;  
+  let pendingCancelAppointmentLabel = '';  
+  let pendingRestoreAppointmentId = null;  
+  let pendingRestoreAppointmentLabel = '';  
+  
+  let showCancelledAppointments = false;  
+  let appointmentListSearchDebounce = null;  
+  let appointmentPatientSearchDebounce = null;  
+  let appointmentPatientHasOpenAppointment = false;  
+  let appointmentPatientCheckToken = 0;  
+  
+  let appointmentsAutoPagingTimer = null;  
+  let appointmentsAutoPagingEnabled = false;
+  let appointmentsFullscreenSessionId = 0;
+  let appointmentsLiveRefreshTimer = null;
+  let appointmentsLiveRefreshInFlight = false;  
+  let appointmentsLastSignature = '';
+  let appointmentQueueMap = {};
+
+  let treatmentSubmitInFlight = false;
+  let cancelAppointmentInFlight = false;
+  let restoreAppointmentInFlight = false;
+  
+  window.treatmentDoctors = window.treatmentDoctors || [];  
+  window.treatmentServices = window.treatmentServices || [];  
+  window.treatmentItemsState = window.treatmentItemsState || [];  
+  
+  window.treatmentMasterCache = window.treatmentMasterCache || {  
+    doctors: null,  
+    services: null  
+  };  
+  
+  function formatAppointmentTimeDisplay(value) {  
+    if (!value) return '';  
+    const s = String(value).trim();  
+    const matchDateTime = s.match(/\d{2}:\d{2}/);  
+    if (matchDateTime) return matchDateTime[0];  
+    const matchTimeOnly = s.match(/^(\d{2}:\d{2})/);  
+    if (matchTimeOnly) return matchTimeOnly[1];  
+    return s;  
+  }  
+  
+  function formatAppointmentDateDisplay(value) {  
+    if (!value) return '';  
+  
+    const s = String(value).trim();  
+    const match = s.match(/^\d{4}-\d{2}-\d{2}/);  
+    if (!match) return s;  
+  
+    const parts = match[0].split('-');  
+    return parts[2] + '-' + parts[1] + '-' + parts[0];  
+  }  
+  
+  function getTodayYmdLocal() {  
+    const now = new Date();  
+    const year = now.getFullYear();  
+    const month = String(now.getMonth() + 1).padStart(2, '0');  
+    const day = String(now.getDate()).padStart(2, '0');  
+    return year + '-' + month + '-' + day;  
+  }  
+  
+  function normalizeAppointmentDateYmd(value) {  
+    if (!value) return '';  
+  
+    const str = String(value).trim();  
+  
+    if (/^\d{4}-\d{2}-\d{2}$/.test(str)) {  
+      return str;  
+    }  
+  
+    if (/^\d{4}-\d{2}-\d{2}\s/.test(str)) {  
+      return str.slice(0, 10);  
+    }  
+  
+    const date = new Date(str);  
+    if (isNaN(date.getTime())) return '';  
+  
+    const year = date.getFullYear();  
+    const month = String(date.getMonth() + 1).padStart(2, '0');  
+    const day = String(date.getDate()).padStart(2, '0');  
+    return year + '-' + month + '-' + day;  
+  }  
+  
+  function getTodayFullscreenAppointments() {  
+    const todayYmd = getTodayYmdLocal();  
+  
+    return (allAppointments || []).filter(function(row) {  
+      const appointmentDate = normalizeAppointmentDateYmd(row.appointment_date || row.date || '');  
+      const status = String(row.status || '').toLowerCase();  
+  
+      return appointmentDate === todayYmd &&  
+             (status === 'scheduled' || status === 'completed' || status === 'cancelled');  
+    }).sort(function(a, b) {  
+      const aTime = String(a.appointment_time || '');  
+      const bTime = String(b.appointment_time || '');  
+      const timeCompare = aTime.localeCompare(bTime);  
+      if (timeCompare !== 0) return timeCompare;  
+  
+      return String(a.appointment_id || '').localeCompare(String(b.appointment_id || ''));  
+    });  
+  }  
+  
+  function getRenderedAppointmentsSource() {  
+    if (isAppointmentsFullscreenMode) {  
+      return fullscreenAppointments || [];  
+    }  
+    return filteredAppointments || [];  
+  } 
+
+  function prepareAppointmentsRows(rows) {
+  return (rows || []).map(function(row) {
+    row._search_text = [
+      row.patient_name || '',
+      row.appointment_date || '',
+      row.appointment_time || '',
+      row.status || '',
+      row.appointment_id || '',
+      row.complaint || ''
+    ].join(' ').toLowerCase();
+
+    return row;
+  });
+}
+
+function buildAppointmentsSignature(rows) {
+  return (rows || []).map(function(row) {
+    return [
+      row.appointment_id || '',
+      row.status || '',
+      row.updated_at || '',
+      row.appointment_date || '',
+      row.appointment_time || ''
+    ].join('|');
+  }).join('||');
+}
+
+function buildAppointmentQueueMap(rows) {
+  const groupedByDate = {};
+  const queueMap = {};
+
+  (rows || []).forEach(function(row) {
+    const dateKey = String(row.appointment_date || '');
+    if (!groupedByDate[dateKey]) {
+      groupedByDate[dateKey] = [];
+    }
+    groupedByDate[dateKey].push(row);
+  });
+
+  Object.keys(groupedByDate).forEach(function(dateKey) {
+    groupedByDate[dateKey].sort(function(a, b) {
+      const timeCompare = String(a.appointment_time || '').localeCompare(String(b.appointment_time || ''));
+      if (timeCompare !== 0) return timeCompare;
+
+      return String(a.appointment_id || '').localeCompare(String(b.appointment_id || ''));
+    });
+
+    groupedByDate[dateKey].forEach(function(row, idx) {
+      queueMap[String(row.appointment_id || '')] = idx + 1;
+    });
+  });
+
+  return queueMap;
+}
+
+function shouldPauseAppointmentsLiveRefresh() {
+  if (document.hidden) return true;
+  if (isAppointmentModalOpen()) return true;
+
+  const treatmentModal = document.getElementById('treatmentModal');
+  if (treatmentModal && !treatmentModal.classList.contains('hidden')) return true;
+
+  return false;
+} 
+  
+  function isAppointmentModalOpen() {  
+    const modal = document.getElementById('appointmentModal');  
+    return modal && !modal.classList.contains('hidden');  
+  }  
+  
+  function showAppointmentsPage() {  
+    setActiveMenu('menuAppointments');  
+    const contentArea = document.getElementById('contentArea');  
+  
+    contentArea.innerHTML = `  
+      <div id="appointmentsFullscreenTarget" class="appointments-fullscreen-target">  
+        <div class="appointments-shell">  
+  
+          <div class="appointments-header appointments-header-main">  
+            <div>  
+              <div class="appointments-eyebrow">Operational Queue</div>  
+              <h2 class="appointments-title">Appointments</h2>  
+              <div class="appointments-subtitle">Kelola jadwal pasien, status appointment, dan alur treatment</div>  
+            </div>  
+  
+            <div class="appointments-header-actions">  
+              <button  
+                type="button"  
+                class="appointments-fullscreen-btn"  
+                id="appointmentsFullscreenBtn"  
+                onclick="toggleAppointmentsFullscreen()"  
+                title="Fullscreen daftar appointment"  
+                aria-label="Fullscreen daftar appointment"  
+              >  
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">  
+                  <path d="M8 3H5a2 2 0 0 0-2 2v3"></path>  
+                  <path d="M16 3h3a2 2 0 0 1 2 2v3"></path>  
+                  <path d="M8 21H5a2 2 0 0 1-2-2v-3"></path>  
+                  <path d="M16 21h3a2 2 0 0 0 2-2v-3"></path>  
+                </svg>  
+                <span>Fullscreen</span>  
+              </button>  
+  
+              <button  
+                type="button"  
+                class="action-btn appointments-create-btn"  
+                onclick="openCreateAppointmentModal()"  
+              >
+                <span>+ Appointment</span>  
+              </button>  
+            </div>  
+          </div>  
+  
+          <div class="content-card appointments-toolbar-card">  
+            <div class="appointments-toolbar">  
+              <div class="appointments-search-wrap">  
+                <label for="appointmentSearchInput" class="appointments-toolbar-label">Cari Appointment</label>  
+                <input  
+                  type="text"  
+                  id="appointmentSearchInput"  
+                  class="search-box"  
+                  placeholder="Cari pasien, tanggal, status, atau ID..."  
+                  oninput="handleAppointmentSearch()"  
+                >  
+              </div>  
+  
+              <div class="appointments-toggle-wrap">  
+                <label class="appointments-toolbar-label">Filter</label>  
+                <label class="inline-toggle appointments-inline-toggle">  
+                  <input  
+                    type="checkbox"  
+                    id="showCancelledAppointments"  
+                    onchange="handleToggleCancelledAppointments()"  
+                  >  
+                  <span>Tampilkan cancelled</span>  
+                </label>  
+              </div>  
+            </div>  
+          </div>  
+  
+          <div class="content-card appointments-display-card">  
+            <div class="appointments-table-head">  
+              <div>  
+                <h3 class="appointments-section-title">Daftar Appointment</h3>  
+                <div class="appointments-section-subtitle">Pantau jadwal aktif dan lanjutkan treatment bila diperlukan</div>  
+              </div>  
+            </div>  
+  
+            <div class="table-wrapper">  
+              <table class="table appointments-table">  
+                <thead>  
+                  <tr>  
+                    <th>Antrian</th>  
+                    <th>Patient</th>  
+                    <th>Tanggal</th>  
+                    <th>Keluhan</th>  
+                    <th>Status</th>  
+                    <th class="appointments-action-col">Action</th>  
+                  </tr>  
+                </thead>  
+                <tbody id="appointmentsTableBody">  
+                  <tr>  
+                    <td colspan="6">Memuat data...</td>  
+                  </tr>  
+                </tbody>  
+              </table>  
+            </div>  
+  
+            <div class="pagination appointments-pagination">  
+              <button type="button" onclick="prevAppointmentPage()">Prev</button>  
+              <div id="appointmentPaginationInfo" class="pagination-info">Halaman 1 dari 1</div>  
+              <button type="button" onclick="nextAppointmentPage()">Next</button>  
+            </div>  
+          </div>  
+        </div>  
+      </div>  
+    `;  
+  
+    const toggle = document.getElementById('showCancelledAppointments');  
+    if (toggle) toggle.checked = showCancelledAppointments;  
+  
+    loadAppointments();
+    syncAppointmentsFullscreenState();
+    syncAppointmentsRefreshMode();  
+  }  
+  
+  function getAppointmentsFullscreenTarget() {  
+    return document.getElementById('appointmentsFullscreenTarget');  
+  }  
+  
+  function isAppointmentsFullscreenActive() {  
+    const target = getAppointmentsFullscreenTarget();  
+    if (!target) return false;  
+  
+    return document.fullscreenElement === target ||  
+           target.classList.contains('appointments-fullscreen-active');  
+  }  
+
+  async function lockAppointmentsLandscapeOnMobile() {
+    try {
+      const isMobile = window.matchMedia('(max-width: 768px)').matches;
+      if (!isMobile) return;
+
+      if (screen.orientation && screen.orientation.lock) {
+        await screen.orientation.lock('landscape');
+      }
+    } catch (err) {
+      // biarkan gagal diam-diam bila browser tidak mendukung
+    }
+  }
+
+  async function unlockAppointmentsOrientation() {
+    try {
+      if (screen.orientation && screen.orientation.unlock) {
+        screen.orientation.unlock();
+      }
+    } catch (err) {
+      // biarkan gagal diam-diam
+    }
+  }
+  
+  function closeAllAppointmentExpandRows() {  
+    const openRows = document.querySelectorAll('.appointment-expand-row.open');  
+    const activeButtons = document.querySelectorAll('.appointment-expand-trigger-btn.active');  
+  
+    openRows.forEach(function(row) {  
+      row.classList.remove('open');  
+    });  
+  
+    activeButtons.forEach(function(btn) {  
+      btn.classList.remove('active');  
+    });  
+  }  
+  
+  function stopAppointmentsAutoPaging() {  
+    appointmentsAutoPagingEnabled = false;  
+  
+    if (appointmentsAutoPagingTimer) {  
+      clearInterval(appointmentsAutoPagingTimer);  
+      appointmentsAutoPagingTimer = null;  
+    }  
+  }
+
+  function stopAppointmentsLiveRefresh() {
+    if (appointmentsLiveRefreshTimer) {
+      clearInterval(appointmentsLiveRefreshTimer);
+      appointmentsLiveRefreshTimer = null;
+    }
+  }
+
+  function getAppointmentsLiveRefreshIntervalMs() {
+    return isAppointmentsFullscreenMode ? 10000 : 30000;
+  }
+
+  function startAppointmentsLiveRefresh() {
+    stopAppointmentsLiveRefresh();
+
+    const target = getAppointmentsFullscreenTarget();
+    if (!target) return;
+
+    appointmentsLiveRefreshTimer = setInterval(function() {
+      const contentArea = document.getElementById('contentArea');
+      const stillOnAppointmentsPage =
+        !!contentArea &&
+        !!document.getElementById('appointmentsFullscreenTarget');
+
+      if (!stillOnAppointmentsPage) {
+        stopAppointmentsLiveRefresh();
+        return;
+      }
+
+      if (appointmentsLiveRefreshInFlight) return;
+      if (shouldPauseAppointmentsLiveRefresh()) return;
+
+      appointmentsLiveRefreshInFlight = true;
+
+      google.script.run
+        .withSuccessHandler(function(rows) {
+          appointmentsLiveRefreshInFlight = false;
+
+          const preparedRows = prepareAppointmentsRows(rows || []);
+          const nextSignature = buildAppointmentsSignature(preparedRows);
+
+          if (appointmentsLastSignature === nextSignature) {
+            return;
+          }
+
+          appointmentsLastSignature = nextSignature;
+          allAppointments = preparedRows;
+
+          if (isAppointmentsFullscreenMode) {
+            fullscreenAppointments = getTodayFullscreenAppointments();
+            appointmentQueueMap = buildAppointmentQueueMap(fullscreenAppointments);
+
+            const totalPages = Math.ceil((fullscreenAppointments || []).length / appointmentPageSize) || 1;
+            if (appointmentCurrentPage > totalPages) {
+              appointmentCurrentPage = 1;
+            }
+
+            closeAllAppointmentExpandRows();
+            renderAppointmentsTable(false);
+            startAppointmentsAutoPaging();
+          } else {
+            applyAppointmentFilters();
+          }
+        })
+        .withFailureHandler(function() {
+          appointmentsLiveRefreshInFlight = false;
+        })
+        .getAppointments();
+    }, getAppointmentsLiveRefreshIntervalMs());
+  }
+
+  function restartAppointmentsLiveRefresh() {
+    stopAppointmentsLiveRefresh();
+    startAppointmentsLiveRefresh();
+  } 
+
+  function syncAppointmentsRefreshMode() {
+    if (isAppointmentsFullscreenMode) {
+      restartAppointmentsLiveRefresh();
+    } else {
+      stopAppointmentsLiveRefresh();
+      appointmentsLiveRefreshInFlight = false;
+    }
+  }
+
+  function cleanupAppointmentsRealtimeState() {
+    stopAppointmentsAutoPaging();
+    stopAppointmentsLiveRefresh();
+    appointmentsLiveRefreshInFlight = false;
+    isAppointmentsFullscreenMode = false;
+    fullscreenAppointments = [];
+  } 
+  
+  function goToNextFullscreenPage() {  
+    if (!isAppointmentsFullscreenMode) return;  
+  
+    const renderSource = getRenderedAppointmentsSource();  
+    const totalPages = Math.ceil((renderSource || []).length / appointmentPageSize) || 1;  
+  
+    if (totalPages <= 1) return;  
+  
+    appointmentCurrentPage = appointmentCurrentPage >= totalPages  
+      ? 1  
+      : appointmentCurrentPage + 1;  
+  
+    closeAllAppointmentExpandRows();  
+    renderAppointmentsTable(true);  
+  }  
+  
+  function startAppointmentsAutoPaging() {
+    stopAppointmentsAutoPaging();
+
+    if (!isAppointmentsFullscreenMode) return;
+
+    const renderSource = getRenderedAppointmentsSource();
+    const totalPages = Math.ceil((renderSource || []).length / appointmentPageSize) || 1;
+
+    if (totalPages <= 1) return;
+
+    appointmentsAutoPagingEnabled = true;
+    const sessionId = appointmentsFullscreenSessionId;
+
+    appointmentsAutoPagingTimer = setInterval(function() {
+      if (!appointmentsAutoPagingEnabled) return;
+      if (!isAppointmentsFullscreenMode) return;
+      if (sessionId !== appointmentsFullscreenSessionId) return;
+
+      goToNextFullscreenPage();
+    }, 10000);
+  }  
+  
+  async function toggleAppointmentsFullscreen() {  
+    if (isAppointmentsFullscreenActive()) {  
+      await exitAppointmentsFullscreen();  
+      return;  
+    }  
+  
+    closeAllAppointmentExpandRows();  
+    await enterAppointmentsFullscreen();  
+  }  
+  
+  async function enterAppointmentsFullscreen() {  
+    const target = getAppointmentsFullscreenTarget();  
+    if (!target) return;  
+  
+    closeAllAppointmentExpandRows();
+    stopAppointmentsAutoPaging();
+    appointmentsFullscreenSessionId++;
+
+    isAppointmentsFullscreenMode = true;
+    fullscreenAppointments = getTodayFullscreenAppointments();
+    appointmentQueueMap = buildAppointmentQueueMap(fullscreenAppointments);
+    appointmentCurrentPage = 1;
+    renderAppointmentsTable(false);  
+  
+    try {  
+      if (target.requestFullscreen) {  
+        await target.requestFullscreen();  
+      } else {  
+        target.classList.add('appointments-fullscreen-active');  
+        document.body.classList.add('appointments-page-fullscreen');  
+      }  
+    } catch (err) {  
+      target.classList.add('appointments-fullscreen-active');  
+      document.body.classList.add('appointments-page-fullscreen');  
+    }  
+  
+    syncAppointmentsFullscreenState();
+    await lockAppointmentsLandscapeOnMobile();
+    startAppointmentsAutoPaging();
+    syncAppointmentsRefreshMode();
+  }  
+  
+  async function exitAppointmentsFullscreen() {
+    const target = getAppointmentsFullscreenTarget();
+    if (!target) return;
+
+    stopAppointmentsAutoPaging();
+    appointmentsFullscreenSessionId++;
+
+    try {
+      if (document.fullscreenElement === target && document.exitFullscreen) {
+        await document.exitFullscreen();
+      }
+    } catch (err) {}
+
+    target.classList.remove('appointments-fullscreen-active');
+    document.body.classList.remove('appointments-page-fullscreen');
+
+    isAppointmentsFullscreenMode = false;
+    fullscreenAppointments = [];
+    appointmentCurrentPage = 1;
+    closeAllAppointmentExpandRows();
+
+    applyAppointmentFilters();
+    syncAppointmentsFullscreenState();
+    syncAppointmentsRefreshMode();
+  }  
+  
+  function syncAppointmentsFullscreenState() {  
+    const target = getAppointmentsFullscreenTarget();  
+    const fullscreenBtn = document.getElementById('appointmentsFullscreenBtn');  
+    const createBtn = document.querySelector('.appointments-create-btn');  
+  
+    if (!target || !fullscreenBtn) return;  
+  
+    const active = document.fullscreenElement === target ||  
+                  target.classList.contains('appointments-fullscreen-active');  
+  
+    fullscreenBtn.style.display = active ? 'none' : 'inline-flex';  
+  
+    if (createBtn) {  
+      createBtn.style.display = active ? 'none' : 'inline-flex';  
+    }  
+  }  
+  
+  document.addEventListener('fullscreenchange', function() {
+    const target = getAppointmentsFullscreenTarget();
+    if (!target) return;
+
+    if (document.fullscreenElement !== target) {
+      target.classList.remove('appointments-fullscreen-active');
+      document.body.classList.remove('appointments-page-fullscreen');
+      stopAppointmentsAutoPaging();
+      appointmentsFullscreenSessionId++;
+
+      if (isAppointmentsFullscreenMode) {
+        isAppointmentsFullscreenMode = false;
+        fullscreenAppointments = [];
+        appointmentCurrentPage = 1;
+        closeAllAppointmentExpandRows();
+        applyAppointmentFilters();
+      }
+    } else {
+      startAppointmentsAutoPaging();
+    }
+
+    syncAppointmentsFullscreenState();
+    syncAppointmentsRefreshMode();
+  });  
+  
+  document.addEventListener('keydown', function(e) {  
+    if (e.key === 'Escape') {  
+      const target = getAppointmentsFullscreenTarget();  
+      if (!target) return;  
+  
+      if (target.classList.contains('appointments-fullscreen-active')) {  
+        exitAppointmentsFullscreen();  
+      }  
+    }  
+  });  
+  
+  function loadAppointments() {
+    appointmentsLiveRefreshInFlight = true;
+
+    google.script.run
+      .withSuccessHandler(function(rows) {
+        appointmentsLiveRefreshInFlight = false;
+
+        const preparedRows = prepareAppointmentsRows(rows || []);
+        const nextSignature = buildAppointmentsSignature(preparedRows);
+
+        allAppointments = preparedRows;
+
+        if (appointmentsLastSignature === nextSignature) {
+          if (isAppointmentsFullscreenMode) {
+            fullscreenAppointments = getTodayFullscreenAppointments();
+            appointmentQueueMap = buildAppointmentQueueMap(fullscreenAppointments);
+
+            const totalPages = Math.ceil((fullscreenAppointments || []).length / appointmentPageSize) || 1;
+            if (appointmentCurrentPage > totalPages) {
+              appointmentCurrentPage = 1;
+            }
+
+            closeAllAppointmentExpandRows();
+            renderAppointmentsTable(false);
+            startAppointmentsAutoPaging();
+          } else {
+            applyAppointmentFilters();
+          }
+
+          preloadTreatmentMasters();
+          return;
+        }
+
+        appointmentsLastSignature = nextSignature;
+
+        if (isAppointmentsFullscreenMode) {
+          fullscreenAppointments = getTodayFullscreenAppointments();
+          appointmentQueueMap = buildAppointmentQueueMap(fullscreenAppointments);
+
+          const totalPages = Math.ceil((fullscreenAppointments || []).length / appointmentPageSize) || 1;
+          if (appointmentCurrentPage > totalPages) {
+            appointmentCurrentPage = 1;
+          }
+
+          closeAllAppointmentExpandRows();
+          renderAppointmentsTable(false);
+          startAppointmentsAutoPaging();
+        } else {
+          applyAppointmentFilters();
+        }
+
+        preloadTreatmentMasters();
+      })
+      .withFailureHandler(function(err) {
+        appointmentsLiveRefreshInFlight = false;
+
+        const tbody = document.getElementById('appointmentsTableBody');
+        if (tbody) {
+          tbody.innerHTML = `<tr><td colspan="6">Error: ${err.message}</td></tr>`;
+        }
+      })
+      .getAppointments();
+  } 
+  
+  function applyAppointmentFilters() {  
+    let rows = [...(allAppointments || [])];  
+  
+    const searchInput = document.getElementById('appointmentSearchInput');  
+    const keyword = String(searchInput ? searchInput.value : '').toLowerCase().trim();  
+  
+    if (showCancelledAppointments) {  
+      rows = rows.filter(function(row) {  
+        return String(row.status || '').toLowerCase() === 'cancelled';  
+      });  
+    } else {  
+      rows = rows.filter(function(row) {  
+        return String(row.status || '').toLowerCase() !== 'cancelled';  
+      });  
+    }  
+  
+    if (keyword) {
+      rows = rows.filter(function(row) {
+        return String(row._search_text || '').includes(keyword);
+      });
+    }
+  
+    filteredAppointments = rows;
+    appointmentQueueMap = buildAppointmentQueueMap(filteredAppointments);
+    appointmentCurrentPage = 1;
+    closeAllAppointmentExpandRows();
+    renderAppointmentsTable(false);  
+  }  
+  
+  function handleToggleCancelledAppointments() {  
+    const toggle = document.getElementById('showCancelledAppointments');  
+    showCancelledAppointments = !!(toggle && toggle.checked);  
+  
+    if (isAppointmentsFullscreenMode) {
+      fullscreenAppointments = getTodayFullscreenAppointments();
+      appointmentQueueMap = buildAppointmentQueueMap(fullscreenAppointments);
+      appointmentCurrentPage = 1;
+      closeAllAppointmentExpandRows();
+      renderAppointmentsTable(false);
+      return;
+    }  
+  
+    applyAppointmentFilters();  
+  }  
+  
+  function handleAppointmentSearch() {  
+    if (appointmentListSearchDebounce) {  
+      clearTimeout(appointmentListSearchDebounce);  
+    }  
+  
+    appointmentListSearchDebounce = setTimeout(function() {  
+      if (isAppointmentsFullscreenMode) {  
+        return;  
+      }  
+  
+      appointmentCurrentPage = 1;  
+      applyAppointmentFilters();  
+    }, 250);  
+  }  
+  
+  function renderAppointmentsTable(useSlideAnimation) {  
+    const tbody = document.getElementById('appointmentsTableBody');  
+    const info = document.getElementById('appointmentPaginationInfo');  
+    const tableWrapper = document.querySelector('.appointments-display-card .table-wrapper');  
+  
+    if (!tbody || !info) return;  
+  
+    const renderSource = getRenderedAppointmentsSource();  
+  
+    if (!renderSource.length) {  
+      const emptyTitle = isAppointmentsFullscreenMode  
+        ? 'Belum ada appointment hari ini'  
+        : (showCancelledAppointments ? 'Belum ada appointment cancelled' : 'Belum ada data appointment');  
+  
+      const emptySubtitle = isAppointmentsFullscreenMode  
+        ? 'Belum ada appointment hari ini dengan status scheduled, completed, atau cancelled'  
+        : (showCancelledAppointments  
+            ? 'Tidak ada appointment cancelled untuk ditampilkan'  
+            : 'Data appointment akan tampil di sini setelah dibuat');  
+  
+      tbody.innerHTML = `  
+        <tr>  
+          <td colspan="6">  
+            <div class="appointments-empty-state">  
+              <div class="appointments-empty-title">${emptyTitle}</div>  
+              <div class="appointments-empty-subtitle">${emptySubtitle}</div>  
+            </div>  
+          </td>  
+        </tr>  
+      `;  
+      info.innerText = 'Halaman 0 dari 0';  
+      return;  
+    }  
+  
+    const totalPages = Math.ceil(renderSource.length / appointmentPageSize);  
+    if (appointmentCurrentPage > totalPages) {  
+      appointmentCurrentPage = totalPages;  
+    }  
+  
+    const start = (appointmentCurrentPage - 1) * appointmentPageSize;  
+    const pageRows = renderSource.slice(start, start + appointmentPageSize);        
+  
+    if (isAppointmentsFullscreenMode && useSlideAnimation && tableWrapper) {  
+      tableWrapper.classList.remove('appointments-page-slide');  
+      void tableWrapper.offsetWidth;  
+      tableWrapper.classList.add('appointments-page-slide');  
+    }  
+  
+    tbody.innerHTML = pageRows.map(function(row) {  
+      const status = String(row.status || '').toLowerCase();  
+      const statusBadge = getAppointmentStatusBadge(status);  
+  
+      const admin = isAdmin();  
+      const owner = isOwner();  
+  
+      const canStartTreatment = !isAppointmentsFullscreenMode && status === 'scheduled' && (admin || owner);  
+      const canEdit = !isAppointmentsFullscreenMode && (admin || owner) && status !== 'completed';  
+      const canCancel = !isAppointmentsFullscreenMode && (admin || owner) && status !== 'completed' && status !== 'cancelled';  
+      const canRestore = !isAppointmentsFullscreenMode && (admin || owner) && status === 'cancelled';  
+  
+      const safePatientName = String(row.patient_name || '').replace(/'/g, "\\'");  
+      const topActionCount = 1 + (canEdit ? 1 : 0) + ((canStartTreatment || canCancel || canRestore) ? 1 : 0);  
+      const topActionWidth = (topActionCount * 38) + ((topActionCount - 1) * 8);  
+      const queueNumber = appointmentQueueMap[String(row.appointment_id || '')] || '-';
+  
+      return `  
+        <tr id="appointment-row-${row.appointment_id}" class="appointment-main-row">  
+          <td>  
+            <div class="appointment-queue-number">${queueNumber}</div>  
+          </td>  
+  
+          <td>  
+            <span class="appointment-patient-name">${row.patient_name || ''}</span>  
+          </td>  
+  
+          <td>${formatAppointmentDateDisplay(row.appointment_date)}</td>  
+  
+          <td>  
+            <span class="appointment-complaint-text">${row.complaint || ''}</span>  
+          </td>  
+  
+          <td>${statusBadge}</td>  
+  
+          <td>  
+            <div class="appointment-icon-actions">  
+              ${  
+                !isAppointmentsFullscreenMode ? `  
+                  <button  
+                    type="button"  
+                    class="icon-btn detail"  
+                    title="Detail appointment"  
+                    aria-label="Detail appointment"  
+                    onclick="openAppointmentDetail('${row.appointment_id}')"  
+                  >  
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">  
+                      <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z"></path>  
+                      <circle cx="12" cy="12" r="3"></circle>  
+                    </svg>  
+                  </button>  
+                ` : ''  
+              }  
+  
+              ${  
+                canEdit ? `  
+                  <button  
+                    type="button"  
+                    class="icon-btn edit"  
+                    title="Edit appointment"  
+                    aria-label="Edit appointment"  
+                    onclick="openEditAppointmentModal('${row.appointment_id}')"  
+                  >  
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">  
+                      <path d="M12 20h9"></path>  
+                      <path d="M16.5 3.5a2.12 2.12 0 1 1 3 3L7 19l-4 1 1-4 12.5-12.5z"></path>  
+                    </svg>  
+                  </button>  
+                ` : ''  
+              }  
+  
+              ${  
+                (canStartTreatment || canCancel || canRestore) ? `  
+                  <button  
+                    type="button"  
+                    id="appointment-expand-btn-${row.appointment_id}"  
+                    class="icon-btn expand appointment-expand-trigger-btn"  
+                    title="Tampilkan aksi"  
+                    aria-label="Tampilkan aksi"  
+                    onclick="toggleAppointmentExpand('${row.appointment_id}')"  
+                  >  
+                    <svg class="expand-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">  
+                      <path d="M6 9l6 6 6-6"></path>  
+                    </svg>  
+                  </button>  
+                ` : ''  
+              }  
+            </div>  
+          </td>  
+        </tr>  
+  
+        <tr id="appointment-expand-${row.appointment_id}" class="appointment-expand-row">  
+          <td colspan="6">  
+            <div class="appointment-expand-box" style="--appointment-action-width:${topActionWidth}px;">  
+              ${  
+                canStartTreatment ? `  
+                  <button  
+                    type="button"  
+                    class="mini-btn treatment"  
+                    onclick="openTreatmentModal('${row.appointment_id}')"  
+                  >  
+                    Mulai Treatment  
+                  </button>  
+                ` : ''  
+              }  
+  
+              ${  
+                canCancel ? `  
+                  <button  
+                    type="button"  
+                    class="mini-btn cancel"  
+                    onclick="confirmCancelAppointment('${row.appointment_id}', '${safePatientName}')"  
+                  >  
+                    Cancel  
+                  </button>  
+                ` : ''  
+              }  
+  
+              ${  
+                canRestore ? `  
+                  <button  
+                    type="button"  
+                    class="mini-btn restore"  
+                    onclick="confirmRestoreAppointment('${row.appointment_id}', '${safePatientName}')"  
+                  >  
+                    Restore  
+                  </button>  
+                ` : ''  
+              }  
+            </div>  
+          </td>  
+        </tr>  
+      `;  
+    }).join('');
+      
+    info.innerText = 'Halaman ' + appointmentCurrentPage + ' dari ' + totalPages;  
+  }  
+  
+  function toggleAppointmentExpand(appointmentId) {  
+    const targetRow = document.getElementById('appointment-expand-' + appointmentId);  
+    const targetBtn = document.getElementById('appointment-expand-btn-' + appointmentId);  
+    if (!targetRow) return;  
+  
+    const isOpen = targetRow.classList.contains('open');  
+  
+    document.querySelectorAll('.appointment-expand-row').forEach(function(row) {  
+      row.classList.remove('open');  
+    });  
+  
+    document.querySelectorAll('.appointment-expand-trigger-btn').forEach(function(btn) {  
+      btn.classList.remove('active');  
+    });  
+  
+    if (!isOpen) {  
+      targetRow.classList.add('open');  
+      if (targetBtn) {  
+        targetBtn.classList.add('active');  
+      }  
+    }  
+  }  
+  
+  function getAppointmentStatusBadge(status) {  
+    const value = String(status || '').toLowerCase();  
+  
+    let cls = 'status-badge default';  
+    let label = value || 'Unknown';  
+  
+    if (value === 'scheduled') {  
+      cls = 'status-badge scheduled';  
+      label = 'Scheduled';  
+    }  
+  
+    if (value === 'completed') {  
+      cls = 'status-badge completed';  
+      label = 'Completed';  
+    }  
+  
+    if (value === 'cancelled') {  
+      cls = 'status-badge cancelled';  
+      label = 'Cancelled';  
+    }  
+  
+    return `<span class="${cls}">${label}</span>`;  
+  }  
+  
+  function getPatientAvailabilityBadge(hasOpenAppointment) {  
+    if (hasOpenAppointment) {  
+      return `<span class="status-badge cancelled">Appointment Aktif</span>`;  
+    }  
+    return `<span class="status-badge completed">Siap Dijadwalkan</span>`;  
+  }  
+  
+  function prevAppointmentPage() {  
+    if (isAppointmentsFullscreenMode) return;  
+  
+    if (appointmentCurrentPage > 1) {  
+      appointmentCurrentPage--;  
+      closeAllAppointmentExpandRows();  
+      renderAppointmentsTable(false);  
+    }  
+  }  
+  
+  function nextAppointmentPage() {  
+    if (isAppointmentsFullscreenMode) return;  
+  
+    const renderSource = getRenderedAppointmentsSource();  
+    const totalPages = Math.ceil(renderSource.length / appointmentPageSize) || 1;  
+  
+    if (appointmentCurrentPage < totalPages) {  
+      appointmentCurrentPage++;  
+      closeAllAppointmentExpandRows();  
+      renderAppointmentsTable(false);  
+    }  
+  }  
+  
+  function openCreateAppointmentModal() {  
+    appointmentFormMode = 'create';  
+    appointmentPatientHasOpenAppointment = false;  
+    appointmentPatientCheckToken++;  
+    appointmentSubmitToken++;  
+    appointmentSubmitInFlight = false;  
+  
+    setAppointmentStatusOptions('create');  
+    clearAppointmentErrors();  
+    clearAppointmentForm();  
+    setAppointmentPatientWarning('');  
+  
+    document.getElementById('appointmentModalTitle').innerText = 'Tambah Appointment';  
+  
+    const btn = document.getElementById('appointmentSubmitBtn');  
+    if (btn) {  
+      btn.disabled = false;  
+      btn.textContent = 'Simpan';  
+    }  
+  
+    const modal = document.getElementById('appointmentModal');  
+    if (modal) {  
+      modal.style.display = 'flex';  
+      modal.classList.remove('hidden');  
+    }  
+  } 
+
+  function fillAppointmentFormFromRow(a) {
+    appointmentFormMode = 'edit';
+    appointmentPatientHasOpenAppointment = false;
+    appointmentPatientCheckToken++;
+    appointmentSubmitToken++;
+    appointmentSubmitInFlight = false;
+
+    setAppointmentStatusOptions('edit');
+
+    document.getElementById('appointmentModalTitle').innerText = 'Edit Appointment';
+    document.getElementById('appointment_id_hidden').value = a.appointment_id || '';
+    document.getElementById('appointment_patient_id').value = a.patient_id || '';
+    document.getElementById('appointment_patient_search').value = a.patient_name || '';
+    document.getElementById('appointment_date').value = formatDateForInput(a.appointment_date || '');
+    document.getElementById('appointment_time').value = formatAppointmentTimeDisplay(a.appointment_time || '');
+    document.getElementById('appointment_complaint').value = a.complaint || '';
+
+    const statusSelect = document.getElementById('appointment_status');
+    if (statusSelect) {
+      statusSelect.value = String(a.status || '').toLowerCase() === 'completed'
+        ? 'scheduled'
+        : (a.status || '');
+    }
+
+    setSelectedAppointmentPatientCard(a.patient_name || '', '', '', true);
+    setAppointmentPatientWarning('');
+    clearAppointmentErrors();
+
+    const results = document.getElementById('appointment_patient_results');
+    if (results) {
+      results.style.display = 'none';
+      results.innerHTML = '';
+    }
+
+    const btn = document.getElementById('appointmentSubmitBtn');
+    if (btn) {
+      btn.disabled = false;
+      btn.textContent = 'Update';
+    }
+  }
+
+  function openAppointmentModalShell() {
+    const modal = document.getElementById('appointmentModal');
+    if (modal) {
+      modal.style.display = 'flex';
+      modal.classList.remove('hidden');
+    }
+  } 
+  
+  function openEditAppointmentModal(appointmentId) {
+    setAppointmentStatusOptions('edit');
+
+    const localAppointment = getLocalAppointmentById(appointmentId);
+
+    // Optimasi: buka instan dari data lokal
+    if (localAppointment) {
+      if (String(localAppointment.status || '').toLowerCase() === 'completed') {
+        showToast('Appointment yang sudah completed tidak bisa diedit', 'error');
+        return;
+      }
+
+      fillAppointmentFormFromRow(localAppointment);
+      openAppointmentModalShell();
+      checkSelectedAppointmentPatientOpenStatus(
+        localAppointment.patient_id || '',
+        localAppointment.appointment_id || ''
+      );
+      return;
+    }
+
+    // Fallback: kalau data lokal tidak ada, baru ambil ke server
+    google.script.run
+      .withSuccessHandler(function(res) {
+        if (!res.success) {
+          showToast(res.message || 'Gagal mengambil data appointment', 'error');
+          return;
+        }
+
+        const a = res.data || {};
+
+        if (String(a.status || '').toLowerCase() === 'completed') {
+          showToast('Appointment yang sudah completed tidak bisa diedit', 'error');
+          return;
+        }
+
+        fillAppointmentFormFromRow(a);
+        openAppointmentModalShell();
+        checkSelectedAppointmentPatientOpenStatus(a.patient_id || '', a.appointment_id || '');
+      })
+      .withFailureHandler(function(err) {
+        showToast('Error: ' + err.message, 'error');
+      })
+      .getAppointmentById(appointmentId);
+  }
+
+  function getLocalAppointmentById(appointmentId) {
+    return (allAppointments || []).find(function(row) {
+      return String(row.appointment_id || '') === String(appointmentId || '');
+    }) || null;
+  }
+
+  function renderAppointmentDetailContent(a) {
+    const content = document.getElementById('appointmentDetailContent');
+    if (!content) return;
+
+    content.innerHTML = `
+      <div class="detail-label">Appointment ID</div>
+      <div class="detail-value">${escapeHtml(a.appointment_id || '')}</div>
+
+      <div class="detail-label">Pasien</div>
+      <div class="detail-value">${escapeHtml(a.patient_name || '')}</div>
+
+      <div class="detail-label">Tanggal</div>
+      <div class="detail-value">${formatAppointmentDateDisplay(a.appointment_date)}</div>
+
+      <div class="detail-label">Jam</div>
+      <div class="detail-value">${formatAppointmentTimeDisplay(a.appointment_time)}</div>
+
+      <div class="detail-label">Keluhan</div>
+      <div class="detail-value">${escapeHtml(a.complaint || '-')}</div>
+
+      <div class="detail-label">Status</div>
+      <div class="detail-value">${getAppointmentStatusBadge(String(a.status || '').toLowerCase())}</div>
+    `;
+  }
+
+  function openAppointmentDetailModalShell() {
+    const modal = document.getElementById('appointmentDetailModal');
+    if (modal) {
+      modal.style.display = 'flex';
+      modal.classList.remove('hidden');
+    }
+  }  
+  
+  function openAppointmentDetail(id) {
+    const localAppointment = getLocalAppointmentById(id);
+
+    // Optimasi: buka instan dari data lokal
+    if (localAppointment) {
+      renderAppointmentDetailContent(localAppointment);
+      openAppointmentDetailModalShell();
+      return;
+    }
+
+    // Fallback: kalau data lokal tidak ada, baru ambil ke server
+    google.script.run
+      .withSuccessHandler(function(res) {
+        if (!res.success) {
+          showToast(res.message || 'Gagal mengambil detail appointment', 'error');
+          return;
+        }
+
+        renderAppointmentDetailContent(res.data || {});
+        openAppointmentDetailModalShell();
+      })
+      .withFailureHandler(function(err) {
+        showToast('Error: ' + err.message, 'error');
+      })
+      .getAppointmentById(id);
+  }  
+  
+  function closeAppointmentDetailModal() {  
+    const modal = document.getElementById('appointmentDetailModal');  
+    if (modal) {  
+      modal.classList.add('hidden');  
+      modal.style.display = 'none';  
+    }  
+  }  
+  
+  function closeAppointmentModal() {
+    appointmentPatientCheckToken++;
+    appointmentSubmitToken++;
+    appointmentSubmitInFlight = false;
+    appointmentPatientHasOpenAppointment = false;
+
+    setModalProcessingState('appointmentModal', false, {
+      primaryButtonId: 'appointmentSubmitBtn',
+      idleText: appointmentFormMode === 'edit' ? 'Update' : 'Simpan'
+    });
+
+    const modal = document.getElementById('appointmentModal');
+    if (modal) {
+      modal.classList.add('hidden');
+      modal.style.display = 'none';
+    }
+
+    clearAppointmentErrors();
+    setAppointmentPatientWarning('');
+
+    const results = document.getElementById('appointment_patient_results');
+    if (results) {
+      results.style.display = 'none';
+      results.innerHTML = '';
+    }
+  }  
+  
+  function clearAppointmentForm() {  
+    document.getElementById('appointment_id_hidden').value = '';  
+    document.getElementById('appointment_patient_id').value = '';  
+    document.getElementById('appointment_patient_search').value = '';  
+    clearSelectedAppointmentPatientCard();  
+    setAppointmentPatientWarning('');  
+  
+    const results = document.getElementById('appointment_patient_results');  
+    if (results) {  
+      results.style.display = 'none';  
+      results.innerHTML = '';  
+    }  
+  
+    document.getElementById('appointment_date').value = '';  
+    document.getElementById('appointment_time').value = '';  
+    document.getElementById('appointment_complaint').value = '';  
+    document.getElementById('appointment_status').value = '';  
+  }  
+  
+  function clearAppointmentErrors() {  
+    const fieldIds = [  
+      'appointment_patient_id',  
+      'appointment_date',  
+      'appointment_time',  
+      'appointment_complaint',  
+      'appointment_status'  
+    ];  
+  
+    fieldIds.forEach(function(id) {  
+      const el = document.getElementById(id);  
+      if (el) el.classList.remove('input-error');  
+  
+      const err = document.getElementById('error_' + id);  
+      if (err) err.textContent = '';  
+    });  
+  }  
+  
+  function applyAppointmentErrors(errors) {  
+    if (!errors) return;  
+  
+    const map = {  
+      patient_id: 'appointment_patient_id',  
+      appointment_date: 'appointment_date',  
+      appointment_time: 'appointment_time',  
+      complaint: 'appointment_complaint',  
+      status: 'appointment_status'  
+    };  
+  
+    Object.keys(errors).forEach(function(key) {  
+      const fieldId = map[key];  
+      if (!fieldId) return;  
+  
+      const input = document.getElementById(fieldId);  
+      const errorEl = document.getElementById('error_' + fieldId);  
+  
+      if (input) input.classList.add('input-error');  
+      if (errorEl) errorEl.textContent = errors[key];  
+    });  
+  } 
+  
+  function submitAppointment(e) {
+    e.preventDefault();
+
+    if (appointmentSubmitInFlight) {
+      return;
+    }
+
+    clearAppointmentErrors();
+
+    const payload = {
+      appointment_id: document.getElementById('appointment_id_hidden').value,
+      patient_id: document.getElementById('appointment_patient_id').value,
+      appointment_date: document.getElementById('appointment_date').value,
+      appointment_time: document.getElementById('appointment_time').value,
+      complaint: document.getElementById('appointment_complaint').value.trim(),
+      status: document.getElementById('appointment_status').value
+    };
+
+    const localErrors = {};
+
+    if (!payload.patient_id) localErrors.patient_id = 'Pasien wajib dipilih dari hasil pencarian';
+    if (!payload.appointment_date) localErrors.appointment_date = 'Tanggal appointment wajib diisi';
+    if (!payload.appointment_time) localErrors.appointment_time = 'Jam appointment wajib diisi';
+    if (!payload.complaint) localErrors.complaint = 'Keluhan wajib diisi';
+    if (!payload.status) localErrors.status = 'Status wajib dipilih';
+
+    if (appointmentPatientHasOpenAppointment) {
+      localErrors.patient_id = 'Pasien ini masih memiliki appointment aktif';
+    }
+
+    if (Object.keys(localErrors).length > 0) {
+      applyAppointmentErrors(localErrors);
+      showToast('Validasi gagal', 'error');
+      return;
+    }
+
+    const isEdit = appointmentFormMode === 'edit';
+    const action = isEdit ? 'updateAppointment' : 'createAppointment';
+    const successMessage = isEdit
+      ? 'Data appointment berhasil diperbarui'
+      : 'Appointment berhasil ditambahkan';
+
+    appointmentSubmitInFlight = true;
+    const currentSubmitToken = ++appointmentSubmitToken;
+
+    appointmentPatientCheckToken++;
+
+    setModalProcessingState('appointmentModal', true, {
+      primaryButtonId: 'appointmentSubmitBtn',
+      loadingText: isEdit ? 'Updating...' : 'Menyimpan...'
+    });
+
+    google.script.run
+      .withSuccessHandler(function(res) {
+        if (currentSubmitToken !== appointmentSubmitToken) return;
+
+        appointmentSubmitInFlight = false;
+
+        if (!res || !res.success) {
+          setModalProcessingState('appointmentModal', false, {
+            primaryButtonId: 'appointmentSubmitBtn',
+            idleText: isEdit ? 'Update' : 'Simpan'
+          });
+
+          if (res && res.errors) {
+            applyAppointmentErrors(res.errors);
+          }
+          showToast((res && res.message) || 'Gagal menyimpan appointment', 'error');
+          return;
+        }
+
+        closeAppointmentModal();
+
+        appointmentPatientHasOpenAppointment = false;
+        appointmentPatientCheckToken++;
+        appointmentFormMode = 'create';
+
+        clearAppointmentForm();
+        clearAppointmentErrors();
+        setAppointmentPatientWarning('');
+
+        const results = document.getElementById('appointment_patient_results');
+        if (results) {
+          results.style.display = 'none';
+          results.innerHTML = '';
+        }
+
+        showToast(successMessage, 'success');
+
+        setTimeout(function() {
+          loadAppointments();
+        }, 100);
+      })
+      .withFailureHandler(function(err) {
+        if (currentSubmitToken !== appointmentSubmitToken) return;
+
+        appointmentSubmitInFlight = false;
+
+        setModalProcessingState('appointmentModal', false, {
+          primaryButtonId: 'appointmentSubmitBtn',
+          idleText: isEdit ? 'Update' : 'Simpan'
+        });
+
+        showToast('Error: ' + (err && err.message ? err.message : err), 'error');
+      })[action](payload);
+  }  
+  
+  function setAppointmentStatusOptions(mode) {  
+    const select = document.getElementById('appointment_status');  
+    if (!select) return;  
+  
+    const options = [  
+      { value: 'scheduled', label: 'scheduled' },  
+      { value: 'cancelled', label: 'cancelled' }  
+    ];  
+  
+    const currentValue = select.value;  
+  
+    select.innerHTML = '<option value="">Pilih status</option>' +  
+      options.map(function(opt) {  
+        return `<option value="${opt.value}">${opt.label}</option>`;  
+      }).join('');  
+  
+    if (options.some(function(o) { return o.value === currentValue; })) {  
+      select.value = currentValue;  
+    } else {  
+      select.value = options[0].value;  
+    }  
+  }  
+  
+  function openTreatmentModal(appointmentId) {  
+    if (!(isAdmin() || isOwner())) {  
+      showToast('Hanya admin atau owner yang dapat memulai treatment', 'error');  
+      return;  
+    }  
+  
+    if (typeof resetTreatmentForm === 'function') {  
+      resetTreatmentForm();  
+    }  
+  
+    const modal = document.getElementById('treatmentModal');  
+    if (modal) {  
+      modal.style.display = 'flex';  
+      modal.classList.remove('hidden');  
+    }  
+  
+    const hasDoctors =  
+      Array.isArray(window.treatmentMasterCache.doctors) &&  
+      window.treatmentMasterCache.doctors.length > 0;  
+  
+    const hasServices =  
+      Array.isArray(window.treatmentMasterCache.services) &&  
+      window.treatmentMasterCache.services.length > 0;  
+  
+    const useCache = hasDoctors && hasServices;  
+  
+    function applyTreatmentInitData(appointment, doctors, services) {  
+      document.getElementById('treatment_appointment_id').value = appointment.appointment_id || '';  
+      document.getElementById('treatment_patient_id').value = appointment.patient_id || '';  
+      document.getElementById('treatment_patient_name').value = appointment.patient_name || '';  
+      document.getElementById('treatment_patient_name_display').value = appointment.patient_name || '';  
+      document.getElementById('treatment_chief_complaint').value = appointment.complaint || '';  
+      document.getElementById('treatment_date').value = getTodayYmd();  
+  
+      window.treatmentDoctors = Array.isArray(doctors) ? doctors : [];  
+      window.treatmentServices = Array.isArray(services) ? services : [];  
+  
+      const select = document.getElementById('treatment_doctor_user_id');  
+      if (select) {  
+        select.innerHTML = '<option value="">Pilih dokter</option>' +  
+          window.treatmentDoctors.map(function(d) {  
+            return `<option value="${d.user_id}">${d.full_name || d.username}</option>`;  
+          }).join('');  
+      }  
+  
+      window.treatmentItemsState = [];  
+      renderTreatmentItemsTable();  
+      updateTreatmentTotal();  
+    }  
+  
+    if (useCache) {  
+      google.script.run  
+        .withSuccessHandler(function(res) {  
+          if (!res || !res.success) {  
+            showToast((res && res.message) || 'Gagal mengambil data appointment', 'error');  
+            closeTreatmentModal();  
+            return;  
+          }  
+  
+          const appointment = res.data;  
+          const status = String(appointment.status || '').toLowerCase();  
+  
+          if (status !== 'scheduled') {  
+            showToast('Treatment hanya bisa dari appointment scheduled', 'error');  
+            closeTreatmentModal();  
+            return;  
+          }  
+  
+          applyTreatmentInitData(  
+            appointment,  
+            window.treatmentMasterCache.doctors,  
+            window.treatmentMasterCache.services  
+          );  
+        })  
+        .withFailureHandler(function(err) {  
+          showToast('Error appointment: ' + (err && err.message ? err.message : err), 'error');  
+          closeTreatmentModal();  
+        })  
+        .getAppointmentById(appointmentId);  
+  
+      return;  
+    }  
+  
+    google.script.run  
+      .withSuccessHandler(function(res) {  
+        if (!res || !res.success) {  
+          showToast((res && res.message) || 'Gagal memuat data treatment', 'error');  
+          closeTreatmentModal();  
+          return;  
+        }  
+  
+        const payload = res.data || {};  
+        const appointment = payload.appointment || {};  
+        const status = String(appointment.status || '').toLowerCase();  
+  
+        if (status !== 'scheduled') {  
+          showToast('Treatment hanya bisa dari appointment scheduled', 'error');  
+          closeTreatmentModal();  
+          return;  
+        }  
+  
+        window.treatmentMasterCache.doctors = Array.isArray(payload.doctors) ? payload.doctors : [];  
+        window.treatmentMasterCache.services = Array.isArray(payload.services) ? payload.services : [];  
+  
+        applyTreatmentInitData(  
+          appointment,  
+          window.treatmentMasterCache.doctors,  
+          window.treatmentMasterCache.services  
+        );  
+      })  
+      .withFailureHandler(function(err) {  
+        showToast('Error treatment init: ' + (err && err.message ? err.message : err), 'error');  
+        closeTreatmentModal();  
+      })  
+      .getTreatmentInitData(appointmentId);  
+  }  
+  
+  function closeTreatmentModal() {
+    treatmentSubmitInFlight = false;
+
+    setModalProcessingState('treatmentModal', false, {
+      primaryButtonId: 'treatmentSubmitBtn',
+      idleText: 'Simpan'
+    });
+
+    const modal = document.getElementById('treatmentModal');
+    if (modal) {
+      modal.classList.add('hidden');
+      modal.style.display = 'none';
+    }
+  }  
+  
+  function handleTreatmentDoctorChange() {  
+    const select = document.getElementById('treatment_doctor_user_id');  
+    const doctorId = select ? String(select.value || '') : '';  
+  
+    const doctor = (window.treatmentDoctors || []).find(function(d) {  
+      return String(d.user_id || '') === doctorId;  
+    });  
+  
+    const hiddenName = document.getElementById('treatment_doctor_name');  
+    if (hiddenName) {  
+      hiddenName.value = doctor  
+        ? String(doctor.full_name || doctor.username || '')  
+        : '';  
+    }  
+  }  
+  
+  function resetTreatmentForm() {  
+    const ids = [  
+      'treatment_appointment_id',  
+      'treatment_patient_id',  
+      'treatment_patient_name',  
+      'treatment_patient_name_display',  
+      'treatment_doctor_name',  
+      'treatment_date',  
+      'treatment_chief_complaint',  
+      'treatment_diagnosis',  
+      'treatment_notes'  
+    ];  
+  
+    ids.forEach(function(id) {  
+      const el = document.getElementById(id);  
+      if (el) el.value = '';  
+    });  
+  
+    const doctorSelect = document.getElementById('treatment_doctor_user_id');  
+    if (doctorSelect) {  
+      doctorSelect.innerHTML = '<option value="">Pilih dokter</option>';  
+    }  
+  
+    const tbody = document.getElementById('treatmentItemsBody');  
+    if (tbody) {  
+      tbody.innerHTML = '<tr><td colspan="5">Belum ada tindakan</td></tr>';  
+    }  
+  
+    const totalEl = document.getElementById('treatmentTotalCost');  
+    if (totalEl) {  
+      totalEl.textContent = 'Rp 0';  
+    }  
+  
+    window.treatmentDoctors = [];  
+    window.treatmentServices = [];  
+    window.treatmentItemsState = [];  
+  }  
+  
+  function resetTreatmentMasterCache() {  
+    window.treatmentMasterCache = {  
+      doctors: null,  
+      services: null  
+    };  
+  }  
+  
+  function buildTreatmentPayload() {  
+    if (!Array.isArray(window.treatmentItemsState)) {  
+      window.treatmentItemsState = [];  
+    }  
+  
+    return {  
+      appointment_id: document.getElementById('treatment_appointment_id').value,  
+      patient_id: document.getElementById('treatment_patient_id').value,  
+      patient_name: document.getElementById('treatment_patient_name').value,  
+      doctor_user_id: document.getElementById('treatment_doctor_user_id').value,  
+      doctor_name: document.getElementById('treatment_doctor_name').value,  
+      treatment_date: document.getElementById('treatment_date').value,  
+      chief_complaint: document.getElementById('treatment_chief_complaint').value.trim(),  
+      diagnosis: document.getElementById('treatment_diagnosis').value.trim(),  
+      notes: document.getElementById('treatment_notes').value.trim(),  
+      actor_user_id: currentUser ? String(currentUser.user_id || '') : '',  
+      actor_role: currentUser ? String(currentUser.role || '').toLowerCase() : '',  
+      items: window.treatmentItemsState.map(function(item) {  
+        return {  
+          service_id: item.service_id,  
+          qty: Number(item.qty || 0)  
+        };  
+      })  
+    };  
+  }  
+  
+  function formatCurrencyIdr(value) {  
+    const num = Number(value || 0);  
+    return 'Rp ' + num.toLocaleString('id-ID');  
+  }  
+  
+  window.addTreatmentItemRow = function() {  
+    if (!Array.isArray(window.treatmentItemsState)) {  
+      window.treatmentItemsState = [];  
+    }  
+  
+    window.treatmentItemsState.push({  
+      service_id: '',  
+      qty: 1  
+    });  
+  
+    renderTreatmentItemsTable();  
+    updateTreatmentTotal();  
+  };  
+  
+  window.removeTreatmentItemRow = function(index) {  
+    if (!Array.isArray(window.treatmentItemsState)) {  
+      window.treatmentItemsState = [];  
+    }  
+  
+    window.treatmentItemsState.splice(index, 1);  
+    renderTreatmentItemsTable();  
+    updateTreatmentTotal();  
+  };  
+  
+  window.updateTreatmentItemService = function(index, serviceId) {  
+    if (!Array.isArray(window.treatmentItemsState)) {  
+      window.treatmentItemsState = [];  
+    }  
+  
+    if (!window.treatmentItemsState[index]) return;  
+  
+    window.treatmentItemsState[index].service_id = String(serviceId || '');  
+    renderTreatmentItemsTable();  
+    updateTreatmentTotal();  
+  };  
+  
+  window.updateTreatmentItemQty = function(index, qty) {  
+    if (!Array.isArray(window.treatmentItemsState)) {  
+      window.treatmentItemsState = [];  
+    }  
+  
+    if (!window.treatmentItemsState[index]) return;  
+  
+    const parsed = Number(qty || 0);  
+    window.treatmentItemsState[index].qty = parsed > 0 ? parsed : 0;  
+  
+    renderTreatmentItemsTable();  
+    updateTreatmentTotal();  
+  };  
+  
+  function getTreatmentServiceById(serviceId) {  
+    return (window.treatmentServices || []).find(function(s) {  
+      return String(s.service_id || '') === String(serviceId || '');  
+    }) || null;  
+  }  
+  
+  function renderTreatmentItemsTable() {  
+    const tbody = document.getElementById('treatmentItemsBody');  
+    if (!tbody) return;  
+  
+    if (!Array.isArray(window.treatmentItemsState)) {  
+      window.treatmentItemsState = [];  
+    }  
+  
+    if (!Array.isArray(window.treatmentServices)) {  
+      window.treatmentServices = [];  
+    }  
+  
+    if (!window.treatmentItemsState.length) {  
+      tbody.innerHTML = '<tr><td colspan="5">Belum ada tindakan</td></tr>';  
+      return;  
+    }  
+  
+    const services = window.treatmentServices;  
+  
+    tbody.innerHTML = window.treatmentItemsState.map(function(item, index) {  
+      const service = services.find(function(s) {  
+        return String(s.service_id || '') === String(item.service_id || '');  
+      }) || null;  
+  
+      const qty = Number(item.qty || 0);  
+      const unitPrice = service ? Number(service.default_price || 0) : 0;  
+      const subtotal = qty * unitPrice;  
+  
+      const optionsHtml = '<option value="">Pilih tindakan</option>' +  
+        services.map(function(s) {  
+          const selected = String(item.service_id || '') === String(s.service_id || '') ? 'selected' : '';  
+          return `<option value="${s.service_id}" ${selected}>${s.service_name}</option>`;  
+        }).join('');  
+  
+      return `  
+        <tr>  
+          <td>  
+            <select class="treatment-row-select" onchange="updateTreatmentItemService(${index}, this.value)">  
+              ${optionsHtml}  
+            </select>  
+          </td>  
+          <td>  
+            <input  
+              type="number"  
+              min="1"  
+              step="1"  
+              class="treatment-row-input"  
+              value="${qty || 1}"  
+              oninput="updateTreatmentItemQty(${index}, this.value)"  
+            >  
+          </td>  
+          <td>${formatCurrencyIdr(unitPrice)}</td>  
+          <td>${formatCurrencyIdr(subtotal)}</td>  
+          <td>  
+            <button type="button" class="treatment-remove-btn" onclick="removeTreatmentItemRow(${index})">Hapus</button>  
+          </td>  
+        </tr>  
+      `;  
+    }).join('');  
+  }  
+  
+  function updateTreatmentTotal() {  
+    if (!Array.isArray(window.treatmentItemsState)) {  
+      window.treatmentItemsState = [];  
+    }  
+  
+    const total = window.treatmentItemsState.reduce(function(sum, item) {  
+      const service = getTreatmentServiceById(item.service_id);  
+      const qty = Number(item.qty || 0);  
+      const unitPrice = service ? Number(service.default_price || 0) : 0;  
+      return sum + (qty * unitPrice);  
+    }, 0);  
+  
+    const totalEl = document.getElementById('treatmentTotalCost');  
+    if (totalEl) {  
+      totalEl.textContent = formatCurrencyIdr(total);  
+    }  
+  }  
+  
+  function clearTreatmentErrors() {  
+    const ids = [  
+      'treatment_patient_name',  
+      'treatment_doctor_user_id',  
+      'treatment_date',  
+      'treatment_chief_complaint',  
+      'treatment_diagnosis',  
+      'treatment_notes',  
+      'treatment_items'  
+    ];  
+  
+    ids.forEach(function(id) {  
+      const el = document.getElementById('error_' + id);  
+      if (el) el.textContent = '';  
+    });  
+  }  
+  
+  function applyTreatmentErrors(errors) {  
+    if (!errors) return;  
+  
+    if (errors.doctor_user_id) {  
+      const el = document.getElementById('error_treatment_doctor_user_id');  
+      if (el) el.textContent = errors.doctor_user_id;  
+    }  
+  
+    if (errors.treatment_date) {  
+      const el = document.getElementById('error_treatment_date');  
+      if (el) el.textContent = errors.treatment_date;  
+    }  
+  
+    if (errors.chief_complaint) {  
+      const el = document.getElementById('error_treatment_chief_complaint');  
+      if (el) el.textContent = errors.chief_complaint;  
+    }  
+  
+    if (errors.diagnosis) {  
+      const el = document.getElementById('error_treatment_diagnosis');  
+      if (el) el.textContent = errors.diagnosis;  
+    }  
+  
+    if (errors.items || errors.item_details) {  
+      const el = document.getElementById('error_treatment_items');  
+      if (el) el.textContent = errors.items || 'Periksa kembali item tindakan';  
+    }  
+  }  
+  
+  function submitTreatment(e) {
+    e.preventDefault();
+
+    if (treatmentSubmitInFlight) return;
+
+    clearTreatmentErrors();
+
+    const payload = buildTreatmentPayload();
+
+    if (!Array.isArray(payload.items) || !payload.items.length) {
+      applyTreatmentErrors({
+        items: 'Minimal satu tindakan wajib dipilih'
+      });
+      showToast('Validasi gagal', 'error');
+      return;
+    }
+
+    treatmentSubmitInFlight = true;
+
+    setModalProcessingState('treatmentModal', true, {
+      primaryButtonId: 'treatmentSubmitBtn',
+      loadingText: 'Menyimpan...'
+    });
+
+    google.script.run
+      .withSuccessHandler(function(res) {
+        treatmentSubmitInFlight = false;
+
+        if (!res || !res.success) {
+          setModalProcessingState('treatmentModal', false, {
+            primaryButtonId: 'treatmentSubmitBtn',
+            idleText: 'Simpan'
+          });
+
+          applyTreatmentErrors(res && res.errors ? res.errors : null);
+          showToast((res && res.message) || 'Gagal menyimpan treatment', 'error');
+          return;
+        }
+
+        closeTreatmentModal();
+        loadAppointments();
+        showToast('Treatment berhasil disimpan', 'success');
+      })
+      .withFailureHandler(function(err) {
+        treatmentSubmitInFlight = false;
+
+        setModalProcessingState('treatmentModal', false, {
+          primaryButtonId: 'treatmentSubmitBtn',
+          idleText: 'Simpan'
+        });
+
+        showToast('Error: ' + (err && err.message ? err.message : err), 'error');
+      })
+      .createTreatment(payload);
+  }  
+  
+  function handleAppointmentPatientSearch() {  
+    const input = document.getElementById('appointment_patient_search');  
+    const keyword = input ? input.value.trim() : '';  
+  
+    document.getElementById('appointment_patient_id').value = '';  
+    appointmentPatientHasOpenAppointment = false;  
+    clearSelectedAppointmentPatientCard();  
+    setAppointmentPatientWarning('');  
+  
+    const resultsBox = document.getElementById('appointment_patient_results');  
+  
+    if (appointmentPatientSearchDebounce) {  
+      clearTimeout(appointmentPatientSearchDebounce);  
+    }  
+  
+    if (keyword.length < 2) {  
+      resultsBox.style.display = 'none';  
+      resultsBox.innerHTML = '';  
+      return;  
+    }  
+  
+    appointmentPatientSearchDebounce = setTimeout(function() {  
+      google.script.run  
+        .withSuccessHandler(function(results) {  
+          if (!isAppointmentModalOpen()) return;  
+          renderAppointmentPatientResults(results || []);  
+        })  
+        .withFailureHandler(function(err) {  
+          if (!isAppointmentModalOpen()) return;  
+          console.error('searchPatientsForAppointment error:', err);  
+        })  
+        .searchPatientsForAppointment(keyword);  
+    }, 300);  
+  }  
+  
+  function renderAppointmentPatientResults(results) {  
+    const resultsBox = document.getElementById('appointment_patient_results');  
+    if (!resultsBox) return;  
+  
+    if (!results.length) {  
+      resultsBox.style.display = 'block';  
+      resultsBox.className = 'patient-search-results';  
+      resultsBox.innerHTML = `<div class="patient-search-empty">Pasien tidak ditemukan</div>`;  
+      return;  
+    }  
+  
+    resultsBox.style.display = 'block';  
+    resultsBox.className = 'patient-search-results';  
+    resultsBox.innerHTML = results.map(function(item) {  
+      return `  
+        <button  
+          type="button"  
+          class="patient-search-item"  
+          onclick="selectAppointmentPatient(  
+            '${item.patient_id}',  
+            '${String(item.patient_name || '').replace(/'/g, "\\'")}',  
+            '${String(item.patient_code || '').replace(/'/g, "\\'")}',  
+            '${String(item.phone || '').replace(/'/g, "\\'")}'  
+          )"  
+        >  
+          <div class="patient-search-name">${item.patient_name || ''}</div>  
+          <div class="patient-search-meta">  
+            ${item.patient_code || ''}${item.phone ? ' • ' + item.phone : ''}  
+          </div>  
+          <div style="margin-top:6px;">  
+            ${getPatientAvailabilityBadge(!!item.has_open_appointment)}  
+          </div>  
+        </button>  
+      `;  
+    }).join('');  
+  }  
+  
+  function selectAppointmentPatient(patientId, patientName, patientCode, phone) {  
+    document.getElementById('appointment_patient_id').value = patientId;  
+    document.getElementById('appointment_patient_search').value = patientName;  
+    setSelectedAppointmentPatientCard(patientName, patientCode, phone, false);  
+  
+    document.getElementById('appointment_patient_results').style.display = 'none';  
+    document.getElementById('appointment_patient_results').innerHTML = '';  
+  
+    const excludeId = document.getElementById('appointment_id_hidden').value || '';  
+    checkSelectedAppointmentPatientOpenStatus(patientId, excludeId);  
+  }  
+  
+  function checkSelectedAppointmentPatientOpenStatus(patientId, excludeAppointmentId) {  
+    if (!patientId) {  
+      appointmentPatientHasOpenAppointment = false;  
+      setAppointmentPatientWarning('');  
+      return;  
+    }  
+  
+    const currentToken = ++appointmentPatientCheckToken;  
+  
+    google.script.run  
+      .withSuccessHandler(function(res) {  
+        if (currentToken !== appointmentPatientCheckToken) return;  
+        if (!isAppointmentModalOpen()) return;  
+  
+        if (!res || !res.success) {  
+          appointmentPatientHasOpenAppointment = false;  
+          setAppointmentPatientWarning('');  
+          return;  
+        }  
+  
+        appointmentPatientHasOpenAppointment = !!res.hasOpenAppointment;  
+  
+        if (appointmentPatientHasOpenAppointment) {  
+          setAppointmentPatientWarning(  
+            'Pasien ini masih memiliki appointment aktif. Appointment baru tidak boleh dibuat sampai appointment sebelumnya selesai.'  
+          );  
+        } else {  
+          setAppointmentPatientWarning('');  
+        }  
+      })  
+      .withFailureHandler(function(err) {  
+        if (currentToken !== appointmentPatientCheckToken) return;  
+        if (!isAppointmentModalOpen()) return;  
+  
+        appointmentPatientHasOpenAppointment = false;  
+        setAppointmentPatientWarning('');  
+        console.error('checkSelectedAppointmentPatientOpenStatus error:', err);  
+      })  
+      .checkPatientOpenAppointment(patientId, excludeAppointmentId);  
+  }  
+  
+  function setSelectedAppointmentPatientCard(patientName, patientCode, phone, simpleOnly) {  
+    const card = document.getElementById('appointment_patient_selected');  
+    if (!card) return;  
+  
+    if (simpleOnly) {  
+      card.className = 'patient-selected-card show';  
+      card.innerHTML = `  
+        <div class="patient-selected-title">${patientName || ''}</div>  
+        <div class="patient-selected-meta">Pasien terpilih</div>  
+      `;  
+      return;  
+    }  
+  
+    card.className = 'patient-selected-card show';  
+    card.innerHTML = `  
+      <div class="patient-selected-title">${patientName || ''}</div>  
+      <div class="patient-selected-meta">  
+        ${patientCode || ''}${phone ? ' • ' + phone : ''}  
+      </div>  
+    `;  
+  }  
+  
+  function clearSelectedAppointmentPatientCard() {  
+    const card = document.getElementById('appointment_patient_selected');  
+    if (!card) return;  
+    card.className = 'patient-selected-card';  
+    card.innerHTML = '';  
+  }  
+  
+  function setAppointmentPatientWarning(message) {  
+    const el = document.getElementById('appointment_patient_warning');  
+    if (!el) return;  
+  
+    if (!message) {  
+      el.style.display = 'none';  
+      el.textContent = '';  
+      return;  
+    }  
+  
+    el.style.display = 'block';  
+    el.textContent = message;  
+  }  
+  
+  function confirmCancelAppointment(id, name) {  
+    pendingCancelAppointmentId = id;  
+    pendingCancelAppointmentLabel = name || '';  
+    const text = document.getElementById('confirmCancelAppointmentText');  
+    if (text) {  
+      text.innerText = 'Yakin ingin membatalkan appointment untuk "' + pendingCancelAppointmentLabel + '"?';  
+    }  
+    document.getElementById('confirmCancelAppointmentModal').classList.remove('hidden');  
+  }  
+  
+  function closeCancelAppointmentModal() {
+    cancelAppointmentInFlight = false;
+
+    setModalProcessingState('confirmCancelAppointmentModal', false, {
+      primarySelector: '.btn-danger',
+      idleText: 'Cancel Appointment'
+    });
+
+    pendingCancelAppointmentId = null;
+    pendingCancelAppointmentLabel = '';
+    document.getElementById('confirmCancelAppointmentModal').classList.add('hidden');
+  }  
+  
+  function executeCancelAppointment() {
+    if (!pendingCancelAppointmentId || cancelAppointmentInFlight) return;
+
+    cancelAppointmentInFlight = true;
+
+    setModalProcessingState('confirmCancelAppointmentModal', true, {
+      primarySelector: '.btn-danger',
+      loadingText: 'Cancelling...'
+    });
+
+    const targetAppointmentId = pendingCancelAppointmentId;
+
+    google.script.run
+      .withSuccessHandler(function(res) {
+        cancelAppointmentInFlight = false;
+
+        if (!res || !res.success) {
+          setModalProcessingState('confirmCancelAppointmentModal', false, {
+            primarySelector: '.btn-danger',
+            idleText: 'Cancel Appointment'
+          });
+
+          showToast((res && res.message) || 'Gagal membatalkan appointment', 'error');
+          return;
+        }
+
+        closeCancelAppointmentModal();
+        loadAppointments();
+        showToast('Appointment dibatalkan', 'success');
+      })
+      .withFailureHandler(function(err) {
+        cancelAppointmentInFlight = false;
+
+        setModalProcessingState('confirmCancelAppointmentModal', false, {
+          primarySelector: '.btn-danger',
+          idleText: 'Cancel Appointment'
+        });
+
+        showToast('Error: ' + (err && err.message ? err.message : err), 'error');
+      })
+      .cancelAppointment(targetAppointmentId);
+  }  
+  
+  function confirmRestoreAppointment(id, name) {  
+    pendingRestoreAppointmentId = id;  
+    pendingRestoreAppointmentLabel = name || '';  
+    const text = document.getElementById('confirmRestoreAppointmentText');  
+    if (text) {  
+      text.innerText = 'Yakin ingin merestore appointment untuk "' + pendingRestoreAppointmentLabel + '"?';  
+    }  
+    document.getElementById('confirmRestoreAppointmentModal').classList.remove('hidden');  
+  }  
+  
+  function closeRestoreAppointmentModal() {
+    restoreAppointmentInFlight = false;
+
+    setModalProcessingState('confirmRestoreAppointmentModal', false, {
+      primarySelector: '.btn-success',
+      idleText: 'Restore Appointment'
+    });
+
+    pendingRestoreAppointmentId = null;
+    pendingRestoreAppointmentLabel = '';
+    document.getElementById('confirmRestoreAppointmentModal').classList.add('hidden');
+  }
+  
+  function executeRestoreAppointment() {
+    if (!pendingRestoreAppointmentId || restoreAppointmentInFlight) return;
+
+    restoreAppointmentInFlight = true;
+
+    setModalProcessingState('confirmRestoreAppointmentModal', true, {
+      primarySelector: '.btn-success',
+      loadingText: 'Restoring...'
+    });
+
+    const targetAppointmentId = pendingRestoreAppointmentId;
+
+    google.script.run
+      .withSuccessHandler(function(res) {
+        restoreAppointmentInFlight = false;
+
+        if (!res || !res.success) {
+          setModalProcessingState('confirmRestoreAppointmentModal', false, {
+            primarySelector: '.btn-success',
+            idleText: 'Restore Appointment'
+          });
+
+          showToast((res && res.message) || 'Gagal merestore appointment', 'error');
+          return;
+        }
+
+        closeRestoreAppointmentModal();
+        loadAppointments();
+        showToast('Appointment direstore', 'success');
+      })
+      .withFailureHandler(function(err) {
+        restoreAppointmentInFlight = false;
+
+        setModalProcessingState('confirmRestoreAppointmentModal', false, {
+          primarySelector: '.btn-success',
+          idleText: 'Restore Appointment'
+        });
+
+        showToast('Error: ' + (err && err.message ? err.message : err), 'error');
+      })
+      .restoreAppointment(targetAppointmentId);
+  } 
+  
+  function preloadTreatmentMasters() {  
+    const hasDoctors =  
+      Array.isArray(window.treatmentMasterCache.doctors) &&  
+      window.treatmentMasterCache.doctors.length > 0;  
+  
+    const hasServices =  
+      Array.isArray(window.treatmentMasterCache.services) &&  
+      window.treatmentMasterCache.services.length > 0;  
+  
+    if (hasDoctors && hasServices) {  
+      return;  
+    }  
+  
+    google.script.run  
+      .withSuccessHandler(function(res) {  
+        if (!res || !res.success) return;  
+  
+        const payload = res.data || {};  
+  
+        window.treatmentMasterCache.doctors = Array.isArray(payload.doctors)  
+          ? payload.doctors  
+          : [];  
+  
+        window.treatmentMasterCache.services = Array.isArray(payload.services)  
+          ? payload.services  
+          : [];  
+      })  
+      .withFailureHandler(function(err) {  
+        console.error('PRELOAD TREATMENT MASTERS ERROR:', err);  
+      })  
+      .getTreatmentInitDataPreview();  
+  }  
+</script>

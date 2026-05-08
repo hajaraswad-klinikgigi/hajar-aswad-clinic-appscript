@@ -1,0 +1,715 @@
+<style>
+  /* =========================================================
+     DASHBOARD PAGE SHELL & HEADER
+     ========================================================= */
+  .dashboard-shell {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+  }
+
+  .dashboard-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: end;
+    gap: 16px;
+    flex-wrap: wrap;
+  }
+
+  .dashboard-eyebrow {
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+    color: #6b7280;
+    margin-bottom: 6px;
+  }
+
+  .dashboard-title {
+    margin: 0 0 4px 0;
+    font-size: 32px;
+    font-weight: 900;
+    line-height: 1.1;
+    letter-spacing: -0.03em;
+    color: #0f172a;
+  }
+
+  .dashboard-subtitle {
+    color: #64748b;
+    font-size: 14px;
+  }
+
+  .dashboard-filter-wrap {
+    min-width: 180px;
+  }
+
+  .dashboard-filter-label {
+    display: block;
+    font-size: 12px;
+    font-weight: 700;
+    color: #6b7280;
+    margin-bottom: 6px;
+  }
+
+  .dashboard-filter-select {
+    width: 180px;
+    max-width: 100%;
+    padding: 10px 12px;
+    border-radius: 14px;
+    border: 1px solid #dbe3ee;
+    background: #fff;
+    font-size: 14px;
+    font-weight: 600;
+    outline: none;
+    box-shadow: 0 2px 8px rgba(15, 23, 42, 0.03);
+  }
+
+  .dashboard-period-info {
+    color: #6b7280;
+    font-size: 14px;
+  }
+
+  /* =========================================================
+     DASHBOARD KPI GROUPED SECTIONS
+     KPI dibagi per konteks agar tidak terasa padat
+     ========================================================= */
+  .dashboard-kpi-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  .dashboard-kpi-section {
+    padding: 16px;
+    border-radius: 20px;
+    border: 1px solid #eef2f7;
+    background: linear-gradient(180deg, #ffffff 0%, #fcfcfd 100%);
+    box-shadow: 0 10px 26px rgba(15, 23, 42, 0.04);
+  }
+
+  .dashboard-kpi-section-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 12px;
+    margin-bottom: 14px;
+  }
+
+  .dashboard-kpi-section-title {
+    font-size: 16px;
+    font-weight: 900;
+    color: #0f172a;
+    letter-spacing: -0.02em;
+    margin-bottom: 4px;
+  }
+
+  .dashboard-kpi-section-subtitle {
+    font-size: 13px;
+    color: #64748b;
+    line-height: 1.45;
+  }
+
+  .dashboard-kpi-subgrid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 14px;
+  }
+
+  .dashboard-kpi-card {
+    background: linear-gradient(180deg, #ffffff 0%, #fbfdff 100%);
+    border-radius: 18px;
+    padding: 16px;
+    box-shadow: 0 8px 20px rgba(15, 23, 42, 0.035);
+    border: 1px solid #eef2f7;
+    min-width: 0;
+  }
+
+  .dashboard-kpi-label {
+    font-size: 12px;
+    color: #6b7280;
+    font-weight: 700;
+    margin-bottom: 8px;
+    line-height: 1.35;
+  }
+
+  .dashboard-kpi-value {
+    font-size: 23px;
+    line-height: 1.12;
+    font-weight: 900;
+    color: #0f172a;
+    word-break: break-word;
+  }
+
+  .dashboard-kpi-neutral {
+    background: linear-gradient(180deg, #ffffff 0%, #fbfdff 100%);
+  }
+
+  .dashboard-kpi-primary {
+    background: linear-gradient(180deg, #f0fdfa 0%, #ecfeff 100%);
+  }
+
+  .dashboard-kpi-success {
+    background: linear-gradient(180deg, #f0fdf4 0%, #f7fee7 100%);
+  }
+
+  .dashboard-kpi-danger {
+    background: linear-gradient(180deg, #fff7ed 0%, #fef2f2 100%);
+  }
+
+  .dashboard-kpi-primary .dashboard-kpi-value {
+    color: #0f766e;
+  }
+
+  .dashboard-kpi-success .dashboard-kpi-value {
+    color: #166534;
+  }
+
+  .dashboard-kpi-danger .dashboard-kpi-value {
+    color: #b91c1c;
+  }
+
+  .kpi-section-title {
+    margin: 0;
+    font-size: 22px;
+    color: #111827;
+    font-weight: 600;
+  }
+
+  /* =========================================================
+     DASHBOARD FEEDBACK SUMMARY
+     Ringkasan Kepuasan Layanan dari modul Finance
+     Selector dibuat spesifik, tidak lagi memakai last-child
+     ========================================================= */
+  .dashboard-feedback-section {
+    min-width: 0;
+  }
+
+  .dashboard-feedback-dashboard-card {
+    border-color: #ccfbf1;
+    background: linear-gradient(180deg, #ffffff 0%, #f0fdfa 100%);
+  }
+
+  .dashboard-feedback-dashboard-card .dashboard-kpi-section-title {
+    color: #0f766e;
+  }
+
+  .dashboard-feedback-dashboard-card .dashboard-kpi-section-subtitle {
+    color: #475569;
+  }
+
+  .dashboard-feedback-summary-grid {
+    display: grid;
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+    gap: 12px;
+  }
+
+  .dashboard-feedback-summary-card {
+    border-radius: 16px;
+    padding: 14px;
+    border: 1px solid #e5e7eb;
+    background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+    min-width: 0;
+  }
+
+  .dashboard-feedback-summary-label {
+    font-size: 12px;
+    color: #64748b;
+    font-weight: 800;
+    margin-bottom: 8px;
+    line-height: 1.35;
+  }
+
+  .dashboard-feedback-summary-value {
+    font-size: 20px;
+    font-weight: 900;
+    color: #0f172a;
+    line-height: 1.2;
+    word-break: break-word;
+  }
+
+  .dashboard-feedback-primary {
+    background: linear-gradient(180deg, #f0fdfa 0%, #ecfeff 100%);
+    border-color: #ccfbf1;
+  }
+
+  .dashboard-feedback-primary .dashboard-feedback-summary-value {
+    color: #0f766e;
+  }
+
+  .dashboard-feedback-success {
+    background: linear-gradient(180deg, #f0fdf4 0%, #f7fee7 100%);
+    border-color: #dcfce7;
+  }
+
+  .dashboard-feedback-success .dashboard-feedback-summary-value {
+    color: #166534;
+  }
+
+  .dashboard-feedback-danger {
+    background: linear-gradient(180deg, #fff7ed 0%, #fef2f2 100%);
+    border-color: #fed7aa;
+  }
+
+  .dashboard-feedback-danger .dashboard-feedback-summary-value {
+    color: #b91c1c;
+  }
+
+  .dashboard-feedback-neutral {
+    background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+  }
+
+  .dashboard-feedback-latest-wrap {
+    margin-top: 16px;
+    padding-top: 14px;
+    border-top: 1px dashed rgba(100, 116, 139, 0.28);
+  }
+
+  .dashboard-feedback-latest-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .dashboard-feedback-latest-item {
+    padding: 12px;
+    border-radius: 14px;
+    border: 1px solid #e2e8f0;
+    background: rgba(255, 255, 255, 0.72);
+  }
+
+  .dashboard-feedback-latest-title {
+    font-size: 15px;
+    font-weight: 900;
+    color: #0f172a;
+    margin-bottom: 4px;
+    line-height: 1.35;
+  }
+
+  .dashboard-feedback-latest-sub {
+    font-size: 12px;
+    color: #64748b;
+    line-height: 1.45;
+  }
+
+  .dashboard-feedback-latest-comment {
+    margin-top: 8px;
+    padding: 10px 12px;
+    border-radius: 12px;
+    background: #f8fafc;
+    color: #334155;
+    font-size: 13px;
+    line-height: 1.5;
+  }
+
+  /* =========================================================
+     DASHBOARD PANELS
+     ========================================================= */
+  .dashboard-panels {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+  }
+
+  .dashboard-panel {
+    background: linear-gradient(180deg, #ffffff 0%, #fcfcfd 100%);
+    border-radius: 20px;
+    padding: 18px;
+    box-shadow: 0 10px 26px rgba(15, 23, 42, 0.05);
+    border: 1px solid #eef2f7;
+    min-height: 220px;
+  }
+
+  .dashboard-panel-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 16px;
+  }
+
+  .dashboard-panel-header h3 {
+    margin: 0;
+    font-size: 20px;
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    color: #0f172a;
+  }
+
+  .dashboard-panel-badge {
+    font-size: 12px;
+    font-weight: 700;
+    color: #475569;
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 999px;
+    padding: 6px 10px;
+    white-space: nowrap;
+  }
+
+  .dashboard-panel-subsection {
+    min-width: 0;
+    margin-top: 4px;
+  }
+
+  .dashboard-panel-subsection + .dashboard-panel-subsection {
+    margin-top: 16px;
+  }
+
+  .dashboard-panel-subtitle {
+    margin-bottom: 10px;
+    font-size: 13px;
+    font-weight: 800;
+    color: #475569;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+
+  .dashboard-panel-divider {
+    height: 1px;
+    margin: 16px 0;
+    background: #eef2f7;
+  }
+
+  /* =========================================================
+     HIGHLIGHT CARD
+     ========================================================= */
+  .dashboard-highlight-card {
+    border-radius: 18px;
+    border: 1px solid #e2e8f0;
+    padding: 18px;
+    background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.8);
+  }
+
+  .dashboard-highlight-time {
+    font-size: 30px;
+    font-weight: 800;
+    line-height: 1;
+    margin-bottom: 8px;
+    color: #0f172a;
+  }
+
+  .dashboard-highlight-name {
+    font-size: 22px;
+    font-weight: 700;
+    margin-bottom: 10px;
+    color: #111827;
+  }
+
+  .dashboard-highlight-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    color: #64748b;
+    font-size: 14px;
+  }
+
+  .dashboard-priority-note {
+    margin-top: 14px;
+    font-size: 13px;
+    color: #64748b;
+    line-height: 1.5;
+  }
+
+  /* =========================================================
+     STATUS CHIPS
+     ========================================================= */
+  .dashboard-status-chip {
+    display: inline-flex;
+    align-items: center;
+    padding: 4px 10px;
+    border-radius: 999px;
+    background: #eff6ff;
+    color: #1d4ed8;
+    border: 1px solid #dbeafe;
+    font-weight: 700;
+    font-size: 12px;
+    text-transform: capitalize;
+    white-space: nowrap;
+  }
+
+  .dashboard-status-chip.overdue {
+    background: #fef2f2;
+    color: #b91c1c;
+    border: 1px solid #fee2e2;
+  }
+
+  .dashboard-status-chip.upcoming {
+    background: #eff6ff;
+    color: #1d4ed8;
+    border: 1px solid #dbeafe;
+  }
+
+  .dashboard-status-chip.completed {
+    background: #f0fdf4;
+    color: #166534;
+    border: 1px solid #dcfce7;
+  }
+
+  /* =========================================================
+     GENERIC DASHBOARD LISTS
+     ========================================================= */
+  .dashboard-list {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .dashboard-list-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 14px 0;
+    border-bottom: 1px solid #f1f5f9;
+  }
+
+  .dashboard-list-item.compact {
+    align-items: start;
+  }
+
+  .dashboard-list-item:last-child {
+    border-bottom: none;
+  }
+
+  .dashboard-list-rank {
+    width: 32px;
+    height: 32px;
+    border-radius: 999px;
+    background: #0f172a;
+    color: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 13px;
+    font-weight: 800;
+    flex: 0 0 32px;
+  }
+
+  .dashboard-list-main {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .dashboard-list-title {
+    font-size: 16px;
+    font-weight: 700;
+    color: #0f172a;
+    margin-bottom: 4px;
+  }
+
+  .dashboard-list-subtitle {
+    font-size: 13px;
+    color: #64748b;
+    line-height: 1.4;
+  }
+
+  .dashboard-list-value {
+    font-size: 14px;
+    font-weight: 800;
+    color: #0f766e;
+    white-space: nowrap;
+  }
+
+  .dashboard-empty {
+    color: #64748b;
+    font-size: 14px;
+    padding: 8px 0;
+    line-height: 1.5;
+  }
+
+  /* =========================================================
+     SUMMARY GRID
+     Digunakan Finance Snapshot dan Recall Snapshot
+     ========================================================= */
+  .dashboard-summary-card {
+    margin-top: 24px;
+    padding: 18px;
+    border: 1px solid #e5e7eb;
+    border-radius: 16px;
+    background: #fff;
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.04);
+  }
+
+  .dashboard-summary-title {
+    font-size: 18px;
+    font-weight: 700;
+    color: #111827;
+    margin-bottom: 14px;
+  }
+
+  .dashboard-summary-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+  }
+
+  .dashboard-summary-box {
+    border-radius: 14px;
+    padding: 14px;
+    background: #f9fafb;
+    border: 1px solid #e5e7eb;
+    min-width: 0;
+  }
+
+  .dashboard-summary-box h4 {
+    margin: 0 0 8px;
+    font-size: 13px;
+    color: #64748b;
+    font-weight: 800;
+    line-height: 1.35;
+  }
+
+  .dashboard-summary-text {
+    font-size: 16px;
+    font-weight: 900;
+    color: #111827;
+    line-height: 1.35;
+    word-break: break-word;
+  }
+
+  /* =========================================================
+     OPS LIST
+     Appointment terbaru, treatment terbaru, recall due
+     ========================================================= */
+  .dashboard-ops-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .dashboard-ops-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 14px;
+    padding: 14px 0;
+    border-bottom: 1px solid #f1f5f9;
+  }
+
+  .dashboard-ops-item:last-child {
+    border-bottom: none;
+  }
+
+  .dashboard-ops-main {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .dashboard-ops-title {
+    font-size: 16px;
+    font-weight: 700;
+    color: #0f172a;
+    margin-bottom: 4px;
+    line-height: 1.3;
+  }
+
+  .dashboard-ops-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    font-size: 13px;
+    color: #64748b;
+    line-height: 1.4;
+  }
+
+  .dashboard-ops-side {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    flex-shrink: 0;
+  }
+
+  .dashboard-ops-value {
+    font-size: 14px;
+    font-weight: 800;
+    color: #0f766e;
+    white-space: nowrap;
+  }
+
+  /* =========================================================
+     DASH-FIN-1H — DASHBOARD FINANCE SNAPSHOT POLISH
+     Polish ringan Finance Snapshot dan panel aktivitas terbaru
+     ========================================================= */
+  .dashboard-finance-snapshot-item {
+    position: relative;
+    overflow: hidden;
+  }
+
+  .dashboard-finance-snapshot-item::before {
+    content: '';
+    position: absolute;
+    inset: 0 auto 0 0;
+    width: 4px;
+    background: #cbd5e1;
+  }
+
+  .dashboard-finance-snapshot-item h4 {
+    padding-left: 4px;
+  }
+
+  .dashboard-finance-snapshot-value {
+    font-size: 17px;
+    font-weight: 900;
+    line-height: 1.25;
+  }
+
+  .dashboard-finance-neutral::before {
+    background: #94a3b8;
+  }
+
+  .dashboard-finance-primary {
+    background: #f0fdfa;
+    border-color: #ccfbf1;
+  }
+
+  .dashboard-finance-primary::before {
+    background: #0f766e;
+  }
+
+  .dashboard-finance-primary .dashboard-finance-snapshot-value {
+    color: #0f766e;
+  }
+
+  .dashboard-finance-success {
+    background: #f0fdf4;
+    border-color: #dcfce7;
+  }
+
+  .dashboard-finance-success::before {
+    background: #16a34a;
+  }
+
+  .dashboard-finance-success .dashboard-finance-snapshot-value {
+    color: #166534;
+  }
+
+  .dashboard-finance-danger {
+    background: #fff7ed;
+    border-color: #fed7aa;
+  }
+
+  .dashboard-finance-danger::before {
+    background: #ea580c;
+  }
+
+  .dashboard-finance-danger .dashboard-finance-snapshot-value {
+    color: #b91c1c;
+  }
+
+  .dashboard-finance-snapshot-item .dashboard-list-subtitle {
+    margin-top: 7px;
+    font-size: 12px;
+    line-height: 1.45;
+  }
+
+  .dashboard-panels .dashboard-panel:first-child {
+    border-color: #ccfbf1;
+    background: linear-gradient(180deg, #ffffff 0%, #f0fdfa 100%);
+  }
+
+  .dashboard-panels .dashboard-panel:first-child .dashboard-panel-badge {
+    color: #0f766e;
+    background: #ecfeff;
+    border-color: #ccfbf1;
+  }
+</style>

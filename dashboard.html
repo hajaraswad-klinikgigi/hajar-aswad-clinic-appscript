@@ -1,0 +1,762 @@
+<script>
+  let dashboardPeriod = 'today';
+
+  function formatDashboardRupiah(value) {
+    const num = Number(value || 0);
+    return 'Rp ' + num.toLocaleString('id-ID');
+  }
+
+  function formatDashboardDateDmy(value) {
+    const s = String(value || '').trim();
+    if (!s) return '-';
+
+    if (/^\d{4}-\d{2}-\d{2}$/.test(s)) {
+      const parts = s.split('-');
+      return parts[2] + '-' + parts[1] + '-' + parts[0];
+    }
+
+    return s;
+  }
+
+  function formatDashboardRating(value) {
+    const rating = Number(value || 0);
+
+    if (!rating) return '-';
+
+    return rating.toFixed(1).replace('.0', '') + ' / 5';
+  }
+
+  function renderDashboardSkeleton() {
+    const kpiGrid = document.getElementById('kpiGrid');
+    const feedbackSummary = document.getElementById('dashboardFeedbackSummary');
+    const financeSnapshot = document.getElementById('financeSnapshot');
+    const topServices = document.getElementById('topServices');
+    const latestAppt = document.getElementById('latestAppt');
+    const latestTreat = document.getElementById('latestTreat');
+    const recallDueList = document.getElementById('recallDueList');
+    const recallSummary = document.getElementById('recallSummary');
+    const periodInfo = document.getElementById('dashboardPeriodInfo');
+
+    if (periodInfo) {
+      periodInfo.innerHTML = 'Memuat periode dashboard...';
+    }
+
+    if (kpiGrid) {
+      kpiGrid.innerHTML = `
+        <div class="dashboard-kpi-section">
+          <div class="dashboard-kpi-section-head">
+            <div>
+              <div class="dashboard-kpi-section-title">Operasional Appointment</div>
+              <div class="dashboard-kpi-section-subtitle">Ringkasan jadwal pasien pada periode terpilih</div>
+            </div>
+          </div>
+
+          <div class="dashboard-kpi-subgrid">
+            <div class="dashboard-kpi-card"><div class="dashboard-kpi-label">Appointment</div><div class="dashboard-kpi-value">...</div></div>
+            <div class="dashboard-kpi-card"><div class="dashboard-kpi-label">Scheduled</div><div class="dashboard-kpi-value">...</div></div>
+            <div class="dashboard-kpi-card"><div class="dashboard-kpi-label">Completed</div><div class="dashboard-kpi-value">...</div></div>
+            <div class="dashboard-kpi-card"><div class="dashboard-kpi-label">Cancelled</div><div class="dashboard-kpi-value">...</div></div>
+          </div>
+        </div>
+
+        <div class="dashboard-kpi-section">
+          <div class="dashboard-kpi-section-head">
+            <div>
+              <div class="dashboard-kpi-section-title">Pasien & Treatment</div>
+              <div class="dashboard-kpi-section-subtitle">Aktivitas pasien dan jumlah treatment pada periode terpilih</div>
+            </div>
+          </div>
+
+          <div class="dashboard-kpi-subgrid">
+            <div class="dashboard-kpi-card"><div class="dashboard-kpi-label">Pasien Aktif</div><div class="dashboard-kpi-value">...</div></div>
+            <div class="dashboard-kpi-card"><div class="dashboard-kpi-label">Pasien Baru</div><div class="dashboard-kpi-value">...</div></div>
+            <div class="dashboard-kpi-card"><div class="dashboard-kpi-label">Pasien Lama</div><div class="dashboard-kpi-value">...</div></div>
+            <div class="dashboard-kpi-card"><div class="dashboard-kpi-label">Treatment</div><div class="dashboard-kpi-value">...</div></div>
+          </div>
+        </div>
+
+        <div class="dashboard-kpi-section">
+          <div class="dashboard-kpi-section-head">
+            <div>
+              <div class="dashboard-kpi-section-title">Finance Ringkas</div>
+              <div class="dashboard-kpi-section-subtitle">Gross billing, diskon, kas masuk, dan piutang</div>
+            </div>
+          </div>
+
+          <div class="dashboard-kpi-subgrid">
+            <div class="dashboard-kpi-card"><div class="dashboard-kpi-label">Gross Billing</div><div class="dashboard-kpi-value">...</div></div>
+            <div class="dashboard-kpi-card"><div class="dashboard-kpi-label">Diskon</div><div class="dashboard-kpi-value">...</div></div>
+            <div class="dashboard-kpi-card"><div class="dashboard-kpi-label">Net Billing</div><div class="dashboard-kpi-value">...</div></div>
+            <div class="dashboard-kpi-card"><div class="dashboard-kpi-label">Kas Masuk</div><div class="dashboard-kpi-value">...</div></div>
+            <div class="dashboard-kpi-card"><div class="dashboard-kpi-label">Piutang</div><div class="dashboard-kpi-value">...</div></div>
+            <div class="dashboard-kpi-card"><div class="dashboard-kpi-label">Billing Belum Lunas</div><div class="dashboard-kpi-value">...</div></div>
+          </div>
+        </div>
+
+        <div class="dashboard-kpi-section">
+          <div class="dashboard-kpi-section-head">
+            <div>
+              <div class="dashboard-kpi-section-title">Performa & Recall</div>
+              <div class="dashboard-kpi-section-subtitle">Rasio appointment dan prioritas pasien recall</div>
+            </div>
+          </div>
+
+          <div class="dashboard-kpi-subgrid">
+            <div class="dashboard-kpi-card"><div class="dashboard-kpi-label">Completed Rate</div><div class="dashboard-kpi-value">...</div></div>
+            <div class="dashboard-kpi-card"><div class="dashboard-kpi-label">Cancelled Rate</div><div class="dashboard-kpi-value">...</div></div>
+            <div class="dashboard-kpi-card"><div class="dashboard-kpi-label">Recall Due</div><div class="dashboard-kpi-value">...</div></div>
+            <div class="dashboard-kpi-card"><div class="dashboard-kpi-label">Recall Overdue</div><div class="dashboard-kpi-value">...</div></div>
+          </div>
+        </div>
+      `;
+    }
+
+    if (feedbackSummary) feedbackSummary.innerHTML = `<div class="dashboard-empty">Memuat ringkasan kepuasan layanan...</div>`;
+    if (financeSnapshot) financeSnapshot.innerHTML = `<div class="dashboard-empty">Memuat ringkasan finance...</div>`;
+    if (topServices) topServices.innerHTML = `<div class="dashboard-empty">Memuat top tindakan...</div>`;
+    if (latestAppt) latestAppt.innerHTML = `<div class="dashboard-empty">Memuat appointment terbaru...</div>`;
+    if (latestTreat) latestTreat.innerHTML = `<div class="dashboard-empty">Memuat treatment terbaru...</div>`;
+    if (recallDueList) recallDueList.innerHTML = `<div class="dashboard-empty">Memuat daftar recall...</div>`;
+    if (recallSummary) recallSummary.innerHTML = `<div class="dashboard-empty">Memuat ringkasan recall...</div>`;
+  }
+
+  function renderDashboardError(message) {
+    const msg = message || 'Gagal memuat dashboard';
+
+    const periodInfo = document.getElementById('dashboardPeriodInfo');
+    const kpiGrid = document.getElementById('kpiGrid');
+    const feedbackSummary = document.getElementById('dashboardFeedbackSummary');
+    const financeSnapshot = document.getElementById('financeSnapshot');
+    const topServices = document.getElementById('topServices');
+    const latestAppt = document.getElementById('latestAppt');
+    const latestTreat = document.getElementById('latestTreat');
+    const recallDueList = document.getElementById('recallDueList');
+    const recallSummary = document.getElementById('recallSummary');
+
+    if (periodInfo) {
+      periodInfo.innerHTML = 'Dashboard gagal dimuat';
+    }
+
+    if (kpiGrid) {
+      kpiGrid.innerHTML = `
+        <div class="dashboard-kpi-card">
+          <div class="dashboard-kpi-label">Dashboard</div>
+          <div class="dashboard-kpi-value">Error</div>
+        </div>
+      `;
+    }
+
+    if (feedbackSummary) feedbackSummary.innerHTML = `<div class="dashboard-empty">${msg}</div>`;
+    if (financeSnapshot) financeSnapshot.innerHTML = `<div class="dashboard-empty">${msg}</div>`;
+    if (topServices) topServices.innerHTML = `<div class="dashboard-empty">${msg}</div>`;
+    if (latestAppt) latestAppt.innerHTML = `<div class="dashboard-empty">${msg}</div>`;
+    if (latestTreat) latestTreat.innerHTML = `<div class="dashboard-empty">${msg}</div>`;
+    if (recallDueList) recallDueList.innerHTML = `<div class="dashboard-empty">${msg}</div>`;
+    if (recallSummary) recallSummary.innerHTML = `<div class="dashboard-empty">${msg}</div>`;
+  }
+
+  function renderDashboardEmpty(message) {
+    return `<div class="dashboard-empty">${message || 'Belum ada data'}</div>`;
+  }
+
+  function getDashboardStatusChip(status) {
+    const value = String(status || '').toLowerCase();
+
+    if (value === 'completed') {
+      return '<span class="dashboard-status-chip completed">Completed</span>';
+    }
+
+    if (value === 'cancelled') {
+      return '<span class="dashboard-status-chip overdue">Cancelled</span>';
+    }
+
+    return '<span class="dashboard-status-chip upcoming">Scheduled</span>';
+  }
+
+  function getDashboardRecallChip(status) {
+    const value = String(status || '').toLowerCase();
+
+    if (value === 'overdue') {
+      return '<span class="dashboard-status-chip overdue">Overdue</span>';
+    }
+
+    if (value === 'due') {
+      return '<span class="dashboard-status-chip upcoming">Due</span>';
+    }
+
+    if (value === 'reached_target') {
+      return '<span class="dashboard-status-chip completed">Reached Target</span>';
+    }
+
+    if (value === 'done') {
+      return '<span class="dashboard-status-chip">Done</span>';
+    }
+
+    return '<span class="dashboard-status-chip">Upcoming</span>';
+  }
+
+  function renderDashboardOpsList(rows, mapper) {
+    if (!Array.isArray(rows) || !rows.length) return '';
+
+    return `
+      <div class="dashboard-ops-list">
+        ${rows.map(mapper).join('')}
+      </div>
+    `;
+  }
+
+  function showDashboardPage() {
+    setActiveMenu('menuDashboard');
+    const content = document.getElementById('contentArea');
+    if (!content) return;
+
+    content.innerHTML = `
+      <div class="dashboard-shell">
+        <div class="dashboard-header">
+          <div>
+            <div class="dashboard-eyebrow">Overview</div>
+            <h2 class="dashboard-title">Dashboard Owner</h2>
+            <div class="dashboard-subtitle">Ringkasan operasional, billing, kas masuk, piutang, recall, kepuasan layanan, dan performa klinik</div>
+          </div>
+
+          <div class="dashboard-filter-wrap">
+            <label for="dashboardPeriodSelect" class="dashboard-filter-label">Periode</label>
+            <select id="dashboardPeriodSelect" class="dashboard-filter-select" onchange="changePeriod(this)">
+              <option value="today">Hari Ini</option>
+              <option value="7days">7 Hari</option>
+              <option value="30days">30 Hari</option>
+            </select>
+          </div>
+        </div>
+
+        <div id="dashboardPeriodInfo" class="dashboard-period-info"></div>
+
+        <div id="kpiGrid" class="dashboard-kpi-grid"></div>
+
+        <div id="dashboardFeedbackSummary" class="dashboard-feedback-section"></div>
+
+        <div class="dashboard-panels">
+          <div class="dashboard-panel">
+            <div class="dashboard-panel-header">
+              <h3>Finance Snapshot</h3>
+              <span class="dashboard-panel-badge">Finance</span>
+            </div>
+            <div id="financeSnapshot"></div>
+          </div>
+
+          <div class="dashboard-panel">
+            <div class="dashboard-panel-header">
+              <h3>Top Tindakan</h3>
+              <span class="dashboard-panel-badge">Top 5</span>
+            </div>
+            <div id="topServices"></div>
+          </div>
+
+          <div class="dashboard-panel">
+            <div class="dashboard-panel-header">
+              <h3>Appointment Terbaru</h3>
+              <span class="dashboard-panel-badge">Terbaru</span>
+            </div>
+            <div id="latestAppt"></div>
+          </div>
+
+          <div class="dashboard-panel">
+            <div class="dashboard-panel-header">
+              <h3>Treatment Terbaru</h3>
+              <span class="dashboard-panel-badge">Terbaru</span>
+            </div>
+            <div id="latestTreat"></div>
+          </div>
+
+          <div class="dashboard-panel">
+            <div class="dashboard-panel-header">
+              <h3>Recall Due List</h3>
+              <span class="dashboard-panel-badge">Top 5</span>
+            </div>
+            <div id="recallDueList"></div>
+          </div>
+
+          <div class="dashboard-panel">
+            <div class="dashboard-panel-header">
+              <h3>Recall Snapshot</h3>
+              <span class="dashboard-panel-badge">Recall</span>
+            </div>
+            <div id="recallSummary"></div>
+          </div>
+        </div>
+      </div>
+    `;
+
+    const select = document.getElementById('dashboardPeriodSelect');
+    if (select) {
+      select.value = dashboardPeriod;
+    }
+
+    renderDashboardSkeleton();
+    loadDashboard();
+  }
+
+  function changePeriod(el) {
+    dashboardPeriod = el && el.value ? el.value : 'today';
+    loadDashboard();
+  }
+
+  function loadDashboard() {
+    renderDashboardSkeleton();
+
+    google.script.run
+      .withSuccessHandler(renderDashboard)
+      .withFailureHandler(function(err) {
+        const msg = 'Error: ' + (err && err.message ? err.message : err);
+        renderDashboardError(msg);
+        showToast(msg, 'error');
+      })
+      .getDashboardOwnerSummary(dashboardPeriod);
+  }
+
+  function renderDashboard(res) {
+    if (!res || !res.success) {
+      const msg = (res && res.message) || 'Gagal memuat dashboard';
+      renderDashboardError(msg);
+      showToast(msg, 'error');
+      return;
+    }
+
+    const d = res.data || {};
+    const k = d.kpi || {};
+
+    renderDashboardKpis(k);
+    renderDashboardPeriod(d.period || {});
+    renderDashboardFeedbackSummary(d.feedback_summary || null);
+    renderFinanceSnapshot(k);
+    renderTopServices(d.top_services || []);
+    renderLatestAppointments(d.latest_appointments || []);
+    renderLatestTreatments(d.latest_treatments || []);
+    renderRecallDueList(d.recall_due_list || []);
+    renderRecallSummary(d.recall_summary || {});
+  }
+
+  function renderDashboardPeriod(period) {
+    const el = document.getElementById('dashboardPeriodInfo');
+    if (!el) return;
+
+    el.innerHTML = `
+      Periode data:
+      <strong>${formatDashboardDateDmy(period.start || '')}</strong>
+      s/d
+      <strong>${formatDashboardDateDmy(period.end || '')}</strong>
+    `;
+  }
+
+  function renderDashboardKpiCard(card) {
+    return `
+      <div class="dashboard-kpi-card dashboard-kpi-${card.tone}">
+        <div class="dashboard-kpi-label">${card.label}</div>
+        <div class="dashboard-kpi-value">${card.value}</div>
+      </div>
+    `;
+  }
+
+  function renderDashboardKpiSection(title, subtitle, cards) {
+    const rows = Array.isArray(cards) ? cards : [];
+
+    return `
+      <div class="dashboard-kpi-section">
+        <div class="dashboard-kpi-section-head">
+          <div>
+            <div class="dashboard-kpi-section-title">${title}</div>
+            <div class="dashboard-kpi-section-subtitle">${subtitle}</div>
+          </div>
+        </div>
+
+        <div class="dashboard-kpi-subgrid">
+          ${rows.map(renderDashboardKpiCard).join('')}
+        </div>
+      </div>
+    `;
+  }
+
+  function renderDashboardKpis(k) {
+    const grid = document.getElementById('kpiGrid');
+    if (!grid) return;
+
+    const grossBilling = Number(k.gross_billing || 0);
+    const discountTotal = Number(k.discount_total || 0);
+    const netBilling = Number(k.net_billing || 0);
+    const cashIn = Number(k.cash_in || 0);
+    const outstandingTotal = Number(k.outstanding_total || 0);
+    const unpaidBillingCount = Number(k.unpaid_billing_count || 0);
+
+    const operationalCards = [
+      { label: 'Appointment', value: Number(k.appointment_total || 0), tone: 'neutral' },
+      { label: 'Scheduled', value: Number(k.scheduled_total || 0), tone: 'neutral' },
+      { label: 'Completed', value: Number(k.completed_total || 0), tone: 'success' },
+      { label: 'Cancelled', value: Number(k.cancelled_total || 0), tone: 'danger' }
+    ];
+
+    const patientTreatmentCards = [
+      { label: 'Pasien Aktif', value: Number(k.active_patients || 0), tone: 'neutral' },
+      { label: 'Pasien Baru', value: Number(k.new_patients || 0), tone: 'neutral' },
+      { label: 'Pasien Lama', value: Number(k.returning_patients || 0), tone: 'neutral' },
+      { label: 'Treatment', value: Number(k.treatment_total || 0), tone: 'neutral' }
+    ];
+
+    const financeCards = [
+      { label: 'Gross Billing', value: formatDashboardRupiah(grossBilling), tone: 'neutral' },
+      { label: 'Diskon', value: formatDashboardRupiah(discountTotal), tone: 'danger' },
+      { label: 'Net Billing', value: formatDashboardRupiah(netBilling), tone: 'primary' },
+      { label: 'Kas Masuk', value: formatDashboardRupiah(cashIn), tone: 'success' },
+      { label: 'Piutang', value: formatDashboardRupiah(outstandingTotal), tone: 'danger' },
+      { label: 'Billing Belum Lunas', value: unpaidBillingCount, tone: 'danger' }
+    ];
+
+    const performanceRecallCards = [
+      { label: 'Completed Rate', value: Number(k.completed_rate || 0) + '%', tone: 'success' },
+      { label: 'Cancelled Rate', value: Number(k.cancelled_rate || 0) + '%', tone: 'danger' },
+      { label: 'Recall Due', value: Number(k.recall_due_total || 0), tone: 'primary' },
+      { label: 'Recall Overdue', value: Number(k.recall_overdue_total || 0), tone: 'danger' }
+    ];
+
+    grid.innerHTML = `
+      ${renderDashboardKpiSection(
+        'Operasional Appointment',
+        'Ringkasan jadwal pasien pada periode terpilih',
+        operationalCards
+      )}
+
+      ${renderDashboardKpiSection(
+        'Pasien & Treatment',
+        'Aktivitas pasien dan jumlah treatment pada periode terpilih',
+        patientTreatmentCards
+      )}
+
+      ${renderDashboardKpiSection(
+        'Finance Ringkas',
+        'Gross billing, diskon, kas masuk, dan piutang',
+        financeCards
+      )}
+
+      ${renderDashboardKpiSection(
+        'Performa & Recall',
+        'Rasio appointment dan prioritas pasien recall',
+        performanceRecallCards
+      )}
+    `;
+  }
+
+  function renderDashboardFeedbackSummaryCard(label, value, tone) {
+    return `
+      <div class="dashboard-feedback-summary-card dashboard-feedback-${tone || 'neutral'}">
+        <div class="dashboard-feedback-summary-label">${label}</div>
+        <div class="dashboard-feedback-summary-value">${value}</div>
+      </div>
+    `;
+  }
+
+  function renderDashboardLatestFeedbackItem(row) {
+    const data = row || {};
+
+    return `
+      <div class="dashboard-feedback-latest-item">
+        <div class="dashboard-feedback-latest-title">${data.patient_name || '-'}</div>
+        <div class="dashboard-feedback-latest-sub">
+          ${formatDashboardDateDmy(data.submitted_ymd || data.submitted_at || '')}
+          • Rating ${formatDashboardRating(data.rating || 0)}
+          • Invoice ${data.billing_id || '-'}
+        </div>
+        ${
+          data.comment
+            ? `<div class="dashboard-feedback-latest-comment">${data.comment}</div>`
+            : ''
+        }
+      </div>
+    `;
+  }
+
+  function renderDashboardFeedbackSummary(summary) {
+    const el = document.getElementById('dashboardFeedbackSummary');
+    if (!el) return;
+
+    const s = summary || {};
+    const latest = Array.isArray(s.latest_feedbacks) ? s.latest_feedbacks : [];
+
+    el.innerHTML = `
+      <div class="dashboard-kpi-section dashboard-feedback-dashboard-card">
+        <div class="dashboard-kpi-section-head">
+          <div>
+            <div class="dashboard-kpi-section-title">Ringkasan Kepuasan Layanan</div>
+            <div class="dashboard-kpi-section-subtitle">Feedback pasien dari invoice digital pada periode terpilih</div>
+          </div>
+        </div>
+
+        <div class="dashboard-feedback-summary-grid">
+          ${renderDashboardFeedbackSummaryCard('Feedback Masuk', Number(s.submitted_count || 0), 'primary')}
+          ${renderDashboardFeedbackSummaryCard('Rata-rata Rating', formatDashboardRating(s.average_rating || 0), 'success')}
+          ${renderDashboardFeedbackSummaryCard('Puas', Number(s.satisfied_count || 0), 'success')}
+          ${renderDashboardFeedbackSummaryCard('Netral', Number(s.neutral_count || 0), 'neutral')}
+          ${renderDashboardFeedbackSummaryCard('Kurang Puas', Number(s.unsatisfied_count || 0), 'danger')}
+          ${renderDashboardFeedbackSummaryCard('Belum Diisi', Number(s.pending_count || 0), 'neutral')}
+        </div>
+
+        <div class="dashboard-feedback-latest-wrap">
+          <div class="dashboard-panel-subtitle">Feedback Terbaru</div>
+          ${
+            latest.length
+              ? `<div class="dashboard-feedback-latest-list">${latest.map(renderDashboardLatestFeedbackItem).join('')}</div>`
+              : `<div class="dashboard-empty">Belum ada feedback yang masuk pada periode ini.</div>`
+          }
+        </div>
+      </div>
+    `;
+  }
+
+  function renderFinanceSnapshotItem(label, value, note, tone) {
+    return `
+      <div class="dashboard-summary-box dashboard-finance-snapshot-item dashboard-finance-${tone || 'neutral'}">
+        <h4>${label}</h4>
+        <div class="dashboard-summary-text dashboard-finance-snapshot-value">${value}</div>
+        ${
+          note
+            ? `<div class="dashboard-list-subtitle">${note}</div>`
+            : ''
+        }
+      </div>
+    `;
+  }
+
+  function renderFinanceSnapshot(k) {
+    const el = document.getElementById('financeSnapshot');
+    if (!el) return;
+
+    const treatmentValueTotal = Number(k.treatment_value_total || 0);
+    const grossBilling = Number(k.gross_billing || 0);
+    const discountTotal = Number(k.discount_total || 0);
+    const netBilling = Number(k.net_billing || 0);
+    const cashIn = Number(k.cash_in || 0);
+    const outstandingTotal = Number(k.outstanding_total || 0);
+    const unpaidBillingCount = Number(k.unpaid_billing_count || 0);
+
+    const cashInRate = netBilling > 0
+      ? Math.round((cashIn / netBilling) * 100)
+      : 0;
+
+    const discountRate = grossBilling > 0
+      ? Math.round((discountTotal / grossBilling) * 100)
+      : 0;
+
+    el.innerHTML = `
+      <div class="dashboard-summary-grid">
+        ${renderFinanceSnapshotItem(
+          'Nilai Treatment',
+          formatDashboardRupiah(treatmentValueTotal),
+          'Nilai tindakan dari sheet Treatments.',
+          'neutral'
+        )}
+
+        ${renderFinanceSnapshotItem(
+          'Gross Billing',
+          formatDashboardRupiah(grossBilling),
+          'Total billing sebelum diskon.',
+          'neutral'
+        )}
+
+        ${renderFinanceSnapshotItem(
+          'Diskon',
+          formatDashboardRupiah(discountTotal),
+          discountRate + '% dari Gross Billing.',
+          'danger'
+        )}
+
+        ${renderFinanceSnapshotItem(
+          'Net Billing',
+          formatDashboardRupiah(netBilling),
+          'Billing bersih setelah diskon.',
+          'primary'
+        )}
+
+        ${renderFinanceSnapshotItem(
+          'Kas Masuk',
+          formatDashboardRupiah(cashIn),
+          cashInRate + '% dari Net Billing periode ini.',
+          'success'
+        )}
+
+        ${renderFinanceSnapshotItem(
+          'Piutang',
+          formatDashboardRupiah(outstandingTotal),
+          unpaidBillingCount + ' billing belum lunas.',
+          'danger'
+        )}
+      </div>
+
+      <div class="dashboard-priority-note">
+        Catatan: Nilai Treatment menunjukkan aktivitas klinis, sedangkan Kas Masuk menunjukkan pembayaran yang benar-benar diterima.
+      </div>
+    `;
+  }
+
+  function renderTopServices(rows) {
+    const el = document.getElementById('topServices');
+    if (!el) return;
+
+    if (!rows.length) {
+      el.innerHTML = renderDashboardEmpty('Belum ada data tindakan');
+      return;
+    }
+
+    el.innerHTML = `
+      <div class="dashboard-list">
+        ${rows.map(function(row, idx) {
+          return `
+            <div class="dashboard-list-item">
+              <div class="dashboard-list-rank">${idx + 1}</div>
+              <div class="dashboard-list-main">
+                <div class="dashboard-list-title">${row.name || '-'}</div>
+                <div class="dashboard-list-subtitle">
+                  Qty ${Number(row.qty || 0)} • ${formatDashboardRupiah(row.total || 0)}
+                </div>
+              </div>
+            </div>
+          `;
+        }).join('')}
+      </div>
+    `;
+  }
+
+  function renderLatestAppointments(rows) {
+    const el = document.getElementById('latestAppt');
+    if (!el) return;
+
+    if (!rows.length) {
+      el.innerHTML = renderDashboardEmpty('Belum ada data appointment');
+      return;
+    }
+
+    el.innerHTML = renderDashboardOpsList(rows, function(row) {
+      return `
+        <div class="dashboard-ops-item">
+          <div class="dashboard-ops-main">
+            <div class="dashboard-ops-title">${row.patient_name || '-'}</div>
+            <div class="dashboard-ops-meta">
+              <span>${formatDashboardDateDmy(row.appointment_date || '')}</span>
+              <span>•</span>
+              <span>${row.appointment_time || '-'}</span>
+            </div>
+          </div>
+
+          <div class="dashboard-ops-side">
+            ${getDashboardStatusChip(row.status)}
+          </div>
+        </div>
+      `;
+    });
+  }
+
+  function renderLatestTreatments(rows) {
+    const el = document.getElementById('latestTreat');
+    if (!el) return;
+
+    if (!rows.length) {
+      el.innerHTML = renderDashboardEmpty('Belum ada data treatment');
+      return;
+    }
+
+    el.innerHTML = renderDashboardOpsList(rows, function(row) {
+      return `
+        <div class="dashboard-ops-item">
+          <div class="dashboard-ops-main">
+            <div class="dashboard-ops-title">${row.patient_name || '-'}</div>
+            <div class="dashboard-ops-meta">
+              <span>${formatDashboardDateDmy(row.treatment_date || '')}</span>
+              <span>•</span>
+              <span>${row.doctor_name || '-'}</span>
+            </div>
+          </div>
+
+          <div class="dashboard-ops-side">
+            <div class="dashboard-ops-value">${formatDashboardRupiah(row.total_cost || 0)}</div>
+          </div>
+        </div>
+      `;
+    });
+  }
+
+  function renderRecallDueList(rows) {
+    const el = document.getElementById('recallDueList');
+    if (!el) return;
+
+    if (!rows.length) {
+      el.innerHTML = renderDashboardEmpty('Belum ada data recall aktif');
+      return;
+    }
+
+    el.innerHTML = renderDashboardOpsList(rows, function(row) {
+      const contactText = row.last_contact_date
+        ? 'Contacted: ' + formatDashboardDateDmy(row.last_contact_date)
+        : 'Belum dihubungi';
+
+      return `
+        <div class="dashboard-ops-item">
+          <div class="dashboard-ops-main">
+            <div class="dashboard-ops-title">${row.patient_name || '-'}</div>
+            <div class="dashboard-ops-meta">
+              <span>Next Due: ${formatDashboardDateDmy(row.next_due_date || '')}</span>
+              <span>•</span>
+              <span>${contactText}</span>
+            </div>
+          </div>
+
+          <div class="dashboard-ops-side">
+            ${getDashboardRecallChip(row.followup_status)}
+          </div>
+        </div>
+      `;
+    });
+  }
+
+  function renderRecallSummary(summary) {
+    const el = document.getElementById('recallSummary');
+    if (!el) return;
+
+    const activeTotal = Number(summary.active_total || 0);
+    const dueTotal = Number(summary.due_total || 0);
+    const overdueTotal = Number(summary.overdue_total || 0);
+    const reachedTargetTotal = Number(summary.reached_target_total || 0);
+    const contactedTotal = Number(summary.contacted_total || 0);
+    const notContactedTotal = Number(summary.not_contacted_total || 0);
+
+    el.innerHTML = `
+      <div class="dashboard-summary-grid">
+        <div class="dashboard-summary-box">
+          <h4>Recall Active</h4>
+          <div class="dashboard-summary-text">${activeTotal}</div>
+        </div>
+
+        <div class="dashboard-summary-box">
+          <h4>Due Today</h4>
+          <div class="dashboard-summary-text">${dueTotal}</div>
+        </div>
+
+        <div class="dashboard-summary-box">
+          <h4>Overdue</h4>
+          <div class="dashboard-summary-text">${overdueTotal}</div>
+        </div>
+
+        <div class="dashboard-summary-box">
+          <h4>Reached Target</h4>
+          <div class="dashboard-summary-text">${reachedTargetTotal}</div>
+        </div>
+
+        <div class="dashboard-summary-box">
+          <h4>Contacted</h4>
+          <div class="dashboard-summary-text">${contactedTotal}</div>
+        </div>
+
+        <div class="dashboard-summary-box">
+          <h4>Not Contacted</h4>
+          <div class="dashboard-summary-text">${notContactedTotal}</div>
+        </div>
+      </div>
+    `;
+  }
+</script>

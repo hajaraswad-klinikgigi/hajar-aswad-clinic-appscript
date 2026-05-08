@@ -1,0 +1,569 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <base target="_top">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <?!= include('style'); ?>
+    <?!= include('style-dashboard'); ?>
+    <?!= include('style-patients'); ?>
+    <?!= include('style-appointments'); ?>
+    <?!= include('style-recall'); ?>
+    <?!= include('style-finance'); ?>
+    <?!= include('style-modals'); ?>
+    <?!= include('style-responsive'); ?>
+  </head>
+  <body>
+    <div id="loginView" class="login-wrap">
+      <div class="login-card">
+
+        <div style="text-align:center; margin-bottom:16px;">
+          <img 
+            src="https://i.imgur.com/vCJBBJY.png"
+            class="login-logo"
+            alt="Logo Klinik"
+            style="width:90px;"
+          >
+        </div>
+        <p style="text-align:center; color:#6b7280; margin-bottom:20px;">
+          Dental Clinic
+        </p>
+
+        <form onsubmit="submitLogin(event)">
+          <input type="text" id="username" placeholder="Username">
+          <input type="password" id="password" placeholder="Password">
+          <button type="submit" class="btn btn-primary">Login</button>
+        </form>
+
+        <div id="message" class="message"></div>
+      </div>
+    </div>
+
+    <div id="dashboardView" style="display:none;">
+      <div class="app-shell">
+        <div class="sidebar-overlay" onclick="closeSidebar()"></div>
+
+        <aside class="sidebar" id="appSidebar">
+          <div class="sidebar-brand">Hajar Aswad</div>
+
+           <button type="button" id="menuDashboard" class="sidebar-menu active" onclick="showDashboardPage(); closeSidebar();">Dashboard</button>
+          <button type="button" id="menuPatients" class="sidebar-menu" onclick="showPatientsPage(); closeSidebar();">Patients</button>
+          <button type="button" id="menuAppointments" class="sidebar-menu" onclick="showAppointmentsPage(); closeSidebar();">Appointments</button>
+          <button type="button" id="menuRecall" class="sidebar-menu" onclick="showRecallPage(); closeSidebar();">Recall</button>
+          <button type="button" id="menuFinance" class="sidebar-menu" onclick="showFinancePage(); closeSidebar();">Finance</button>
+          <button type="button" onclick="logoutLocal()">Logout</button>
+        </aside>
+
+        <main class="main-content">
+          <div class="topbar">
+            <div class="topbar-left">
+              <button type="button" class="mobile-menu-btn" onclick="toggleSidebar()">☰</button>
+
+              <div class="topbar-user-block">
+                <div id="welcomeText" class="topbar-title">Nama User</div>
+                <div id="topbarSubtitle" class="topbar-subtitle">Selamat datang kembali</div>
+              </div>
+            </div>
+
+            <div class="role-badge" id="roleText">role</div>
+          </div>
+
+          <div id="contentArea"></div>
+        </main>
+      </div>
+    </div>
+
+    <div id="patientModal" class="modal hidden">
+      <div class="modal-box modal-box-sticky patient-modal-box">
+        <div class="detail-modal-header-sticky">
+          <h2 id="patientModalTitle" class="detail-modal-title-sticky">Tambah Pasien</h2>
+
+          <button
+            type="button"
+            class="detail-close-btn"
+            onclick="closePatientModal()"
+            aria-label="Tutup modal pasien"
+            title="Tutup"
+          >
+            <svg viewBox="0 0 24 24" fill="none" stroke-width="2">
+              <path d="M6 6l12 12"></path>
+              <path d="M18 6l-12 12"></path>
+            </svg>
+          </button>
+        </div>
+
+        <div class="modal-form-scroll">
+          <form onsubmit="submitPatient(event)">
+            <input type="hidden" id="patient_id_hidden">
+
+            <label>Nama Lengkap</label>
+            <input
+              type="text"
+              id="patient_full_name"
+              required
+              oninput="formatPatientNameInput(this)"
+            >
+            <div id="error_patient_full_name" class="field-error"></div>
+
+            <label>Gender</label>
+            <select id="patient_gender" required>
+              <option value="">Pilih gender</option>
+              <option value="Laki-laki">Laki-laki</option>
+              <option value="Perempuan">Perempuan</option>
+            </select>
+            <div id="error_patient_gender" class="field-error"></div>
+
+            <label>Tanggal Lahir</label>
+            <input
+              type="text"
+              id="patient_birth_date"
+              placeholder="dd-mm-yyyy"
+              inputmode="numeric"
+              maxlength="10"
+              oninput="formatBirthDateInput(this)"
+              required
+            >
+            <div id="error_patient_birth_date" class="field-error"></div>
+
+            <label>No HP</label>
+            <input type="text" id="patient_phone">
+            <div id="error_patient_phone" class="field-error"></div>
+
+            <label>Email</label>
+            <input type="email" id="patient_email">
+            <div id="error_patient_email" class="field-error"></div>
+
+            <button
+              type="button"
+              id="patientGuardianToggleBtn"
+              class="btn btn-secondary"
+              onclick="togglePatientGuardianSection()"
+              style="width:100%; justify-content:space-between; margin-bottom:12px;"
+            >
+              <span>Data Wali</span>
+              <span id="patientGuardianToggleIcon">▼</span>
+            </button>
+
+            <div
+              id="patientGuardianRuleText"
+              style="display:none; margin-top:-2px; margin-bottom:14px; font-size:12px; line-height:1.5; color:#64748b;"
+            ></div>
+
+            <div id="patientGuardianSectionWrap" style="display:none;">
+              <label>Nama Wali</label>
+              <input
+                type="text"
+                id="patient_guardian_name"
+                oninput="formatPatientNameInput(this)"
+              >
+              <div id="error_patient_guardian_name" class="field-error"></div>
+
+              <label>Hubungan Wali</label>
+              <input
+                type="text"
+                id="patient_guardian_relationship"
+                placeholder="Contoh: Ayah, Ibu, Wali"
+              >
+              <div id="error_patient_guardian_relationship" class="field-error"></div>
+
+              <label>No HP Wali</label>
+              <input type="text" id="patient_guardian_phone">
+              <div id="error_patient_guardian_phone" class="field-error"></div>
+
+              <label>Email Wali</label>
+              <input type="email" id="patient_guardian_email">
+              <div id="error_patient_guardian_email" class="field-error"></div>
+            </div>
+
+            <label>Alamat</label>
+            <textarea id="patient_address" required></textarea>
+            <div id="error_patient_address" class="field-error"></div>
+
+            <label>Catatan Alergi</label>
+            <textarea id="patient_allergy_notes"></textarea>
+            <div id="error_patient_allergy_notes" class="field-error"></div>
+
+            <label>Catatan Medis</label>
+            <textarea id="patient_medical_notes"></textarea>
+            <div id="error_patient_medical_notes" class="field-error"></div>
+
+            <div class="modal-actions modal-actions-right">
+              <button type="button" class="btn btn-secondary" onclick="closePatientModal()">Batal</button>
+              <button type="submit" class="btn btn-primary" id="patientSubmitBtn">Simpan</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+
+    <div id="patientDetailModal" class="modal hidden">
+      <div class="modal-box detail-modal-box-sticky">
+        <div class="detail-modal-header-sticky">
+          <h2 class="detail-modal-title-sticky">Detail Pasien</h2>
+
+          <button
+            type="button"
+            class="detail-close-btn"
+            onclick="closePatientDetailModal()"
+            aria-label="Tutup detail pasien"
+            title="Tutup"
+          >
+            <svg viewBox="0 0 24 24" fill="none" stroke-width="2">
+              <path d="M6 6l12 12"></path>
+              <path d="M18 6l-12 12"></path>
+            </svg>
+          </button>
+        </div>
+
+        <div id="patientDetailContent" class="detail-modal-content-scroll"></div>
+      </div>
+    </div>
+
+    <div id="patientPhotoUploadModal" class="modal hidden">
+      <div class="modal-box modal-box-sticky patient-photo-upload-modal-box">
+        <div class="detail-modal-header-sticky">
+          <h2 class="detail-modal-title-sticky">Upload Foto Pasien</h2>
+
+          <button
+            type="button"
+            class="detail-close-btn"
+            onclick="closePatientPhotoUploadModal()"
+            aria-label="Tutup modal upload foto pasien"
+            title="Tutup"
+          >
+            <svg viewBox="0 0 24 24" fill="none" stroke-width="2">
+              <path d="M6 6l12 12"></path>
+              <path d="M18 6l-12 12"></path>
+            </svg>
+          </button>
+        </div>
+
+        <div class="modal-form-scroll">
+          <form onsubmit="submitPatientPhotoUpload(event)">
+            <input type="hidden" id="photo_patient_id_hidden">
+
+            <label>Treatment</label>
+            <select id="photo_treatment_id" required onchange="handlePatientPhotoTreatmentChange()"></select>
+            <div id="error_photo_treatment_id" class="field-error"></div>
+            <div id="photo_treatment_warning" class="field-error" style="display:none;"></div>
+
+            <label>Tipe Foto</label>
+            <select id="photo_type" required>
+              <option value="">Pilih tipe</option>
+              <option value="before">before</option>
+              <option value="after">after</option>
+            </select>
+            <div id="error_photo_type" class="field-error"></div>
+
+            <label>File Foto</label>
+            <input type="file" id="photo_file_input" accept="image/png,image/jpeg,image/webp" required onchange="previewPatientPhotoFile(this)">
+            <div id="error_photo_file" class="field-error"></div>
+
+            <div id="photoPreviewWrap" style="display:none; margin-bottom:14px;">
+              <img id="photoPreviewImage" alt="Preview Foto" style="width:100%; max-height:280px; object-fit:cover; border-radius:14px; border:1px solid #e5e7eb;">
+            </div>
+
+            <label>Catatan Foto</label>
+            <textarea id="photo_note" placeholder="Contoh: before tambal gigi 16"></textarea>
+            <div id="error_photo_note" class="field-error"></div>
+
+            <div class="modal-actions modal-actions-right">
+              <button type="button" class="btn btn-secondary" onclick="closePatientPhotoUploadModal()">Batal</button>
+              <button type="submit" class="btn btn-primary" id="patientPhotoUploadSubmitBtn">Upload</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+
+    <div id="patientPhotoPreviewModal" class="modal hidden">
+      <div class="modal-box patient-photo-preview-modal-box">
+        <div class="detail-modal-header-sticky">
+          <h2 class="detail-modal-title-sticky" id="patientPhotoPreviewTitle">Preview Foto</h2>
+
+          <button
+            type="button"
+            class="detail-close-btn"
+            onclick="closePatientPhotoPreviewModal()"
+            aria-label="Tutup preview foto"
+            title="Tutup"
+          >
+            <svg viewBox="0 0 24 24" fill="none" stroke-width="2">
+              <path d="M6 6l12 12"></path>
+              <path d="M18 6l-12 12"></path>
+            </svg>
+          </button>
+        </div>
+
+        <div class="patient-photo-preview-content">
+          <img id="patientPhotoPreviewImage" src="" alt="Preview Foto">
+          <div id="patientPhotoPreviewNote" class="patient-photo-preview-note"></div>
+        </div>
+      </div>
+    </div>
+
+    <div id="confirmDeletePatientPhotoModal" class="modal hidden">
+      <div class="modal-box" style="width:420px;">
+        <h2>Konfirmasi</h2>
+        <p id="confirmDeletePatientPhotoText" class="confirm-text">Yakin ingin menghapus foto pasien ini?</p>
+        <div class="confirm-modal-actions">
+          <button
+            type="button"
+            class="btn btn-secondary"
+            id="confirmDeletePatientPhotoCancelBtn"
+            onclick="closeDeletePatientPhotoModal()"
+          >
+            Batal
+          </button>
+
+          <button
+            type="button"
+            class="btn btn-danger"
+            id="confirmDeletePatientPhotoSubmitBtn"
+            onclick="executeDeletePatientPhoto()"
+          >
+            Hapus Foto
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <div id="confirmDeactivateModal" class="modal hidden">
+      <div class="modal-box" style="width:420px;">
+        <h2>Konfirmasi</h2>
+        <p id="confirmDeactivateText" class="confirm-text">Yakin ingin menonaktifkan pasien?</p>
+        <div class="confirm-modal-actions">
+          <button type="button" class="btn btn-secondary" onclick="closeDeactivateModal()">Batal</button>
+          <button type="button" class="btn btn-danger" onclick="executeDeactivatePatient()">Nonaktifkan</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="appointmentModal" class="modal hidden">
+      <div class="modal-box modal-box-sticky appointment-modal-box">
+        <div class="detail-modal-header-sticky">
+          <h2 id="appointmentModalTitle" class="detail-modal-title-sticky">Tambah Appointment</h2>
+
+          <button
+            type="button"
+            class="detail-close-btn"
+            onclick="closeAppointmentModal()"
+            aria-label="Tutup modal appointment"
+            title="Tutup"
+          >
+            <svg viewBox="0 0 24 24" fill="none" stroke-width="2">
+              <path d="M6 6l12 12"></path>
+              <path d="M18 6l-12 12"></path>
+            </svg>
+          </button>
+        </div>
+
+        <div class="modal-form-scroll">
+          <form onsubmit="submitAppointment(event)">
+            <input type="hidden" id="appointment_id_hidden">
+            <input type="hidden" id="appointment_patient_id">
+
+            <label>Cari Pasien</label>
+            <input
+              type="text"
+              id="appointment_patient_search"
+              placeholder="Ketik minimal 2 huruf nama, kode pasien, atau no HP..."
+              autocomplete="off"
+              oninput="handleAppointmentPatientSearch()"
+            >
+            <div id="error_appointment_patient_id" class="field-error"></div>
+
+            <div id="appointment_patient_selected" class="patient-selected-card"></div>
+
+            <div id="appointment_patient_warning" class="field-error" style="display:none;"></div>
+
+            <div id="appointment_patient_results" class="patient-search-results"></div>
+
+            <label>Tanggal Appointment</label>
+            <input type="date" id="appointment_date" required>
+            <div id="error_appointment_date" class="field-error"></div>
+
+            <label>Jam Appointment</label>
+            <input type="time" id="appointment_time" required>
+            <div id="error_appointment_time" class="field-error"></div>
+
+            <label>Keluhan</label>
+            <textarea id="appointment_complaint" required></textarea>
+            <div id="error_appointment_complaint" class="field-error"></div>
+
+            <label>Status</label>
+            <select id="appointment_status" required>
+              <option value="">Pilih status</option>
+              <option value="scheduled">scheduled</option>
+              <option value="cancelled">cancelled</option>
+            </select>
+            <div id="error_appointment_status" class="field-error"></div>
+
+            <div class="modal-actions modal-actions-right">
+              <button type="button" class="btn btn-secondary" onclick="closeAppointmentModal()">Batal</button>
+              <button type="submit" class="btn btn-primary" id="appointmentSubmitBtn">Simpan</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+
+    <div id="appointmentDetailModal" class="modal hidden">
+      <div class="modal-box detail-modal-box-sticky detail-modal-box-appointment">
+        <div class="detail-modal-header-sticky">
+          <h2 class="detail-modal-title-sticky">Detail Appointment</h2>
+
+          <button
+            type="button"
+            class="detail-close-btn"
+            onclick="closeAppointmentDetailModal()"
+            aria-label="Tutup detail appointment"
+            title="Tutup"
+          >
+            <svg viewBox="0 0 24 24" fill="none" stroke-width="2">
+              <path d="M6 6l12 12"></path>
+              <path d="M18 6l-12 12"></path>
+            </svg>
+          </button>
+        </div>
+
+        <div class="detail-modal-content-scroll">
+          <div id="appointmentDetailContent" class="detail-grid"></div>
+        </div>
+      </div>
+    </div>
+
+    <div id="confirmCancelAppointmentModal" class="modal hidden">
+      <div class="modal-box" style="width:420px;">
+        <h2>Konfirmasi</h2>
+        <p id="confirmCancelAppointmentText" class="confirm-text">Yakin ingin membatalkan appointment?</p>
+        <div class="confirm-modal-actions">
+          <button type="button" class="btn btn-secondary" onclick="closeCancelAppointmentModal()">Batal</button>
+          <button type="button" class="btn btn-danger" onclick="executeCancelAppointment()">Cancel Appointment</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="confirmRestoreAppointmentModal" class="modal hidden">
+      <div class="modal-box" style="width:420px;">
+        <h2>Konfirmasi</h2>
+        <p id="confirmRestoreAppointmentText" class="confirm-text">Yakin ingin merestore appointment?</p>
+        <div class="confirm-modal-actions">
+          <button type="button" class="btn btn-secondary" onclick="closeRestoreAppointmentModal()">Batal</button>
+          <button type="button" class="btn btn-success" onclick="executeRestoreAppointment()">Restore Appointment</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="treatmentModal" class="modal hidden">
+      <div class="modal-box modal-box-sticky treatment-modal-box">
+        <div class="detail-modal-header-sticky">
+          <h2 class="detail-modal-title-sticky">Mulai Treatment</h2>
+
+          <button
+            type="button"
+            class="detail-close-btn"
+            onclick="closeTreatmentModal()"
+            aria-label="Tutup modal treatment"
+            title="Tutup"
+          >
+            <svg viewBox="0 0 24 24" fill="none" stroke-width="2">
+              <path d="M6 6l12 12"></path>
+              <path d="M18 6l-12 12"></path>
+            </svg>
+          </button>
+        </div>
+
+        <div class="modal-form-scroll">
+          <form onsubmit="submitTreatment(event)">
+            <input type="hidden" id="treatment_appointment_id">
+            <input type="hidden" id="treatment_patient_id">
+            <input type="hidden" id="treatment_patient_name">
+
+            <label>Pasien</label>
+            <input type="text" id="treatment_patient_name_display" readonly>
+            <div id="error_treatment_patient_name" class="field-error"></div>
+
+            <label>Dokter</label>
+            <select id="treatment_doctor_user_id" required onchange="handleTreatmentDoctorChange()">
+              <option value="">Pilih dokter</option>
+            </select>
+            <input type="hidden" id="treatment_doctor_name">
+            <div id="error_treatment_doctor_user_id" class="field-error"></div>
+
+            <label>Tanggal Treatment</label>
+            <input type="date" id="treatment_date" required>
+            <div id="error_treatment_date" class="field-error"></div>
+
+            <label>Keluhan Utama</label>
+            <textarea id="treatment_chief_complaint" required></textarea>
+            <div id="error_treatment_chief_complaint" class="field-error"></div>
+
+            <label>Diagnosis</label>
+            <textarea id="treatment_diagnosis" required></textarea>
+            <div id="error_treatment_diagnosis" class="field-error"></div>
+
+            <label>Catatan Dokter</label>
+            <textarea id="treatment_notes"></textarea>
+            <div id="error_treatment_notes" class="field-error"></div>
+
+            <div style="margin-top:18px; margin-bottom:10px; display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap;">
+              <h3 style="margin:0;">Daftar Tindakan</h3>
+
+              <button
+                type="button"
+                class="treatment-btn-primary treatment-btn-top"
+                onclick="addTreatmentItemRow()"
+              >
+                Tambah Tindakan
+              </button>
+            </div>
+
+            <div id="error_treatment_items" class="field-error" style="margin-bottom:10px;"></div>
+
+            <div class="table-wrapper">
+              <table class="table">
+                <thead>
+                  <tr>
+                    <th>Tindakan</th>
+                    <th>Qty</th>
+                    <th>Harga</th>
+                    <th>Subtotal</th>
+                    <th>Action</th>
+                  </tr>
+                </thead>
+                <tbody id="treatmentItemsBody">
+                  <tr>
+                    <td colspan="5">Belum ada tindakan</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            <div style="margin-top:14px; text-align:right; font-weight:700;">
+              Total: <span id="treatmentTotalCost">Rp 0</span>
+            </div>
+
+            <div class="modal-actions modal-actions-right">
+              <button type="button" class="btn btn-secondary" onclick="closeTreatmentModal()">
+                Batal
+              </button>
+
+              <button type="submit" class="btn btn-primary" id="treatmentSubmitBtn">
+                Simpan
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+
+    <div id="toastContainer" class="toast-container"></div>
+
+    <?!= include('dashboard'); ?>
+    <?!= include('patients'); ?>
+    <?!= include('appointments'); ?>
+    <?!= include('recall'); ?>
+    <?!= include('finance'); ?>
+    <?!= include('scripts'); ?>
+  </body>
+</html>
