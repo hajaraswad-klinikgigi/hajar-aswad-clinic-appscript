@@ -132,7 +132,7 @@ function repoIsSupabaseBackendMode_(backendMode) {
  * - Mutasi/write tetap tidak boleh diarahkan ke Supabase.
  * - Jangan jadikan true permanen.
  */
-const REPO_UI_READ_SUPABASE_TEST_ENABLED = true;
+const REPO_UI_READ_SUPABASE_TEST_ENABLED = false;
 
 function repoIsUiReadSupabaseTestEnabled_() {
   return REPO_UI_READ_SUPABASE_TEST_ENABLED === true;
