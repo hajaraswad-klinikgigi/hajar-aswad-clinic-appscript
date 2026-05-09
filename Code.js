@@ -296,7 +296,27 @@ function getCachedJson(key) {
 }
 
 function putCachedJson(key, value, seconds) {
-  getAppCache().put(key, JSON.stringify(value), seconds || 30);
+  try {
+    var text = JSON.stringify(value);
+
+    // Guard konservatif agar tidak mendekati limit CacheService.
+    // Jika payload terlalu besar, cache dilewati tapi aplikasi tetap jalan.
+    if (text.length > 80000) {
+      console.warn('Cache skipped because value is too large:', key, text.length);
+      return false;
+    }
+
+    getAppCache().put(key, text, seconds || 30);
+    return true;
+
+  } catch (err) {
+    console.warn(
+      'Cache skipped because putCachedJson failed:',
+      key,
+      err && err.message ? err.message : err
+    );
+    return false;
+  }
 }
 
 function generateFeedbackApiKeyManual() {
