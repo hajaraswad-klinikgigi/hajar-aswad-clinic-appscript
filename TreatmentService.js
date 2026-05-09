@@ -746,6 +746,87 @@ function getTreatmentInitData(appointmentId, options) {
   };
 }
 
+function normalizeTreatmentUiText_(value) {
+  if (value === null || value === undefined) return '';
+
+  if (Object.prototype.toString.call(value) === '[object Date]') {
+    return Utilities.formatDate(
+      value,
+      Session.getScriptTimeZone(),
+      'yyyy-MM-dd HH:mm:ss'
+    );
+  }
+
+  return String(value);
+}
+
+function normalizeTreatmentUiNumber_(value) {
+  const num = Number(value || 0);
+  return isNaN(num) ? 0 : num;
+}
+
+function normalizeTreatmentUiBoolean_(value) {
+  if (value === true) return true;
+  const text = String(value || '').trim().toLowerCase();
+  return text === 'true' || text === '1' || text === 'yes' || text === 'ya';
+}
+
+function getTreatmentInitDataForUi(appointmentId) {
+  try {
+    const res = getTreatmentInitData(appointmentId);
+
+    if (!res || !res.success) {
+      return {
+        success: false,
+        message: (res && res.message) || 'Gagal memuat data treatment'
+      };
+    }
+
+    const payload = res.data || {};
+    const appointment = payload.appointment || {};
+    const doctors = Array.isArray(payload.doctors) ? payload.doctors : [];
+    const services = Array.isArray(payload.services) ? payload.services : [];
+
+    return {
+      success: true,
+      data: {
+        appointment: {
+          appointment_id: normalizeTreatmentUiText_(appointment.appointment_id),
+          patient_id: normalizeTreatmentUiText_(appointment.patient_id),
+          patient_name: normalizeTreatmentUiText_(appointment.patient_name),
+          appointment_date: normalizeTreatmentUiText_(appointment.appointment_date),
+          appointment_time: normalizeTreatmentUiText_(appointment.appointment_time),
+          complaint: normalizeTreatmentUiText_(appointment.complaint),
+          status: normalizeTreatmentUiText_(appointment.status)
+        },
+        doctors: doctors.map(function(row) {
+          return {
+            user_id: normalizeTreatmentUiText_(row.user_id),
+            username: normalizeTreatmentUiText_(row.username),
+            full_name: normalizeTreatmentUiText_(row.full_name)
+          };
+        }),
+        services: services.map(function(row) {
+          return {
+            service_id: normalizeTreatmentUiText_(row.service_id),
+            service_name: normalizeTreatmentUiText_(row.service_name),
+            default_price: normalizeTreatmentUiNumber_(row.default_price),
+            is_ortho_install: normalizeTreatmentUiBoolean_(row.is_ortho_install),
+            is_ortho_control: normalizeTreatmentUiBoolean_(row.is_ortho_control)
+          };
+        })
+      }
+    };
+
+  } catch (err) {
+    return {
+      success: false,
+      message: 'Terjadi kesalahan saat memuat data treatment untuk UI',
+      error: err && err.message ? err.message : String(err)
+    };
+  }
+}
+
 function getTreatmentInitDataPreview(options) {
   const opts = getTreatmentServiceUiReadOptions_(options);
   const doctorsRes = getActiveDoctors(opts);
@@ -1420,4 +1501,204 @@ function testTreatmentServicePhase6GUiReadLog() {
     Logger.log(JSON.stringify(errorResult, null, 2));
     return errorResult;
   }
+}
+
+//sementara
+function testDebugTreatmentWiwikAppointmentLog() {
+  const result = {
+    success: true,
+    checked_at: typeof nowIso === 'function' ? nowIso() : new Date().toISOString(),
+    issue_count: 0,
+    issues: [],
+    matched_appointments: [],
+    selected: null,
+    treatment_init_result: null,
+    treatment_by_appointment_result: null
+  };
+
+  try {
+    const appointments = getAppointments();
+
+    const matches = (appointments || []).filter(function(row) {
+      const patientName = String(row.patient_name || '').trim().toLowerCase();
+      const dateText = String(row.appointment_date || row.date || '').trim();
+
+      return patientName.indexOf('wiwik') !== -1 &&
+        (
+          dateText.indexOf('2026-05-09') !== -1 ||
+          dateText.indexOf('09-05-2026') !== -1 ||
+          dateText.indexOf('09/05/2026') !== -1
+        );
+    });
+
+    result.matched_appointments = matches.map(function(row) {
+      return {
+        appointment_id: row.appointment_id,
+        patient_id: row.patient_id,
+        patient_name: row.patient_name,
+        appointment_date: row.appointment_date || row.date,
+        appointment_time: row.appointment_time || row.time,
+        status: row.status,
+        updated_at: row.updated_at
+      };
+    });
+
+    if (!matches.length) {
+      result.success = false;
+      result.issues.push({
+        issue: 'WIWIK_APPOINTMENT_NOT_FOUND',
+        message: 'Appointment Wiwik tanggal 2026-05-09 tidak ditemukan dari getAppointments()'
+      });
+      result.issue_count = result.issues.length;
+      Logger.log(JSON.stringify(result, null, 2));
+      return result;
+    }
+
+    const selected = matches[0];
+    const appointmentId = String(selected.appointment_id || '').trim();
+
+    result.selected = {
+      appointment_id: appointmentId,
+      patient_id: selected.patient_id,
+      patient_name: selected.patient_name,
+      appointment_date: selected.appointment_date || selected.date,
+      appointment_time: selected.appointment_time || selected.time,
+      status: selected.status,
+      updated_at: selected.updated_at
+    };
+
+    result.treatment_init_result = getTreatmentInitData(appointmentId);
+    result.treatment_by_appointment_result = getTreatmentByAppointmentId(appointmentId);
+
+    result.issue_count = result.issues.length;
+    result.success = result.issue_count === 0;
+
+    Logger.log(JSON.stringify(result, null, 2));
+    return result;
+
+  } catch (err) {
+    result.success = false;
+    result.issues.push({
+      issue: 'DEBUG_TEST_EXCEPTION',
+      message: err && err.message ? err.message : String(err)
+    });
+    result.issue_count = result.issues.length;
+
+    Logger.log(JSON.stringify(result, null, 2));
+    return result;
+  }
+}
+
+function testDebugTreatmentWiwikAppointmentSummaryLog() {
+  const appointmentId = 'APT-20260509-132441428-476';
+
+  const result = {
+    success: true,
+    checked_at: typeof nowIso === 'function' ? nowIso() : new Date().toISOString(),
+    appointment_id: appointmentId,
+    appointment: null,
+    treatment_init: null,
+    treatment_by_appointment: null,
+    raw_treatment_match: null
+  };
+
+  try {
+    const appointmentRes = getAppointmentById(appointmentId);
+    result.appointment = {
+      success: !!(appointmentRes && appointmentRes.success),
+      message: appointmentRes && appointmentRes.message ? appointmentRes.message : '',
+      data: appointmentRes && appointmentRes.data ? {
+        appointment_id: appointmentRes.data.appointment_id,
+        patient_id: appointmentRes.data.patient_id,
+        patient_name: appointmentRes.data.patient_name,
+        appointment_date: appointmentRes.data.appointment_date,
+        appointment_time: appointmentRes.data.appointment_time,
+        complaint: appointmentRes.data.complaint,
+        status: appointmentRes.data.status,
+        updated_at: appointmentRes.data.updated_at
+      } : null
+    };
+
+    const initRes = getTreatmentInitData(appointmentId);
+    result.treatment_init = {
+      success: !!(initRes && initRes.success),
+      message: initRes && initRes.message ? initRes.message : '',
+      appointment_status: initRes && initRes.data && initRes.data.appointment
+        ? initRes.data.appointment.status
+        : '',
+      doctor_count: initRes && initRes.data && Array.isArray(initRes.data.doctors)
+        ? initRes.data.doctors.length
+        : 0,
+      service_count: initRes && initRes.data && Array.isArray(initRes.data.services)
+        ? initRes.data.services.length
+        : 0
+    };
+
+    const treatmentRes = getTreatmentByAppointmentId(appointmentId);
+    result.treatment_by_appointment = {
+      success: !!(treatmentRes && treatmentRes.success),
+      message: treatmentRes && treatmentRes.message ? treatmentRes.message : '',
+      treatment_id: treatmentRes && treatmentRes.data && treatmentRes.data.treatment
+        ? treatmentRes.data.treatment.treatment_id
+        : '',
+      item_count: treatmentRes && treatmentRes.data && Array.isArray(treatmentRes.data.items)
+        ? treatmentRes.data.items.length
+        : 0
+    };
+
+    const treatments = getTreatmentsRaw({ backend_mode: 'spreadsheet' }) || [];
+    const rawMatch = treatments.find(function(row) {
+      return String(row.appointment_id || '').trim() === appointmentId;
+    }) || null;
+
+    result.raw_treatment_match = rawMatch ? {
+      treatment_id: rawMatch.treatment_id,
+      appointment_id: rawMatch.appointment_id,
+      patient_id: rawMatch.patient_id,
+      patient_name: rawMatch.patient_name,
+      treatment_date: rawMatch.treatment_date,
+      total_cost: rawMatch.total_cost,
+      created_at: rawMatch.created_at,
+      updated_at: rawMatch.updated_at
+    } : null;
+
+    Logger.log(JSON.stringify(result, null, 2));
+    return result;
+
+  } catch (err) {
+    result.success = false;
+    result.error = err && err.message ? err.message : String(err);
+    Logger.log(JSON.stringify(result, null, 2));
+    return result;
+  }
+}
+
+function testTreatmentInitDataForUiWiwikLog() {
+  const appointmentId = 'APT-20260509-132441428-476';
+  const res = getTreatmentInitDataForUi(appointmentId);
+
+  const result = {
+    success: !!(res && res.success),
+    checked_at: typeof nowIso === 'function' ? nowIso() : new Date().toISOString(),
+    appointment_id: appointmentId,
+    message: res && res.message ? res.message : '',
+    appointment_status: res && res.data && res.data.appointment
+      ? res.data.appointment.status
+      : '',
+    doctor_count: res && res.data && Array.isArray(res.data.doctors)
+      ? res.data.doctors.length
+      : 0,
+    service_count: res && res.data && Array.isArray(res.data.services)
+      ? res.data.services.length
+      : 0,
+    first_doctor: res && res.data && res.data.doctors && res.data.doctors.length
+      ? res.data.doctors[0]
+      : null,
+    first_service: res && res.data && res.data.services && res.data.services.length
+      ? res.data.services[0]
+      : null
+  };
+
+  Logger.log(JSON.stringify(result, null, 2));
+  return result;
 }
