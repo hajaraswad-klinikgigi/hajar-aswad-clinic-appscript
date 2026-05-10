@@ -787,6 +787,20 @@ function generateBillingInvoicePdfUnlocked_(billingId, options) {
 
 function generateBillingInvoicePdf(payload) {
   try {
+    const freezeCheck = repoCheckProductionMutationAllowed_({
+      operation: 'GENERATE_BILLING_INVOICE_PDF',
+      module: 'FinanceInvoiceService',
+      action: 'generateBillingInvoicePdf',
+      __test_freeze_enabled: payload && payload.__test_freeze_enabled === true
+    });
+
+    if (!freezeCheck.allowed) {
+      return {
+        success: false,
+        message: freezeCheck.message
+      };
+    }
+
     const permission = requireFinancePermission_(
       payload,
       'generate_billing_invoice_pdf'
@@ -1080,6 +1094,20 @@ function ensureFreshBillingInvoicePdfForEmail_(billingId, options) {
 
 function sendBillingInvoiceEmail(payload) {
   try {
+    const freezeCheck = repoCheckProductionMutationAllowed_({
+      operation: 'SEND_BILLING_INVOICE_EMAIL',
+      module: 'FinanceInvoiceService',
+      action: 'sendBillingInvoiceEmail',
+      __test_freeze_enabled: payload && payload.__test_freeze_enabled === true
+    });
+
+    if (!freezeCheck.allowed) {
+      return {
+        success: false,
+        message: freezeCheck.message
+      };
+    }
+
     const permission = requireFinancePermission_(
       payload,
       'send_billing_invoice_email'
@@ -1591,4 +1619,251 @@ function getBillingInvoiceDeliveryInfo(payload) {
     success: true,
     data: Object.assign({}, deliveryInfo, freshnessInfo)
   };
+}
+
+function testCutoverPhase8BFinanceInvoiceFreezeGuardLog() {
+  const result = {
+    success: true,
+    stage: '8B-8-FinanceInvoiceService-FreezeGuard',
+    checked_at: typeof nowIso === 'function' ? nowIso() : new Date().toISOString(),
+    flags: {
+      default_backend_mode: typeof dbGetBackendMode_ === 'function' ? dbGetBackendMode_() : '',
+      ui_read_backend_mode: typeof repoGetUiReadBackendMode_ === 'function'
+        ? repoGetUiReadBackendMode_()
+        : '',
+      ui_read_supabase_test_enabled: typeof repoIsUiReadSupabaseTestEnabled_ === 'function'
+        ? repoIsUiReadSupabaseTestEnabled_()
+        : null,
+      supabase_staging_write_test_enabled: typeof repoIsSupabaseStagingWriteTestEnabled_ === 'function'
+        ? repoIsSupabaseStagingWriteTestEnabled_()
+        : null,
+      production_mutation_freeze_enabled: typeof repoIsProductionMutationFreezeEnabled_ === 'function'
+        ? repoIsProductionMutationFreezeEnabled_()
+        : null
+    },
+    before_counts: {},
+    after_counts: {},
+    before_invoice_summary: {},
+    after_invoice_summary: {},
+    checks: {
+      default_off_generate_normal_flow_reached: false,
+      default_off_send_normal_flow_reached: false,
+      simulated_freeze_generate_blocked: false,
+      simulated_freeze_send_blocked: false,
+      counts_unchanged: false,
+      invoice_summary_unchanged: false
+    },
+    messages: {},
+    issue_count: 0,
+    issues: []
+  };
+
+  function addIssue(issue, details) {
+    result.issues.push(Object.assign({
+      issue: issue
+    }, details || {}));
+  }
+
+  function getCounts_() {
+    return {
+      billings: getBillingsRaw().length,
+      billing_feedbacks: getBillingFeedbacksRaw().length
+    };
+  }
+
+  function getInvoiceSummary_() {
+    const billings = getBillingsRaw();
+
+    return {
+      invoice_pdf_file_id_count: billings.filter(function(row) {
+        return String(row.invoice_pdf_file_id || '').trim();
+      }).length,
+      invoice_pdf_url_count: billings.filter(function(row) {
+        return String(row.invoice_pdf_url || '').trim();
+      }).length,
+      invoice_sent_to_count: billings.filter(function(row) {
+        return String(row.invoice_sent_to || '').trim();
+      }).length,
+      invoice_sent_at_count: billings.filter(function(row) {
+        return String(row.invoice_sent_at || '').trim();
+      }).length,
+      invoice_signature_count: billings.filter(function(row) {
+        return String(row.invoice_pdf_signature || '').trim();
+      }).length,
+      invoice_delivery_sent_count: billings.filter(function(row) {
+        return String(row.invoice_delivery_status || '').trim().toLowerCase() === 'sent';
+      }).length,
+      invoice_delivery_generated_count: billings.filter(function(row) {
+        return String(row.invoice_delivery_status || '').trim().toLowerCase() === 'generated';
+      }).length,
+      invoice_delivery_stale_count: billings.filter(function(row) {
+        return String(row.invoice_delivery_status || '').trim().toLowerCase() === 'stale';
+      }).length
+    };
+  }
+
+  function isFreezeMessage_(res) {
+    return !!(
+      res &&
+      res.success === false &&
+      String(res.message || '').indexOf('Sistem sedang dalam proses migrasi database') !== -1
+    );
+  }
+
+  function isNormalPermissionOrValidationMessage_(res) {
+    const msg = String((res && res.message) || '');
+
+    return !!(
+      res &&
+      res.success === false &&
+      (
+        msg === 'Billing ID tidak ditemukan' ||
+        msg === 'Data billing tidak ditemukan' ||
+        msg === 'Sesi login tidak ditemukan. Silakan login ulang.' ||
+        msg.indexOf('Sesi login') !== -1 ||
+        msg.indexOf('Akses ditolak') !== -1 ||
+        msg.indexOf('Tidak memiliki akses') !== -1 ||
+        msg.indexOf('Terjadi kesalahan') !== -1
+      )
+    );
+  }
+
+  try {
+    result.before_counts = getCounts_();
+    result.before_invoice_summary = getInvoiceSummary_();
+
+    if (
+      result.flags.default_backend_mode !== 'spreadsheet' ||
+      result.flags.ui_read_backend_mode !== 'spreadsheet' ||
+      result.flags.ui_read_supabase_test_enabled !== false ||
+      result.flags.supabase_staging_write_test_enabled !== false ||
+      result.flags.production_mutation_freeze_enabled !== false
+    ) {
+      addIssue('FLAGS_NOT_SAFE_DEFAULT_OFF', result.flags);
+    }
+
+    const defaultOffGenerate = generateBillingInvoicePdf({
+      billing_id: '',
+      actor_role: 'owner',
+      actor_user_id: 'USR-OWNER'
+    });
+
+    result.messages.default_off_generate = defaultOffGenerate && defaultOffGenerate.message
+      ? defaultOffGenerate.message
+      : '';
+
+    result.checks.default_off_generate_normal_flow_reached = isNormalPermissionOrValidationMessage_(defaultOffGenerate);
+
+    if (!result.checks.default_off_generate_normal_flow_reached) {
+      addIssue('DEFAULT_OFF_GENERATE_DID_NOT_REACH_NORMAL_FLOW', {
+        response: defaultOffGenerate
+      });
+    }
+
+    const defaultOffSend = sendBillingInvoiceEmail({
+      billing_id: '',
+      email_to: '',
+      actor_role: 'owner',
+      actor_user_id: 'USR-OWNER'
+    });
+
+    result.messages.default_off_send = defaultOffSend && defaultOffSend.message
+      ? defaultOffSend.message
+      : '';
+
+    result.checks.default_off_send_normal_flow_reached = isNormalPermissionOrValidationMessage_(defaultOffSend);
+
+    if (!result.checks.default_off_send_normal_flow_reached) {
+      addIssue('DEFAULT_OFF_SEND_DID_NOT_REACH_NORMAL_FLOW', {
+        response: defaultOffSend
+      });
+    }
+
+    const simulatedFreezeGenerate = generateBillingInvoicePdf({
+      __test_freeze_enabled: true,
+      billing_id: 'BIL-20260505-140855694-907',
+      actor_role: 'owner',
+      actor_user_id: 'USR-OWNER'
+    });
+
+    result.messages.simulated_freeze_generate = simulatedFreezeGenerate && simulatedFreezeGenerate.message
+      ? simulatedFreezeGenerate.message
+      : '';
+
+    result.checks.simulated_freeze_generate_blocked = isFreezeMessage_(simulatedFreezeGenerate);
+
+    if (!result.checks.simulated_freeze_generate_blocked) {
+      addIssue('SIMULATED_FREEZE_GENERATE_NOT_BLOCKED', {
+        response: simulatedFreezeGenerate
+      });
+    }
+
+    const simulatedFreezeSend = sendBillingInvoiceEmail({
+      __test_freeze_enabled: true,
+      billing_id: 'BIL-20260505-140855694-907',
+      email_to: 'test@example.com',
+      actor_role: 'owner',
+      actor_user_id: 'USR-OWNER'
+    });
+
+    result.messages.simulated_freeze_send = simulatedFreezeSend && simulatedFreezeSend.message
+      ? simulatedFreezeSend.message
+      : '';
+
+    result.checks.simulated_freeze_send_blocked = isFreezeMessage_(simulatedFreezeSend);
+
+    if (!result.checks.simulated_freeze_send_blocked) {
+      addIssue('SIMULATED_FREEZE_SEND_NOT_BLOCKED', {
+        response: simulatedFreezeSend
+      });
+    }
+
+    result.after_counts = getCounts_();
+    result.after_invoice_summary = getInvoiceSummary_();
+
+    result.checks.counts_unchanged =
+      result.after_counts.billings === result.before_counts.billings &&
+      result.after_counts.billing_feedbacks === result.before_counts.billing_feedbacks;
+
+    if (!result.checks.counts_unchanged) {
+      addIssue('FINANCE_INVOICE_COUNTS_CHANGED_DURING_FREEZE_GUARD_TEST', {
+        before: result.before_counts,
+        after: result.after_counts
+      });
+    }
+
+    result.checks.invoice_summary_unchanged =
+      JSON.stringify(result.after_invoice_summary) === JSON.stringify(result.before_invoice_summary);
+
+    if (!result.checks.invoice_summary_unchanged) {
+      addIssue('FINANCE_INVOICE_FIELDS_CHANGED_DURING_FREEZE_GUARD_TEST', {
+        before: result.before_invoice_summary,
+        after: result.after_invoice_summary
+      });
+    }
+
+    result.issue_count = result.issues.length;
+    result.success = result.issue_count === 0;
+
+    Logger.log(JSON.stringify(result));
+    return result;
+
+  } catch (err) {
+    const errorResult = {
+      success: false,
+      stage: '8B-8-FinanceInvoiceService-FreezeGuard',
+      checked_at: typeof nowIso === 'function' ? nowIso() : new Date().toISOString(),
+      message: err && err.message ? err.message : String(err || 'Unknown error'),
+      issue_count: 1,
+      issues: [
+        {
+          issue: 'FINANCE_INVOICE_FREEZE_GUARD_TEST_ERROR',
+          message: err && err.message ? err.message : String(err || 'Unknown error')
+        }
+      ]
+    };
+
+    Logger.log(JSON.stringify(errorResult));
+    return errorResult;
+  }
 }

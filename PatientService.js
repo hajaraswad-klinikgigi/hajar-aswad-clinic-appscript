@@ -833,6 +833,20 @@ function validatePatientData(data, excludePatientId) {
 }
 
 function createPatient(data) {
+  const freezeCheck = repoCheckProductionMutationAllowed_({
+    operation: 'CREATE_PATIENT',
+    module: 'PatientService',
+    action: 'createPatient',
+    __test_freeze_enabled: data && data.__test_freeze_enabled === true
+  });
+
+  if (!freezeCheck.allowed) {
+    return {
+      success: false,
+      message: freezeCheck.message
+    };
+  }
+
   const lock = LockService.getScriptLock();
 
   try {
@@ -928,6 +942,20 @@ function createPatient(data) {
 }
 
 function updatePatient(data) {
+  const freezeCheck = repoCheckProductionMutationAllowed_({
+    operation: 'UPDATE_PATIENT',
+    module: 'PatientService',
+    action: 'updatePatient',
+    __test_freeze_enabled: data && data.__test_freeze_enabled === true
+  });
+
+  if (!freezeCheck.allowed) {
+    return {
+      success: false,
+      message: freezeCheck.message
+    };
+  }
+  
   const lock = LockService.getScriptLock();
 
   try {
@@ -1598,6 +1626,210 @@ function testPatientServicePhase6GUiReadLog() {
     };
 
     Logger.log(JSON.stringify(errorResult, null, 2));
+    return errorResult;
+  }
+}
+
+function testCutoverPhase8BPatientFreezeGuardLog() {
+  const result = {
+    success: true,
+    stage: '8B-3-PatientService-FreezeGuard',
+    checked_at: typeof nowIso === 'function' ? nowIso() : new Date().toISOString(),
+    flags: {
+      default_backend_mode: typeof dbGetBackendMode_ === 'function' ? dbGetBackendMode_() : '',
+      ui_read_backend_mode: typeof repoGetUiReadBackendMode_ === 'function'
+        ? repoGetUiReadBackendMode_()
+        : '',
+      ui_read_supabase_test_enabled: typeof repoIsUiReadSupabaseTestEnabled_ === 'function'
+        ? repoIsUiReadSupabaseTestEnabled_()
+        : null,
+      supabase_staging_write_test_enabled: typeof repoIsSupabaseStagingWriteTestEnabled_ === 'function'
+        ? repoIsSupabaseStagingWriteTestEnabled_()
+        : null,
+      production_mutation_freeze_enabled: typeof repoIsProductionMutationFreezeEnabled_ === 'function'
+        ? repoIsProductionMutationFreezeEnabled_()
+        : null
+    },
+    before_counts: {},
+    after_counts: {},
+    checks: {
+      default_off_create_validation_reached: false,
+      default_off_update_validation_reached: false,
+      simulated_freeze_create_blocked: false,
+      simulated_freeze_update_blocked: false,
+      counts_unchanged: false
+    },
+    messages: {},
+    issue_count: 0,
+    issues: []
+  };
+
+  function addIssue(issue, details) {
+    result.issues.push(Object.assign({
+      issue: issue
+    }, details || {}));
+  }
+
+  function getPatientCount_() {
+    return getPatientsRaw({
+      backend_mode: 'spreadsheet'
+    }).length;
+  }
+
+  try {
+    result.before_counts.patients = getPatientCount_();
+
+    if (
+      result.flags.default_backend_mode !== 'spreadsheet' ||
+      result.flags.ui_read_backend_mode !== 'spreadsheet' ||
+      result.flags.ui_read_supabase_test_enabled !== false ||
+      result.flags.supabase_staging_write_test_enabled !== false ||
+      result.flags.production_mutation_freeze_enabled !== false
+    ) {
+      addIssue('FLAGS_NOT_SAFE_DEFAULT_OFF', result.flags);
+    }
+
+    const defaultOffCreate = createPatient({
+      full_name: '',
+      gender: '',
+      birth_date: '',
+      phone: '',
+      email: '',
+      address: ''
+    });
+
+    result.messages.default_off_create = defaultOffCreate && defaultOffCreate.message
+      ? defaultOffCreate.message
+      : '';
+
+    result.checks.default_off_create_validation_reached = !!(
+      defaultOffCreate &&
+      defaultOffCreate.success === false &&
+      defaultOffCreate.message === 'Validasi gagal'
+    );
+
+    if (!result.checks.default_off_create_validation_reached) {
+      addIssue('DEFAULT_OFF_CREATE_DID_NOT_REACH_VALIDATION', {
+        response: defaultOffCreate
+      });
+    }
+
+    const defaultOffUpdate = updatePatient({
+      patient_id: '',
+      full_name: '',
+      gender: '',
+      birth_date: '',
+      phone: '',
+      email: '',
+      address: ''
+    });
+
+    result.messages.default_off_update = defaultOffUpdate && defaultOffUpdate.message
+      ? defaultOffUpdate.message
+      : '';
+
+    result.checks.default_off_update_validation_reached = !!(
+      defaultOffUpdate &&
+      defaultOffUpdate.success === false &&
+      (
+        defaultOffUpdate.message === 'Validasi gagal' ||
+        defaultOffUpdate.message === 'Patient ID tidak ditemukan' ||
+        defaultOffUpdate.message === 'Data pasien tidak ditemukan'
+      )
+    );
+
+    if (!result.checks.default_off_update_validation_reached) {
+      addIssue('DEFAULT_OFF_UPDATE_DID_NOT_REACH_NORMAL_FLOW', {
+        response: defaultOffUpdate
+      });
+    }
+
+    const simulatedFreezeCreate = createPatient({
+      __test_freeze_enabled: true,
+      full_name: '',
+      gender: '',
+      birth_date: '',
+      phone: '',
+      email: '',
+      address: ''
+    });
+
+    result.messages.simulated_freeze_create = simulatedFreezeCreate && simulatedFreezeCreate.message
+      ? simulatedFreezeCreate.message
+      : '';
+
+    result.checks.simulated_freeze_create_blocked = !!(
+      simulatedFreezeCreate &&
+      simulatedFreezeCreate.success === false &&
+      String(simulatedFreezeCreate.message || '').indexOf('Sistem sedang dalam proses migrasi database') !== -1
+    );
+
+    if (!result.checks.simulated_freeze_create_blocked) {
+      addIssue('SIMULATED_FREEZE_CREATE_NOT_BLOCKED', {
+        response: simulatedFreezeCreate
+      });
+    }
+
+    const simulatedFreezeUpdate = updatePatient({
+      __test_freeze_enabled: true,
+      patient_id: 'PAT-0001',
+      full_name: 'SHOULD NOT UPDATE',
+      gender: 'Laki-laki',
+      birth_date: '2000-01-01',
+      phone: '08123456789',
+      email: 'test@example.com',
+      address: 'SHOULD NOT UPDATE'
+    });
+
+    result.messages.simulated_freeze_update = simulatedFreezeUpdate && simulatedFreezeUpdate.message
+      ? simulatedFreezeUpdate.message
+      : '';
+
+    result.checks.simulated_freeze_update_blocked = !!(
+      simulatedFreezeUpdate &&
+      simulatedFreezeUpdate.success === false &&
+      String(simulatedFreezeUpdate.message || '').indexOf('Sistem sedang dalam proses migrasi database') !== -1
+    );
+
+    if (!result.checks.simulated_freeze_update_blocked) {
+      addIssue('SIMULATED_FREEZE_UPDATE_NOT_BLOCKED', {
+        response: simulatedFreezeUpdate
+      });
+    }
+
+    result.after_counts.patients = getPatientCount_();
+
+    result.checks.counts_unchanged = result.after_counts.patients === result.before_counts.patients;
+
+    if (!result.checks.counts_unchanged) {
+      addIssue('PATIENT_COUNT_CHANGED_DURING_FREEZE_GUARD_TEST', {
+        before: result.before_counts,
+        after: result.after_counts
+      });
+    }
+
+    result.issue_count = result.issues.length;
+    result.success = result.issue_count === 0;
+
+    Logger.log(JSON.stringify(result));
+    return result;
+
+  } catch (err) {
+    const errorResult = {
+      success: false,
+      stage: '8B-3-PatientService-FreezeGuard',
+      checked_at: typeof nowIso === 'function' ? nowIso() : new Date().toISOString(),
+      message: err && err.message ? err.message : String(err || 'Unknown error'),
+      issue_count: 1,
+      issues: [
+        {
+          issue: 'PATIENT_FREEZE_GUARD_TEST_ERROR',
+          message: err && err.message ? err.message : String(err || 'Unknown error')
+        }
+      ]
+    };
+
+    Logger.log(JSON.stringify(errorResult));
     return errorResult;
   }
 }

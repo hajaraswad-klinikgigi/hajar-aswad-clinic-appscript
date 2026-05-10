@@ -474,6 +474,20 @@ function syncOrthoRecallAfterTreatment(orthoMode, treatment, patient) {
 }
 
 function createTreatment(payload) {
+  const freezeCheck = repoCheckProductionMutationAllowed_({
+    operation: 'CREATE_TREATMENT',
+    module: 'TreatmentService',
+    action: 'createTreatment',
+    __test_freeze_enabled: payload && payload.__test_freeze_enabled === true
+  });
+
+  if (!freezeCheck.allowed) {
+    return {
+      success: false,
+      message: freezeCheck.message
+    };
+  }
+
   const lock = LockService.getScriptLock();
   const writeReadOptions = getTreatmentServiceSpreadsheetWriteReadOptions_();
 
@@ -1701,4 +1715,187 @@ function testTreatmentInitDataForUiWiwikLog() {
 
   Logger.log(JSON.stringify(result, null, 2));
   return result;
+}
+
+function testCutoverPhase8BTreatmentFreezeGuardLog() {
+  const result = {
+    success: true,
+    stage: '8B-5-TreatmentService-FreezeGuard',
+    checked_at: typeof nowIso === 'function' ? nowIso() : new Date().toISOString(),
+    flags: {
+      default_backend_mode: typeof dbGetBackendMode_ === 'function' ? dbGetBackendMode_() : '',
+      ui_read_backend_mode: typeof repoGetUiReadBackendMode_ === 'function'
+        ? repoGetUiReadBackendMode_()
+        : '',
+      ui_read_supabase_test_enabled: typeof repoIsUiReadSupabaseTestEnabled_ === 'function'
+        ? repoIsUiReadSupabaseTestEnabled_()
+        : null,
+      supabase_staging_write_test_enabled: typeof repoIsSupabaseStagingWriteTestEnabled_ === 'function'
+        ? repoIsSupabaseStagingWriteTestEnabled_()
+        : null,
+      production_mutation_freeze_enabled: typeof repoIsProductionMutationFreezeEnabled_ === 'function'
+        ? repoIsProductionMutationFreezeEnabled_()
+        : null
+    },
+    before_counts: {},
+    after_counts: {},
+    checks: {
+      default_off_validation_or_access_reached: false,
+      simulated_freeze_create_blocked: false,
+      counts_unchanged: false
+    },
+    messages: {},
+    issue_count: 0,
+    issues: []
+  };
+
+  function addIssue(issue, details) {
+    result.issues.push(Object.assign({
+      issue: issue
+    }, details || {}));
+  }
+
+  function getCounts_() {
+    return {
+      treatments: getTreatmentsRaw({
+        backend_mode: 'spreadsheet'
+      }).length,
+      treatment_items: getTreatmentItemsRaw({
+        backend_mode: 'spreadsheet'
+      }).length,
+      medical_records: getMedicalRecordsRaw({
+        backend_mode: 'spreadsheet'
+      }).length,
+      appointments: getAppointmentsRaw({
+        backend_mode: 'spreadsheet'
+      }).length
+    };
+  }
+
+  function isFreezeMessage_(res) {
+    return !!(
+      res &&
+      res.success === false &&
+      String(res.message || '').indexOf('Sistem sedang dalam proses migrasi database') !== -1
+    );
+  }
+
+  try {
+    result.before_counts = getCounts_();
+
+    if (
+      result.flags.default_backend_mode !== 'spreadsheet' ||
+      result.flags.ui_read_backend_mode !== 'spreadsheet' ||
+      result.flags.ui_read_supabase_test_enabled !== false ||
+      result.flags.supabase_staging_write_test_enabled !== false ||
+      result.flags.production_mutation_freeze_enabled !== false
+    ) {
+      addIssue('FLAGS_NOT_SAFE_DEFAULT_OFF', result.flags);
+    }
+
+    const defaultOffCreate = createTreatment({
+      actor_role: '',
+      appointment_id: '',
+      patient_id: '',
+      patient_name: '',
+      doctor_user_id: '',
+      doctor_name: '',
+      treatment_date: '',
+      chief_complaint: '',
+      diagnosis: '',
+      notes: '',
+      items: []
+    });
+
+    result.messages.default_off_create = defaultOffCreate && defaultOffCreate.message
+      ? defaultOffCreate.message
+      : '';
+
+    result.checks.default_off_validation_or_access_reached = !!(
+      defaultOffCreate &&
+      defaultOffCreate.success === false &&
+      (
+        defaultOffCreate.message === 'Hanya admin atau owner yang dapat menginput treatment' ||
+        defaultOffCreate.message === 'Validasi gagal' ||
+        defaultOffCreate.message === 'Appointment tidak ditemukan'
+      )
+    );
+
+    if (!result.checks.default_off_validation_or_access_reached) {
+      addIssue('DEFAULT_OFF_CREATE_DID_NOT_REACH_NORMAL_FLOW', {
+        response: defaultOffCreate
+      });
+    }
+
+    const simulatedFreezeCreate = createTreatment({
+      __test_freeze_enabled: true,
+      actor_role: 'owner',
+      appointment_id: 'APT-0001',
+      patient_id: 'PAT-0001',
+      patient_name: 'SHOULD NOT WRITE',
+      doctor_user_id: 'USR-DR01',
+      doctor_name: 'SHOULD NOT WRITE',
+      treatment_date: '2027-01-01',
+      chief_complaint: 'SHOULD NOT WRITE',
+      diagnosis: 'SHOULD NOT WRITE',
+      notes: 'SHOULD NOT WRITE',
+      items: [
+        {
+          service_id: 'SRV-001',
+          qty: 1
+        }
+      ]
+    });
+
+    result.messages.simulated_freeze_create = simulatedFreezeCreate && simulatedFreezeCreate.message
+      ? simulatedFreezeCreate.message
+      : '';
+
+    result.checks.simulated_freeze_create_blocked = isFreezeMessage_(simulatedFreezeCreate);
+
+    if (!result.checks.simulated_freeze_create_blocked) {
+      addIssue('SIMULATED_FREEZE_CREATE_TREATMENT_NOT_BLOCKED', {
+        response: simulatedFreezeCreate
+      });
+    }
+
+    result.after_counts = getCounts_();
+
+    result.checks.counts_unchanged =
+      result.after_counts.treatments === result.before_counts.treatments &&
+      result.after_counts.treatment_items === result.before_counts.treatment_items &&
+      result.after_counts.medical_records === result.before_counts.medical_records &&
+      result.after_counts.appointments === result.before_counts.appointments;
+
+    if (!result.checks.counts_unchanged) {
+      addIssue('COUNTS_CHANGED_DURING_TREATMENT_FREEZE_GUARD_TEST', {
+        before: result.before_counts,
+        after: result.after_counts
+      });
+    }
+
+    result.issue_count = result.issues.length;
+    result.success = result.issue_count === 0;
+
+    Logger.log(JSON.stringify(result));
+    return result;
+
+  } catch (err) {
+    const errorResult = {
+      success: false,
+      stage: '8B-5-TreatmentService-FreezeGuard',
+      checked_at: typeof nowIso === 'function' ? nowIso() : new Date().toISOString(),
+      message: err && err.message ? err.message : String(err || 'Unknown error'),
+      issue_count: 1,
+      issues: [
+        {
+          issue: 'TREATMENT_FREEZE_GUARD_TEST_ERROR',
+          message: err && err.message ? err.message : String(err || 'Unknown error')
+        }
+      ]
+    };
+
+    Logger.log(JSON.stringify(errorResult));
+    return errorResult;
+  }
 }

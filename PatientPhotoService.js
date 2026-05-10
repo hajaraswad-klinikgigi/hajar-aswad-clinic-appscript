@@ -235,6 +235,20 @@ function groupPatientPhotosByTreatment(patientId) {
 }
 
 function createPatientPhoto(data) {
+  const freezeCheck = repoCheckProductionMutationAllowed_({
+    operation: 'CREATE_PATIENT_PHOTO',
+    module: 'PatientPhotoService',
+    action: 'createPatientPhoto',
+    __test_freeze_enabled: data && data.__test_freeze_enabled === true
+  });
+
+  if (!freezeCheck.allowed) {
+    return {
+      success: false,
+      message: freezeCheck.message
+    };
+  }
+
   const lock = LockService.getScriptLock();
 
   try {
@@ -367,6 +381,20 @@ function rejectPhotoUploadAccess() {
 }
 
 function createPatientPhotoUpload(payload) {
+  const freezeCheck = repoCheckProductionMutationAllowed_({
+    operation: 'UPLOAD_PATIENT_PHOTO',
+    module: 'PatientPhotoService',
+    action: 'createPatientPhotoUpload',
+    __test_freeze_enabled: payload && payload.__test_freeze_enabled === true
+  });
+
+  if (!freezeCheck.allowed) {
+    return {
+      success: false,
+      message: freezeCheck.message
+    };
+  }
+
   const lock = LockService.getScriptLock();
 
   try {
@@ -541,6 +569,20 @@ function getPatientPhotoById(photoId) {
 }
 
 function deletePatientPhoto(payload) {
+  const freezeCheck = repoCheckProductionMutationAllowed_({
+    operation: 'DELETE_PATIENT_PHOTO',
+    module: 'PatientPhotoService',
+    action: 'deletePatientPhoto',
+    __test_freeze_enabled: payload && payload.__test_freeze_enabled === true
+  });
+
+  if (!freezeCheck.allowed) {
+    return {
+      success: false,
+      message: freezeCheck.message
+    };
+  }
+
   const lock = LockService.getScriptLock();
 
   try {
@@ -614,5 +656,261 @@ function deletePatientPhoto(payload) {
     };
   } finally {
     lock.releaseLock();
+  }
+}
+
+function testCutoverPhase8BPatientPhotoFreezeGuardLog() {
+  const result = {
+    success: true,
+    stage: '8B-11-PatientPhotoService-FreezeGuard',
+    checked_at: typeof nowIso === 'function' ? nowIso() : new Date().toISOString(),
+    flags: {
+      default_backend_mode: typeof dbGetBackendMode_ === 'function' ? dbGetBackendMode_() : '',
+      ui_read_backend_mode: typeof repoGetUiReadBackendMode_ === 'function'
+        ? repoGetUiReadBackendMode_()
+        : '',
+      ui_read_supabase_test_enabled: typeof repoIsUiReadSupabaseTestEnabled_ === 'function'
+        ? repoIsUiReadSupabaseTestEnabled_()
+        : null,
+      supabase_staging_write_test_enabled: typeof repoIsSupabaseStagingWriteTestEnabled_ === 'function'
+        ? repoIsSupabaseStagingWriteTestEnabled_()
+        : null,
+      production_mutation_freeze_enabled: typeof repoIsProductionMutationFreezeEnabled_ === 'function'
+        ? repoIsProductionMutationFreezeEnabled_()
+        : null
+    },
+    before_counts: {},
+    after_counts: {},
+    checks: {
+      default_off_create_photo_normal_flow_reached: false,
+      default_off_upload_photo_normal_flow_reached: false,
+      default_off_delete_photo_normal_flow_reached: false,
+      simulated_freeze_create_photo_blocked: false,
+      simulated_freeze_upload_photo_blocked: false,
+      simulated_freeze_delete_photo_blocked: false,
+      counts_unchanged: false
+    },
+    messages: {},
+    issue_count: 0,
+    issues: []
+  };
+
+  function addIssue(issue, details) {
+    result.issues.push(Object.assign({
+      issue: issue
+    }, details || {}));
+  }
+
+  function getCounts_() {
+    return {
+      patient_photos: getPatientPhotosRaw().length
+    };
+  }
+
+  function isFreezeMessage_(res) {
+    return !!(
+      res &&
+      res.success === false &&
+      String(res.message || '').indexOf('Sistem sedang dalam proses migrasi database') !== -1
+    );
+  }
+
+  function isNormalFlowMessage_(res) {
+    const msg = String((res && res.message) || '');
+
+    return !!(
+      res &&
+      res.success === false &&
+      (
+        msg === 'Validasi gagal' ||
+        msg === 'Hanya admin atau owner yang dapat upload foto pasien' ||
+        msg === 'Photo ID tidak ditemukan' ||
+        msg === 'Foto pasien tidak ditemukan' ||
+        msg === 'Data pasien tidak ditemukan' ||
+        msg === 'Treatment tidak ditemukan' ||
+        msg.indexOf('Validasi gagal') !== -1
+      )
+    );
+  }
+
+  try {
+    result.before_counts = getCounts_();
+
+    if (
+      result.flags.default_backend_mode !== 'spreadsheet' ||
+      result.flags.ui_read_backend_mode !== 'spreadsheet' ||
+      result.flags.ui_read_supabase_test_enabled !== false ||
+      result.flags.supabase_staging_write_test_enabled !== false ||
+      result.flags.production_mutation_freeze_enabled !== false
+    ) {
+      addIssue('FLAGS_NOT_SAFE_DEFAULT_OFF', result.flags);
+    }
+
+    const defaultOffCreatePhoto = createPatientPhoto({
+      patient_id: '',
+      treatment_id: '',
+      photo_type: '',
+      file_name: '',
+      file_url: '',
+      file_drive_id: '',
+      sort_order: 0
+    });
+
+    result.messages.default_off_create_photo = defaultOffCreatePhoto && defaultOffCreatePhoto.message
+      ? defaultOffCreatePhoto.message
+      : '';
+
+    result.checks.default_off_create_photo_normal_flow_reached =
+      isNormalFlowMessage_(defaultOffCreatePhoto);
+
+    if (!result.checks.default_off_create_photo_normal_flow_reached) {
+      addIssue('DEFAULT_OFF_CREATE_PHOTO_DID_NOT_REACH_NORMAL_FLOW', {
+        response: defaultOffCreatePhoto
+      });
+    }
+
+    const defaultOffUploadPhoto = createPatientPhotoUpload({
+      actor_role: '',
+      patient_id: '',
+      treatment_id: '',
+      photo_type: '',
+      file_name: '',
+      mime_type: '',
+      base64_data: ''
+    });
+
+    result.messages.default_off_upload_photo = defaultOffUploadPhoto && defaultOffUploadPhoto.message
+      ? defaultOffUploadPhoto.message
+      : '';
+
+    result.checks.default_off_upload_photo_normal_flow_reached =
+      isNormalFlowMessage_(defaultOffUploadPhoto);
+
+    if (!result.checks.default_off_upload_photo_normal_flow_reached) {
+      addIssue('DEFAULT_OFF_UPLOAD_PHOTO_DID_NOT_REACH_NORMAL_FLOW', {
+        response: defaultOffUploadPhoto
+      });
+    }
+
+    const defaultOffDeletePhoto = deletePatientPhoto({
+      actor_role: 'owner',
+      photo_id: ''
+    });
+
+    result.messages.default_off_delete_photo = defaultOffDeletePhoto && defaultOffDeletePhoto.message
+      ? defaultOffDeletePhoto.message
+      : '';
+
+    result.checks.default_off_delete_photo_normal_flow_reached =
+      isNormalFlowMessage_(defaultOffDeletePhoto);
+
+    if (!result.checks.default_off_delete_photo_normal_flow_reached) {
+      addIssue('DEFAULT_OFF_DELETE_PHOTO_DID_NOT_REACH_NORMAL_FLOW', {
+        response: defaultOffDeletePhoto
+      });
+    }
+
+    const simulatedFreezeCreatePhoto = createPatientPhoto({
+      __test_freeze_enabled: true,
+      patient_id: 'PAT-0001',
+      treatment_id: 'TRX-0001',
+      photo_type: 'before',
+      file_name: 'SHOULD_NOT_WRITE_8B.jpg',
+      file_url: 'https://example.com/should-not-write.jpg',
+      file_drive_id: 'FILE-SHOULD-NOT-WRITE-8B',
+      sort_order: 1
+    });
+
+    result.messages.simulated_freeze_create_photo = simulatedFreezeCreatePhoto && simulatedFreezeCreatePhoto.message
+      ? simulatedFreezeCreatePhoto.message
+      : '';
+
+    result.checks.simulated_freeze_create_photo_blocked =
+      isFreezeMessage_(simulatedFreezeCreatePhoto);
+
+    if (!result.checks.simulated_freeze_create_photo_blocked) {
+      addIssue('SIMULATED_FREEZE_CREATE_PHOTO_NOT_BLOCKED', {
+        response: simulatedFreezeCreatePhoto
+      });
+    }
+
+    const simulatedFreezeUploadPhoto = createPatientPhotoUpload({
+      __test_freeze_enabled: true,
+      actor_role: 'owner',
+      patient_id: 'PAT-0001',
+      treatment_id: 'TRX-0001',
+      photo_type: 'before',
+      file_name: 'SHOULD_NOT_WRITE_8B.jpg',
+      mime_type: 'image/jpeg',
+      base64_data: 'AAA='
+    });
+
+    result.messages.simulated_freeze_upload_photo = simulatedFreezeUploadPhoto && simulatedFreezeUploadPhoto.message
+      ? simulatedFreezeUploadPhoto.message
+      : '';
+
+    result.checks.simulated_freeze_upload_photo_blocked =
+      isFreezeMessage_(simulatedFreezeUploadPhoto);
+
+    if (!result.checks.simulated_freeze_upload_photo_blocked) {
+      addIssue('SIMULATED_FREEZE_UPLOAD_PHOTO_NOT_BLOCKED', {
+        response: simulatedFreezeUploadPhoto
+      });
+    }
+
+    const simulatedFreezeDeletePhoto = deletePatientPhoto({
+      __test_freeze_enabled: true,
+      actor_role: 'owner',
+      photo_id: 'PHT-0001'
+    });
+
+    result.messages.simulated_freeze_delete_photo = simulatedFreezeDeletePhoto && simulatedFreezeDeletePhoto.message
+      ? simulatedFreezeDeletePhoto.message
+      : '';
+
+    result.checks.simulated_freeze_delete_photo_blocked =
+      isFreezeMessage_(simulatedFreezeDeletePhoto);
+
+    if (!result.checks.simulated_freeze_delete_photo_blocked) {
+      addIssue('SIMULATED_FREEZE_DELETE_PHOTO_NOT_BLOCKED', {
+        response: simulatedFreezeDeletePhoto
+      });
+    }
+
+    result.after_counts = getCounts_();
+
+    result.checks.counts_unchanged =
+      result.after_counts.patient_photos === result.before_counts.patient_photos;
+
+    if (!result.checks.counts_unchanged) {
+      addIssue('PATIENT_PHOTO_COUNT_CHANGED_DURING_FREEZE_GUARD_TEST', {
+        before: result.before_counts,
+        after: result.after_counts
+      });
+    }
+
+    result.issue_count = result.issues.length;
+    result.success = result.issue_count === 0;
+
+    Logger.log(JSON.stringify(result));
+    return result;
+
+  } catch (err) {
+    const errorResult = {
+      success: false,
+      stage: '8B-11-PatientPhotoService-FreezeGuard',
+      checked_at: typeof nowIso === 'function' ? nowIso() : new Date().toISOString(),
+      message: err && err.message ? err.message : String(err || 'Unknown error'),
+      issue_count: 1,
+      issues: [
+        {
+          issue: 'PATIENT_PHOTO_FREEZE_GUARD_TEST_ERROR',
+          message: err && err.message ? err.message : String(err || 'Unknown error')
+        }
+      ]
+    };
+
+    Logger.log(JSON.stringify(errorResult));
+    return errorResult;
   }
 }

@@ -492,6 +492,20 @@ function buildBillingInstallmentPlanForPaymentResponse_(billing, recalculationRe
 }
 
 function recordBillingPayment(payload) {
+  const freezeCheck = repoCheckProductionMutationAllowed_({
+    operation: 'RECORD_BILLING_PAYMENT',
+    module: 'FinancePaymentService',
+    action: 'recordBillingPayment',
+    __test_freeze_enabled: payload && payload.__test_freeze_enabled === true
+  });
+
+  if (!freezeCheck.allowed) {
+    return {
+      success: false,
+      message: freezeCheck.message
+    };
+  }
+
   const lock = LockService.getScriptLock();
   let locked = false;
 
@@ -752,4 +766,271 @@ function createBillingPayment(payload) {
 
 function saveBillingPayment(payload) {
   return recordBillingPayment(payload);
+}
+
+function testCutoverPhase8BFinancePaymentFreezeGuardLog() {
+  const result = {
+    success: true,
+    stage: '8B-7-FinancePaymentService-FreezeGuard',
+    checked_at: typeof nowIso === 'function' ? nowIso() : new Date().toISOString(),
+    flags: {
+      default_backend_mode: typeof dbGetBackendMode_ === 'function' ? dbGetBackendMode_() : '',
+      ui_read_backend_mode: typeof repoGetUiReadBackendMode_ === 'function'
+        ? repoGetUiReadBackendMode_()
+        : '',
+      ui_read_supabase_test_enabled: typeof repoIsUiReadSupabaseTestEnabled_ === 'function'
+        ? repoIsUiReadSupabaseTestEnabled_()
+        : null,
+      supabase_staging_write_test_enabled: typeof repoIsSupabaseStagingWriteTestEnabled_ === 'function'
+        ? repoIsSupabaseStagingWriteTestEnabled_()
+        : null,
+      production_mutation_freeze_enabled: typeof repoIsProductionMutationFreezeEnabled_ === 'function'
+        ? repoIsProductionMutationFreezeEnabled_()
+        : null
+    },
+    before_counts: {},
+    after_counts: {},
+    before_totals: {},
+    after_totals: {},
+    checks: {
+      default_off_record_payment_normal_flow_reached: false,
+      simulated_freeze_record_payment_blocked: false,
+      simulated_freeze_create_payment_wrapper_blocked: false,
+      simulated_freeze_save_payment_wrapper_blocked: false,
+      counts_unchanged: false,
+      totals_unchanged: false
+    },
+    messages: {},
+    issue_count: 0,
+    issues: []
+  };
+
+  function addIssue(issue, details) {
+    result.issues.push(Object.assign({
+      issue: issue
+    }, details || {}));
+  }
+
+  function getCounts_() {
+    return {
+      billings: getBillingsRaw().length,
+      payments: getPaymentsRaw().length,
+      billing_installments: getBillingInstallmentsRaw().length
+    };
+  }
+
+  function toAmount_(value) {
+    if (typeof financeToAmount_ === 'function') return financeToAmount_(value);
+
+    const num = Number(value || 0);
+    return isFinite(num) ? num : 0;
+  }
+
+  function roundAmount_(value) {
+    if (typeof financeRoundAmount_ === 'function') return financeRoundAmount_(value);
+    return Math.round(Number(value || 0));
+  }
+
+  function sumAmount_(rows, fieldName) {
+    return roundAmount_((rows || []).reduce(function(sum, row) {
+      return sum + toAmount_(row && row[fieldName]);
+    }, 0));
+  }
+
+  function getTotals_() {
+    const billings = getBillingsRaw();
+    const payments = getPaymentsRaw();
+    const installments = getBillingInstallmentsRaw();
+
+    return {
+      billings_paid_total: sumAmount_(billings, 'paid_total'),
+      billings_outstanding_total: sumAmount_(billings, 'outstanding_total'),
+      payments_amount: sumAmount_(payments, 'amount'),
+      billing_installments_paid_amount: sumAmount_(installments, 'paid_amount')
+    };
+  }
+
+  function isFreezeMessage_(res) {
+    return !!(
+      res &&
+      res.success === false &&
+      String(res.message || '').indexOf('Sistem sedang dalam proses migrasi database') !== -1
+    );
+  }
+
+  try {
+    result.before_counts = getCounts_();
+    result.before_totals = getTotals_();
+
+    if (
+      result.flags.default_backend_mode !== 'spreadsheet' ||
+      result.flags.ui_read_backend_mode !== 'spreadsheet' ||
+      result.flags.ui_read_supabase_test_enabled !== false ||
+      result.flags.supabase_staging_write_test_enabled !== false ||
+      result.flags.production_mutation_freeze_enabled !== false
+    ) {
+      addIssue('FLAGS_NOT_SAFE_DEFAULT_OFF', result.flags);
+    }
+
+    const defaultOffRecord = recordBillingPayment({
+      billing_id: '',
+      payment_scope: '',
+      installment_id: '',
+      payment_date: '',
+      payment_method: '',
+      amount: 0,
+      reference_no: '',
+      notes: '',
+      actor_role: 'owner',
+      actor_user_id: 'USR-OWNER'
+    });
+
+    result.messages.default_off_record_payment = defaultOffRecord && defaultOffRecord.message
+      ? defaultOffRecord.message
+      : '';
+
+    result.checks.default_off_record_payment_normal_flow_reached = !!(
+      defaultOffRecord &&
+      defaultOffRecord.success === false &&
+      (
+        defaultOffRecord.message === 'Validasi gagal' ||
+        defaultOffRecord.message === 'Billing ID tidak ditemukan' ||
+        defaultOffRecord.message === 'Data billing tidak ditemukan' ||
+        defaultOffRecord.message === 'Sesi login tidak ditemukan. Silakan login ulang.' ||
+        String(defaultOffRecord.message || '').indexOf('Akses ditolak') !== -1 ||
+        String(defaultOffRecord.message || '').indexOf('Tidak memiliki akses') !== -1 ||
+        String(defaultOffRecord.message || '').indexOf('Sesi login') !== -1
+      )
+    );
+
+    if (!result.checks.default_off_record_payment_normal_flow_reached) {
+      addIssue('DEFAULT_OFF_RECORD_PAYMENT_DID_NOT_REACH_NORMAL_FLOW', {
+        response: defaultOffRecord
+      });
+    }
+
+    const simulatedFreezeRecord = recordBillingPayment({
+      __test_freeze_enabled: true,
+      billing_id: 'BIL-20260505-140855694-907',
+      payment_scope: 'full',
+      installment_id: '',
+      payment_date: '2027-01-01',
+      payment_method: 'cash',
+      amount: 1000,
+      reference_no: 'SHOULD-NOT-WRITE-8B',
+      notes: 'SHOULD NOT WRITE 8B',
+      actor_role: 'owner',
+      actor_user_id: 'USR-OWNER'
+    });
+
+    result.messages.simulated_freeze_record_payment = simulatedFreezeRecord && simulatedFreezeRecord.message
+      ? simulatedFreezeRecord.message
+      : '';
+
+    result.checks.simulated_freeze_record_payment_blocked = isFreezeMessage_(simulatedFreezeRecord);
+
+    if (!result.checks.simulated_freeze_record_payment_blocked) {
+      addIssue('SIMULATED_FREEZE_RECORD_PAYMENT_NOT_BLOCKED', {
+        response: simulatedFreezeRecord
+      });
+    }
+
+    const simulatedFreezeCreateWrapper = createBillingPayment({
+      __test_freeze_enabled: true,
+      billing_id: 'BIL-20260505-140855694-907',
+      payment_scope: 'full',
+      payment_date: '2027-01-01',
+      payment_method: 'cash',
+      amount: 1000,
+      actor_role: 'owner',
+      actor_user_id: 'USR-OWNER'
+    });
+
+    result.messages.simulated_freeze_create_payment_wrapper = simulatedFreezeCreateWrapper && simulatedFreezeCreateWrapper.message
+      ? simulatedFreezeCreateWrapper.message
+      : '';
+
+    result.checks.simulated_freeze_create_payment_wrapper_blocked = isFreezeMessage_(simulatedFreezeCreateWrapper);
+
+    if (!result.checks.simulated_freeze_create_payment_wrapper_blocked) {
+      addIssue('SIMULATED_FREEZE_CREATE_PAYMENT_WRAPPER_NOT_BLOCKED', {
+        response: simulatedFreezeCreateWrapper
+      });
+    }
+
+    const simulatedFreezeSaveWrapper = saveBillingPayment({
+      __test_freeze_enabled: true,
+      billing_id: 'BIL-20260505-140855694-907',
+      payment_scope: 'full',
+      payment_date: '2027-01-01',
+      payment_method: 'cash',
+      amount: 1000,
+      actor_role: 'owner',
+      actor_user_id: 'USR-OWNER'
+    });
+
+    result.messages.simulated_freeze_save_payment_wrapper = simulatedFreezeSaveWrapper && simulatedFreezeSaveWrapper.message
+      ? simulatedFreezeSaveWrapper.message
+      : '';
+
+    result.checks.simulated_freeze_save_payment_wrapper_blocked = isFreezeMessage_(simulatedFreezeSaveWrapper);
+
+    if (!result.checks.simulated_freeze_save_payment_wrapper_blocked) {
+      addIssue('SIMULATED_FREEZE_SAVE_PAYMENT_WRAPPER_NOT_BLOCKED', {
+        response: simulatedFreezeSaveWrapper
+      });
+    }
+
+    result.after_counts = getCounts_();
+    result.after_totals = getTotals_();
+
+    result.checks.counts_unchanged =
+      result.after_counts.billings === result.before_counts.billings &&
+      result.after_counts.payments === result.before_counts.payments &&
+      result.after_counts.billing_installments === result.before_counts.billing_installments;
+
+    if (!result.checks.counts_unchanged) {
+      addIssue('FINANCE_PAYMENT_COUNTS_CHANGED_DURING_FREEZE_GUARD_TEST', {
+        before: result.before_counts,
+        after: result.after_counts
+      });
+    }
+
+    result.checks.totals_unchanged =
+      result.after_totals.billings_paid_total === result.before_totals.billings_paid_total &&
+      result.after_totals.billings_outstanding_total === result.before_totals.billings_outstanding_total &&
+      result.after_totals.payments_amount === result.before_totals.payments_amount &&
+      result.after_totals.billing_installments_paid_amount === result.before_totals.billing_installments_paid_amount;
+
+    if (!result.checks.totals_unchanged) {
+      addIssue('FINANCE_PAYMENT_TOTALS_CHANGED_DURING_FREEZE_GUARD_TEST', {
+        before: result.before_totals,
+        after: result.after_totals
+      });
+    }
+
+    result.issue_count = result.issues.length;
+    result.success = result.issue_count === 0;
+
+    Logger.log(JSON.stringify(result));
+    return result;
+
+  } catch (err) {
+    const errorResult = {
+      success: false,
+      stage: '8B-7-FinancePaymentService-FreezeGuard',
+      checked_at: typeof nowIso === 'function' ? nowIso() : new Date().toISOString(),
+      message: err && err.message ? err.message : String(err || 'Unknown error'),
+      issue_count: 1,
+      issues: [
+        {
+          issue: 'FINANCE_PAYMENT_FREEZE_GUARD_TEST_ERROR',
+          message: err && err.message ? err.message : String(err || 'Unknown error')
+        }
+      ]
+    };
+
+    Logger.log(JSON.stringify(errorResult));
+    return errorResult;
+  }
 }

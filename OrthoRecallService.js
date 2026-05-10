@@ -560,6 +560,20 @@ function upsertOrthoRecallFromControl(payload) {
 }
 
 function saveOrthoRecallContact(payload) {
+  const freezeCheck = repoCheckProductionMutationAllowed_({
+    operation: 'SAVE_ORTHO_RECALL_CONTACT',
+    module: 'OrthoRecallService',
+    action: 'saveOrthoRecallContact',
+    __test_freeze_enabled: payload && payload.__test_freeze_enabled === true
+  });
+
+  if (!freezeCheck.allowed) {
+    return {
+      success: false,
+      message: freezeCheck.message
+    };
+  }
+
   const orthoRecallId = String((payload && payload.ortho_recall_id) || '').trim();
   const note = String((payload && payload.last_contact_note) || '').trim();
 
@@ -623,6 +637,20 @@ function buildOrthoRecallProgramNote(existingNote, actionLabel, reason) {
 }
 
 function completeOrthoRecallProgram(payload) {
+  const freezeCheck = repoCheckProductionMutationAllowed_({
+    operation: 'COMPLETE_ORTHO_RECALL_PROGRAM',
+    module: 'OrthoRecallService',
+    action: 'completeOrthoRecallProgram',
+    __test_freeze_enabled: payload && payload.__test_freeze_enabled === true
+  });
+
+  if (!freezeCheck.allowed) {
+    return {
+      success: false,
+      message: freezeCheck.message
+    };
+  }
+
   const orthoRecallId = String((payload && payload.ortho_recall_id) || '').trim();
   const reason = String((payload && payload.reason) || '').trim();
 
@@ -690,6 +718,20 @@ function completeOrthoRecallProgram(payload) {
 }
 
 function cancelOrthoRecallProgram(payload) {
+  const freezeCheck = repoCheckProductionMutationAllowed_({
+    operation: 'CANCEL_ORTHO_RECALL_PROGRAM',
+    module: 'OrthoRecallService',
+    action: 'cancelOrthoRecallProgram',
+    __test_freeze_enabled: payload && payload.__test_freeze_enabled === true
+  });
+
+  if (!freezeCheck.allowed) {
+    return {
+      success: false,
+      message: freezeCheck.message
+    };
+  }
+
   const orthoRecallId = String((payload && payload.ortho_recall_id) || '').trim();
   const reason = String((payload && payload.reason) || '').trim();
 
@@ -757,6 +799,21 @@ function cancelOrthoRecallProgram(payload) {
 }
 
 function refreshAllOrthoRecallStatuses(options) {
+  const freezeCheck = repoCheckProductionMutationAllowed_({
+    operation: 'REFRESH_ORTHO_RECALL_STATUSES',
+    module: 'OrthoRecallService',
+    action: 'refreshAllOrthoRecallStatuses',
+    __test_freeze_enabled: options && options.__test_freeze_enabled === true
+  });
+
+  if (!freezeCheck.allowed) {
+    return {
+      success: false,
+      message: freezeCheck.message,
+      updated_count: 0
+    };
+  }
+
   if (isOrthoRecallServiceUiReadSupabaseMode_(options)) {
     return {
       success: true,
@@ -829,7 +886,23 @@ function getOrthoRecallList(options) {
   };
 }
 
-function syncOrthoRecallPhonesFromPatients() {
+function syncOrthoRecallPhonesFromPatients(options) {
+  const freezeCheck = repoCheckProductionMutationAllowed_({
+    operation: 'SYNC_ORTHO_RECALL_PHONES',
+    module: 'OrthoRecallService',
+    action: 'syncOrthoRecallPhonesFromPatients',
+    __test_freeze_enabled: options && options.__test_freeze_enabled === true
+  });
+
+  if (!freezeCheck.allowed) {
+    return {
+      success: false,
+      message: freezeCheck.message,
+      updated_count: 0,
+      skipped_count: 0
+    };
+  }
+
   const writeReadOptions = getOrthoRecallServiceSpreadsheetWriteReadOptions_();
   const rows = getOrthoRecallRaw(writeReadOptions);
   let updatedCount = 0;
@@ -1752,6 +1825,275 @@ function testOrthoRecallServicePhase6GUiReadLog() {
     };
 
     Logger.log(JSON.stringify(errorResult, null, 2));
+    return errorResult;
+  }
+}
+
+function testCutoverPhase8BOrthoRecallFreezeGuardLog() {
+  const result = {
+    success: true,
+    stage: '8B-6-OrthoRecallService-FreezeGuard',
+    checked_at: typeof nowIso === 'function' ? nowIso() : new Date().toISOString(),
+    flags: {
+      default_backend_mode: typeof dbGetBackendMode_ === 'function' ? dbGetBackendMode_() : '',
+      ui_read_backend_mode: typeof repoGetUiReadBackendMode_ === 'function'
+        ? repoGetUiReadBackendMode_()
+        : '',
+      ui_read_supabase_test_enabled: typeof repoIsUiReadSupabaseTestEnabled_ === 'function'
+        ? repoIsUiReadSupabaseTestEnabled_()
+        : null,
+      supabase_staging_write_test_enabled: typeof repoIsSupabaseStagingWriteTestEnabled_ === 'function'
+        ? repoIsSupabaseStagingWriteTestEnabled_()
+        : null,
+      production_mutation_freeze_enabled: typeof repoIsProductionMutationFreezeEnabled_ === 'function'
+        ? repoIsProductionMutationFreezeEnabled_()
+        : null
+    },
+    before_counts: {},
+    after_counts: {},
+    checks: {
+      default_off_save_contact_normal_flow_reached: false,
+      default_off_complete_normal_flow_reached: false,
+      default_off_cancel_normal_flow_reached: false,
+      simulated_freeze_save_contact_blocked: false,
+      simulated_freeze_complete_blocked: false,
+      simulated_freeze_cancel_blocked: false,
+      simulated_freeze_refresh_blocked: false,
+      simulated_freeze_sync_phones_blocked: false,
+      counts_unchanged: false
+    },
+    messages: {},
+    issue_count: 0,
+    issues: []
+  };
+
+  function addIssue(issue, details) {
+    result.issues.push(Object.assign({
+      issue: issue
+    }, details || {}));
+  }
+
+  function getCounts_() {
+    return {
+      ortho_recalls: getOrthoRecallRaw({
+        backend_mode: 'spreadsheet'
+      }).length
+    };
+  }
+
+  function isFreezeMessage_(res) {
+    return !!(
+      res &&
+      res.success === false &&
+      String(res.message || '').indexOf('Sistem sedang dalam proses migrasi database') !== -1
+    );
+  }
+
+  try {
+    result.before_counts = getCounts_();
+
+    if (
+      result.flags.default_backend_mode !== 'spreadsheet' ||
+      result.flags.ui_read_backend_mode !== 'spreadsheet' ||
+      result.flags.ui_read_supabase_test_enabled !== false ||
+      result.flags.supabase_staging_write_test_enabled !== false ||
+      result.flags.production_mutation_freeze_enabled !== false
+    ) {
+      addIssue('FLAGS_NOT_SAFE_DEFAULT_OFF', result.flags);
+    }
+
+    const defaultOffSaveContact = saveOrthoRecallContact({
+      ortho_recall_id: '',
+      last_contact_note: ''
+    });
+
+    result.messages.default_off_save_contact = defaultOffSaveContact && defaultOffSaveContact.message
+      ? defaultOffSaveContact.message
+      : '';
+
+    result.checks.default_off_save_contact_normal_flow_reached = !!(
+      defaultOffSaveContact &&
+      defaultOffSaveContact.success === false &&
+      (
+        defaultOffSaveContact.message === 'Recall ID tidak ditemukan' ||
+        defaultOffSaveContact.message === 'Data recall tidak ditemukan'
+      )
+    );
+
+    if (!result.checks.default_off_save_contact_normal_flow_reached) {
+      addIssue('DEFAULT_OFF_SAVE_CONTACT_DID_NOT_REACH_NORMAL_FLOW', {
+        response: defaultOffSaveContact
+      });
+    }
+
+    const defaultOffComplete = completeOrthoRecallProgram({
+      ortho_recall_id: '',
+      reason: ''
+    });
+
+    result.messages.default_off_complete = defaultOffComplete && defaultOffComplete.message
+      ? defaultOffComplete.message
+      : '';
+
+    result.checks.default_off_complete_normal_flow_reached = !!(
+      defaultOffComplete &&
+      defaultOffComplete.success === false &&
+      (
+        defaultOffComplete.message === 'Recall ID tidak ditemukan' ||
+        defaultOffComplete.message === 'Data recall tidak ditemukan'
+      )
+    );
+
+    if (!result.checks.default_off_complete_normal_flow_reached) {
+      addIssue('DEFAULT_OFF_COMPLETE_DID_NOT_REACH_NORMAL_FLOW', {
+        response: defaultOffComplete
+      });
+    }
+
+    const defaultOffCancel = cancelOrthoRecallProgram({
+      ortho_recall_id: '',
+      reason: ''
+    });
+
+    result.messages.default_off_cancel = defaultOffCancel && defaultOffCancel.message
+      ? defaultOffCancel.message
+      : '';
+
+    result.checks.default_off_cancel_normal_flow_reached = !!(
+      defaultOffCancel &&
+      defaultOffCancel.success === false &&
+      (
+        defaultOffCancel.message === 'Recall ID tidak ditemukan' ||
+        defaultOffCancel.message === 'Data recall tidak ditemukan'
+      )
+    );
+
+    if (!result.checks.default_off_cancel_normal_flow_reached) {
+      addIssue('DEFAULT_OFF_CANCEL_DID_NOT_REACH_NORMAL_FLOW', {
+        response: defaultOffCancel
+      });
+    }
+
+    const simulatedFreezeSaveContact = saveOrthoRecallContact({
+      __test_freeze_enabled: true,
+      ortho_recall_id: 'ORC-20260424-153834842-468',
+      last_contact_note: 'SHOULD NOT WRITE'
+    });
+
+    result.messages.simulated_freeze_save_contact = simulatedFreezeSaveContact && simulatedFreezeSaveContact.message
+      ? simulatedFreezeSaveContact.message
+      : '';
+
+    result.checks.simulated_freeze_save_contact_blocked = isFreezeMessage_(simulatedFreezeSaveContact);
+
+    if (!result.checks.simulated_freeze_save_contact_blocked) {
+      addIssue('SIMULATED_FREEZE_SAVE_CONTACT_NOT_BLOCKED', {
+        response: simulatedFreezeSaveContact
+      });
+    }
+
+    const simulatedFreezeComplete = completeOrthoRecallProgram({
+      __test_freeze_enabled: true,
+      ortho_recall_id: 'ORC-20260424-153834842-468',
+      reason: 'SHOULD NOT WRITE'
+    });
+
+    result.messages.simulated_freeze_complete = simulatedFreezeComplete && simulatedFreezeComplete.message
+      ? simulatedFreezeComplete.message
+      : '';
+
+    result.checks.simulated_freeze_complete_blocked = isFreezeMessage_(simulatedFreezeComplete);
+
+    if (!result.checks.simulated_freeze_complete_blocked) {
+      addIssue('SIMULATED_FREEZE_COMPLETE_NOT_BLOCKED', {
+        response: simulatedFreezeComplete
+      });
+    }
+
+    const simulatedFreezeCancel = cancelOrthoRecallProgram({
+      __test_freeze_enabled: true,
+      ortho_recall_id: 'ORC-20260424-153834842-468',
+      reason: 'SHOULD NOT WRITE'
+    });
+
+    result.messages.simulated_freeze_cancel = simulatedFreezeCancel && simulatedFreezeCancel.message
+      ? simulatedFreezeCancel.message
+      : '';
+
+    result.checks.simulated_freeze_cancel_blocked = isFreezeMessage_(simulatedFreezeCancel);
+
+    if (!result.checks.simulated_freeze_cancel_blocked) {
+      addIssue('SIMULATED_FREEZE_CANCEL_NOT_BLOCKED', {
+        response: simulatedFreezeCancel
+      });
+    }
+
+    const simulatedFreezeRefresh = refreshAllOrthoRecallStatuses({
+      __test_freeze_enabled: true
+    });
+
+    result.messages.simulated_freeze_refresh = simulatedFreezeRefresh && simulatedFreezeRefresh.message
+      ? simulatedFreezeRefresh.message
+      : '';
+
+    result.checks.simulated_freeze_refresh_blocked = isFreezeMessage_(simulatedFreezeRefresh);
+
+    if (!result.checks.simulated_freeze_refresh_blocked) {
+      addIssue('SIMULATED_FREEZE_REFRESH_NOT_BLOCKED', {
+        response: simulatedFreezeRefresh
+      });
+    }
+
+    const simulatedFreezeSyncPhones = syncOrthoRecallPhonesFromPatients({
+      __test_freeze_enabled: true
+    });
+
+    result.messages.simulated_freeze_sync_phones = simulatedFreezeSyncPhones && simulatedFreezeSyncPhones.message
+      ? simulatedFreezeSyncPhones.message
+      : '';
+
+    result.checks.simulated_freeze_sync_phones_blocked = isFreezeMessage_(simulatedFreezeSyncPhones);
+
+    if (!result.checks.simulated_freeze_sync_phones_blocked) {
+      addIssue('SIMULATED_FREEZE_SYNC_PHONES_NOT_BLOCKED', {
+        response: simulatedFreezeSyncPhones
+      });
+    }
+
+    result.after_counts = getCounts_();
+
+    result.checks.counts_unchanged =
+      result.after_counts.ortho_recalls === result.before_counts.ortho_recalls;
+
+    if (!result.checks.counts_unchanged) {
+      addIssue('ORTHO_RECALL_COUNT_CHANGED_DURING_FREEZE_GUARD_TEST', {
+        before: result.before_counts,
+        after: result.after_counts
+      });
+    }
+
+    result.issue_count = result.issues.length;
+    result.success = result.issue_count === 0;
+
+    Logger.log(JSON.stringify(result));
+    return result;
+
+  } catch (err) {
+    const errorResult = {
+      success: false,
+      stage: '8B-6-OrthoRecallService-FreezeGuard',
+      checked_at: typeof nowIso === 'function' ? nowIso() : new Date().toISOString(),
+      message: err && err.message ? err.message : String(err || 'Unknown error'),
+      issue_count: 1,
+      issues: [
+        {
+          issue: 'ORTHO_RECALL_FREEZE_GUARD_TEST_ERROR',
+          message: err && err.message ? err.message : String(err || 'Unknown error')
+        }
+      ]
+    };
+
+    Logger.log(JSON.stringify(errorResult));
     return errorResult;
   }
 }

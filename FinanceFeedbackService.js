@@ -43,6 +43,20 @@ function buildBillingFeedbackUrl_(token) {
 }
 
 function ensureBillingFeedbackTokenForBilling(billingId, options) {
+  const freezeCheck = repoCheckProductionMutationAllowed_({
+    operation: 'ENSURE_BILLING_FEEDBACK_TOKEN',
+    module: 'FinanceFeedbackService',
+    action: 'ensureBillingFeedbackTokenForBilling',
+    __test_freeze_enabled: options && options.__test_freeze_enabled === true
+  });
+
+  if (!freezeCheck.allowed) {
+    return {
+      success: false,
+      message: freezeCheck.message
+    };
+  }
+
   const opts = options || {};
   const useLock = opts.use_lock !== false;
   const lock = useLock ? LockService.getScriptLock() : null;
@@ -450,6 +464,20 @@ function validateBillingFeedbackPayload_(payload) {
 }
 
 function submitBillingFeedback(payload) {
+  const freezeCheck = repoCheckProductionMutationAllowed_({
+    operation: 'SUBMIT_BILLING_FEEDBACK',
+    module: 'FinanceFeedbackService',
+    action: 'submitBillingFeedback',
+    __test_freeze_enabled: payload && payload.__test_freeze_enabled === true
+  });
+
+  if (!freezeCheck.allowed) {
+    return {
+      success: false,
+      message: freezeCheck.message
+    };
+  }
+
   const lock = LockService.getScriptLock();
   let locked = false;
 
@@ -597,4 +625,206 @@ function testGetBillingFeedbackSummaryToday() {
 
   Logger.log(JSON.stringify(result, null, 2));
   return result;
+}
+
+function testCutoverPhase8BFinanceFeedbackFreezeGuardLog() {
+  const result = {
+    success: true,
+    stage: '8B-9-FinanceFeedbackService-FreezeGuard',
+    checked_at: typeof nowIso === 'function' ? nowIso() : new Date().toISOString(),
+    flags: {
+      default_backend_mode: typeof dbGetBackendMode_ === 'function' ? dbGetBackendMode_() : '',
+      ui_read_backend_mode: typeof repoGetUiReadBackendMode_ === 'function'
+        ? repoGetUiReadBackendMode_()
+        : '',
+      ui_read_supabase_test_enabled: typeof repoIsUiReadSupabaseTestEnabled_ === 'function'
+        ? repoIsUiReadSupabaseTestEnabled_()
+        : null,
+      supabase_staging_write_test_enabled: typeof repoIsSupabaseStagingWriteTestEnabled_ === 'function'
+        ? repoIsSupabaseStagingWriteTestEnabled_()
+        : null,
+      production_mutation_freeze_enabled: typeof repoIsProductionMutationFreezeEnabled_ === 'function'
+        ? repoIsProductionMutationFreezeEnabled_()
+        : null
+    },
+    before_counts: {},
+    after_counts: {},
+    checks: {
+      default_off_ensure_token_normal_flow_reached: false,
+      default_off_submit_feedback_normal_flow_reached: false,
+      simulated_freeze_ensure_token_blocked: false,
+      simulated_freeze_submit_feedback_blocked: false,
+      counts_unchanged: false
+    },
+    messages: {},
+    issue_count: 0,
+    issues: []
+  };
+
+  function addIssue(issue, details) {
+    result.issues.push(Object.assign({
+      issue: issue
+    }, details || {}));
+  }
+
+  function getCounts_() {
+    return {
+      billings: getBillingsRaw().length,
+      billing_feedbacks: getBillingFeedbacksRaw().length
+    };
+  }
+
+  function isFreezeMessage_(res) {
+    return !!(
+      res &&
+      res.success === false &&
+      String(res.message || '').indexOf('Sistem sedang dalam proses migrasi database') !== -1
+    );
+  }
+
+  try {
+    result.before_counts = getCounts_();
+
+    if (
+      result.flags.default_backend_mode !== 'spreadsheet' ||
+      result.flags.ui_read_backend_mode !== 'spreadsheet' ||
+      result.flags.ui_read_supabase_test_enabled !== false ||
+      result.flags.supabase_staging_write_test_enabled !== false ||
+      result.flags.production_mutation_freeze_enabled !== false
+    ) {
+      addIssue('FLAGS_NOT_SAFE_DEFAULT_OFF', result.flags);
+    }
+
+    const defaultOffEnsure = ensureBillingFeedbackTokenForBilling('', {
+      use_lock: false
+    });
+
+    result.messages.default_off_ensure_token = defaultOffEnsure && defaultOffEnsure.message
+      ? defaultOffEnsure.message
+      : '';
+
+    result.checks.default_off_ensure_token_normal_flow_reached = !!(
+      defaultOffEnsure &&
+      defaultOffEnsure.success === false &&
+      (
+        defaultOffEnsure.message === 'Billing ID tidak ditemukan' ||
+        defaultOffEnsure.message === 'Data billing tidak ditemukan'
+      )
+    );
+
+    if (!result.checks.default_off_ensure_token_normal_flow_reached) {
+      addIssue('DEFAULT_OFF_ENSURE_TOKEN_DID_NOT_REACH_NORMAL_FLOW', {
+        response: defaultOffEnsure
+      });
+    }
+
+    const defaultOffSubmit = submitBillingFeedback({
+      feedback_token: '',
+      rating: 0,
+      service_quality: '',
+      staff_friendliness: '',
+      clinic_cleanliness: '',
+      waiting_time: '',
+      comment: ''
+    });
+
+    result.messages.default_off_submit_feedback = defaultOffSubmit && defaultOffSubmit.message
+      ? defaultOffSubmit.message
+      : '';
+
+    result.checks.default_off_submit_feedback_normal_flow_reached = !!(
+      defaultOffSubmit &&
+      defaultOffSubmit.success === false &&
+      (
+        defaultOffSubmit.message === 'Validasi gagal' ||
+        defaultOffSubmit.message === 'Link feedback tidak valid atau sudah tidak tersedia'
+      )
+    );
+
+    if (!result.checks.default_off_submit_feedback_normal_flow_reached) {
+      addIssue('DEFAULT_OFF_SUBMIT_FEEDBACK_DID_NOT_REACH_NORMAL_FLOW', {
+        response: defaultOffSubmit
+      });
+    }
+
+    const simulatedFreezeEnsure = ensureBillingFeedbackTokenForBilling(
+      'BIL-20260505-140855694-907',
+      {
+        use_lock: false,
+        __test_freeze_enabled: true
+      }
+    );
+
+    result.messages.simulated_freeze_ensure_token = simulatedFreezeEnsure && simulatedFreezeEnsure.message
+      ? simulatedFreezeEnsure.message
+      : '';
+
+    result.checks.simulated_freeze_ensure_token_blocked = isFreezeMessage_(simulatedFreezeEnsure);
+
+    if (!result.checks.simulated_freeze_ensure_token_blocked) {
+      addIssue('SIMULATED_FREEZE_ENSURE_TOKEN_NOT_BLOCKED', {
+        response: simulatedFreezeEnsure
+      });
+    }
+
+    const simulatedFreezeSubmit = submitBillingFeedback({
+      __test_freeze_enabled: true,
+      feedback_token: 'TOKEN-SHOULD-NOT-WRITE-8B',
+      rating: 5,
+      service_quality: 'very_satisfied',
+      staff_friendliness: 'very_satisfied',
+      clinic_cleanliness: 'very_satisfied',
+      waiting_time: 'very_satisfied',
+      comment: 'SHOULD NOT WRITE 8B'
+    });
+
+    result.messages.simulated_freeze_submit_feedback = simulatedFreezeSubmit && simulatedFreezeSubmit.message
+      ? simulatedFreezeSubmit.message
+      : '';
+
+    result.checks.simulated_freeze_submit_feedback_blocked = isFreezeMessage_(simulatedFreezeSubmit);
+
+    if (!result.checks.simulated_freeze_submit_feedback_blocked) {
+      addIssue('SIMULATED_FREEZE_SUBMIT_FEEDBACK_NOT_BLOCKED', {
+        response: simulatedFreezeSubmit
+      });
+    }
+
+    result.after_counts = getCounts_();
+
+    result.checks.counts_unchanged =
+      result.after_counts.billings === result.before_counts.billings &&
+      result.after_counts.billing_feedbacks === result.before_counts.billing_feedbacks;
+
+    if (!result.checks.counts_unchanged) {
+      addIssue('FINANCE_FEEDBACK_COUNTS_CHANGED_DURING_FREEZE_GUARD_TEST', {
+        before: result.before_counts,
+        after: result.after_counts
+      });
+    }
+
+    result.issue_count = result.issues.length;
+    result.success = result.issue_count === 0;
+
+    Logger.log(JSON.stringify(result));
+    return result;
+
+  } catch (err) {
+    const errorResult = {
+      success: false,
+      stage: '8B-9-FinanceFeedbackService-FreezeGuard',
+      checked_at: typeof nowIso === 'function' ? nowIso() : new Date().toISOString(),
+      message: err && err.message ? err.message : String(err || 'Unknown error'),
+      issue_count: 1,
+      issues: [
+        {
+          issue: 'FINANCE_FEEDBACK_FREEZE_GUARD_TEST_ERROR',
+          message: err && err.message ? err.message : String(err || 'Unknown error')
+        }
+      ]
+    };
+
+    Logger.log(JSON.stringify(errorResult));
+    return errorResult;
+  }
 }

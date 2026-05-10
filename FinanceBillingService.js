@@ -361,6 +361,20 @@ function recalculateBillingTotalsUnlocked_(billingId, options) {
 }
 
 function recalculateBillingTotals(payload) {
+  const freezeCheck = repoCheckProductionMutationAllowed_({
+    operation: 'RECALCULATE_BILLING_TOTALS',
+    module: 'FinanceBillingService',
+    action: 'recalculateBillingTotals',
+    __test_freeze_enabled: payload && payload.__test_freeze_enabled === true
+  });
+
+  if (!freezeCheck.allowed) {
+    return {
+      success: false,
+      message: freezeCheck.message
+    };
+  }
+
   const permission = requireFinancePermission_(payload, 'recalculate_billing_totals');
 
   if (!permission.success) {
@@ -381,6 +395,20 @@ function recalculateBillingTotals(payload) {
    ========================================================= */
 
 function createDraftBillingFromTreatment(treatment, treatmentItems, options) {
+  const freezeCheck = repoCheckProductionMutationAllowed_({
+    operation: 'CREATE_DRAFT_BILLING_FROM_TREATMENT',
+    module: 'FinanceBillingService',
+    action: 'createDraftBillingFromTreatment',
+    __test_freeze_enabled: options && options.__test_freeze_enabled === true
+  });
+
+  if (!freezeCheck.allowed) {
+    return {
+      success: false,
+      message: freezeCheck.message
+    };
+  }
+
   const opts = options || {};
 
   if (opts.internal_call !== true) {
@@ -536,6 +564,20 @@ function createDraftBillingFromTreatment_(treatment, treatmentItems) {
 }
 
 function generateBillingFromTreatment(payload) {
+  const freezeCheck = repoCheckProductionMutationAllowed_({
+    operation: 'GENERATE_BILLING_FROM_TREATMENT',
+    module: 'FinanceBillingService',
+    action: 'generateBillingFromTreatment',
+    __test_freeze_enabled: payload && payload.__test_freeze_enabled === true
+  });
+
+  if (!freezeCheck.allowed) {
+    return {
+      success: false,
+      message: freezeCheck.message
+    };
+  }
+
   const permission = requireFinancePermission_(payload, 'generate_billing_from_treatment');
 
   if (!permission.success) {
@@ -1593,6 +1635,328 @@ function testFinanceBillingServicePhase6GUiReadLog() {
     };
 
     Logger.log(JSON.stringify(errorResult, null, 2));
+    return errorResult;
+  }
+}
+
+function testCutoverPhase8BFinanceBillingFreezeGuardLog() {
+  const result = {
+    success: true,
+    stage: '8B-10-FinanceBillingService-FreezeGuard',
+    checked_at: typeof nowIso === 'function' ? nowIso() : new Date().toISOString(),
+    flags: {
+      default_backend_mode: typeof dbGetBackendMode_ === 'function' ? dbGetBackendMode_() : '',
+      ui_read_backend_mode: typeof repoGetUiReadBackendMode_ === 'function'
+        ? repoGetUiReadBackendMode_()
+        : '',
+      ui_read_supabase_test_enabled: typeof repoIsUiReadSupabaseTestEnabled_ === 'function'
+        ? repoIsUiReadSupabaseTestEnabled_()
+        : null,
+      supabase_staging_write_test_enabled: typeof repoIsSupabaseStagingWriteTestEnabled_ === 'function'
+        ? repoIsSupabaseStagingWriteTestEnabled_()
+        : null,
+      production_mutation_freeze_enabled: typeof repoIsProductionMutationFreezeEnabled_ === 'function'
+        ? repoIsProductionMutationFreezeEnabled_()
+        : null
+    },
+    before_counts: {},
+    after_counts: {},
+    before_totals: {},
+    after_totals: {},
+    checks: {
+      default_off_recalculate_normal_flow_reached: false,
+      default_off_generate_from_treatment_normal_flow_reached: false,
+      default_off_create_draft_normal_flow_reached: false,
+      simulated_freeze_recalculate_blocked: false,
+      simulated_freeze_generate_from_treatment_blocked: false,
+      simulated_freeze_create_draft_blocked: false,
+      counts_unchanged: false,
+      totals_unchanged: false
+    },
+    messages: {},
+    issue_count: 0,
+    issues: []
+  };
+
+  function addIssue(issue, details) {
+    result.issues.push(Object.assign({
+      issue: issue
+    }, details || {}));
+  }
+
+  function toAmount_(value) {
+    if (typeof financeToAmount_ === 'function') return financeToAmount_(value);
+    const num = Number(value || 0);
+    return isFinite(num) ? num : 0;
+  }
+
+  function roundAmount_(value) {
+    if (typeof financeRoundAmount_ === 'function') return financeRoundAmount_(value);
+    return Math.round(Number(value || 0));
+  }
+
+  function sumAmount_(rows, fieldName) {
+    return roundAmount_((rows || []).reduce(function(sum, row) {
+      return sum + toAmount_(row && row[fieldName]);
+    }, 0));
+  }
+
+  function getCounts_() {
+    return {
+      billings: getBillingsRaw().length,
+      billing_items: getBillingItemsRaw().length,
+      billing_adjustments: getBillingAdjustmentsRaw().length,
+      payments: getPaymentsRaw().length
+    };
+  }
+
+  function getTotals_() {
+    const billings = getBillingsRaw();
+    const billingItems = getBillingItemsRaw();
+    const adjustments = getBillingAdjustmentsRaw();
+    const payments = getPaymentsRaw();
+
+    return {
+      billings_subtotal: sumAmount_(billings, 'subtotal'),
+      billings_discount_total: sumAmount_(billings, 'discount_total'),
+      billings_grand_total: sumAmount_(billings, 'grand_total'),
+      billings_paid_total: sumAmount_(billings, 'paid_total'),
+      billings_outstanding_total: sumAmount_(billings, 'outstanding_total'),
+      billing_items_subtotal: sumAmount_(billingItems, 'subtotal'),
+      billing_adjustments_amount: sumAmount_(adjustments, 'amount'),
+      payments_amount: sumAmount_(payments, 'amount')
+    };
+  }
+
+  function isFreezeMessage_(res) {
+    return !!(
+      res &&
+      res.success === false &&
+      String(res.message || '').indexOf('Sistem sedang dalam proses migrasi database') !== -1
+    );
+  }
+
+  function isNormalPermissionOrValidationMessage_(res) {
+    const msg = String((res && res.message) || '');
+
+    return !!(
+      res &&
+      res.success === false &&
+      (
+        msg === 'Billing ID tidak ditemukan' ||
+        msg === 'Treatment ID tidak ditemukan' ||
+        msg === 'Treatment tidak ditemukan' ||
+        msg === 'Akses langsung membuat draft billing tidak diizinkan.' ||
+        msg === 'Sesi login tidak ditemukan. Silakan login ulang.' ||
+        msg.indexOf('Sesi login') !== -1 ||
+        msg.indexOf('Akses ditolak') !== -1 ||
+        msg.indexOf('Tidak memiliki akses') !== -1 ||
+        msg.indexOf('Validasi gagal') !== -1
+      )
+    );
+  }
+
+  try {
+    result.before_counts = getCounts_();
+    result.before_totals = getTotals_();
+
+    if (
+      result.flags.default_backend_mode !== 'spreadsheet' ||
+      result.flags.ui_read_backend_mode !== 'spreadsheet' ||
+      result.flags.ui_read_supabase_test_enabled !== false ||
+      result.flags.supabase_staging_write_test_enabled !== false ||
+      result.flags.production_mutation_freeze_enabled !== false
+    ) {
+      addIssue('FLAGS_NOT_SAFE_DEFAULT_OFF', result.flags);
+    }
+
+    const defaultOffRecalculate = recalculateBillingTotals({
+      billing_id: '',
+      actor_role: 'owner',
+      actor_user_id: 'USR-OWNER'
+    });
+
+    result.messages.default_off_recalculate = defaultOffRecalculate && defaultOffRecalculate.message
+      ? defaultOffRecalculate.message
+      : '';
+
+    result.checks.default_off_recalculate_normal_flow_reached =
+      isNormalPermissionOrValidationMessage_(defaultOffRecalculate);
+
+    if (!result.checks.default_off_recalculate_normal_flow_reached) {
+      addIssue('DEFAULT_OFF_RECALCULATE_DID_NOT_REACH_NORMAL_FLOW', {
+        response: defaultOffRecalculate
+      });
+    }
+
+    const defaultOffGenerateFromTreatment = generateBillingFromTreatment({
+      treatment_id: '',
+      actor_role: 'owner',
+      actor_user_id: 'USR-OWNER'
+    });
+
+    result.messages.default_off_generate_from_treatment = defaultOffGenerateFromTreatment && defaultOffGenerateFromTreatment.message
+      ? defaultOffGenerateFromTreatment.message
+      : '';
+
+    result.checks.default_off_generate_from_treatment_normal_flow_reached =
+      isNormalPermissionOrValidationMessage_(defaultOffGenerateFromTreatment);
+
+    if (!result.checks.default_off_generate_from_treatment_normal_flow_reached) {
+      addIssue('DEFAULT_OFF_GENERATE_FROM_TREATMENT_DID_NOT_REACH_NORMAL_FLOW', {
+        response: defaultOffGenerateFromTreatment
+      });
+    }
+
+    const defaultOffCreateDraft = createDraftBillingFromTreatment(
+      {},
+      [],
+      {
+        use_lock: false,
+        internal_call: false
+      }
+    );
+
+    result.messages.default_off_create_draft = defaultOffCreateDraft && defaultOffCreateDraft.message
+      ? defaultOffCreateDraft.message
+      : '';
+
+    result.checks.default_off_create_draft_normal_flow_reached =
+      isNormalPermissionOrValidationMessage_(defaultOffCreateDraft);
+
+    if (!result.checks.default_off_create_draft_normal_flow_reached) {
+      addIssue('DEFAULT_OFF_CREATE_DRAFT_DID_NOT_REACH_NORMAL_FLOW', {
+        response: defaultOffCreateDraft
+      });
+    }
+
+    const simulatedFreezeRecalculate = recalculateBillingTotals({
+      __test_freeze_enabled: true,
+      billing_id: 'BIL-20260505-140855694-907',
+      actor_role: 'owner',
+      actor_user_id: 'USR-OWNER'
+    });
+
+    result.messages.simulated_freeze_recalculate = simulatedFreezeRecalculate && simulatedFreezeRecalculate.message
+      ? simulatedFreezeRecalculate.message
+      : '';
+
+    result.checks.simulated_freeze_recalculate_blocked =
+      isFreezeMessage_(simulatedFreezeRecalculate);
+
+    if (!result.checks.simulated_freeze_recalculate_blocked) {
+      addIssue('SIMULATED_FREEZE_RECALCULATE_NOT_BLOCKED', {
+        response: simulatedFreezeRecalculate
+      });
+    }
+
+    const simulatedFreezeGenerateFromTreatment = generateBillingFromTreatment({
+      __test_freeze_enabled: true,
+      treatment_id: 'TRX-0001',
+      actor_role: 'owner',
+      actor_user_id: 'USR-OWNER'
+    });
+
+    result.messages.simulated_freeze_generate_from_treatment = simulatedFreezeGenerateFromTreatment && simulatedFreezeGenerateFromTreatment.message
+      ? simulatedFreezeGenerateFromTreatment.message
+      : '';
+
+    result.checks.simulated_freeze_generate_from_treatment_blocked =
+      isFreezeMessage_(simulatedFreezeGenerateFromTreatment);
+
+    if (!result.checks.simulated_freeze_generate_from_treatment_blocked) {
+      addIssue('SIMULATED_FREEZE_GENERATE_FROM_TREATMENT_NOT_BLOCKED', {
+        response: simulatedFreezeGenerateFromTreatment
+      });
+    }
+
+    const simulatedFreezeCreateDraft = createDraftBillingFromTreatment(
+      {
+        treatment_id: 'TRX-0001',
+        appointment_id: 'APT-0001',
+        patient_id: 'PAT-0001',
+        patient_name: 'SHOULD NOT WRITE',
+        treatment_date: '2027-01-01'
+      },
+      [
+        {
+          treatment_item_id: 'TRI-8B-SHOULD-NOT-WRITE',
+          treatment_id: 'TRX-0001',
+          service_id: 'SRV-001',
+          service_name: 'SHOULD NOT WRITE',
+          qty: 1,
+          unit_price: 1000,
+          subtotal: 1000
+        }
+      ],
+      {
+        use_lock: false,
+        internal_call: true,
+        __test_freeze_enabled: true
+      }
+    );
+
+    result.messages.simulated_freeze_create_draft = simulatedFreezeCreateDraft && simulatedFreezeCreateDraft.message
+      ? simulatedFreezeCreateDraft.message
+      : '';
+
+    result.checks.simulated_freeze_create_draft_blocked =
+      isFreezeMessage_(simulatedFreezeCreateDraft);
+
+    if (!result.checks.simulated_freeze_create_draft_blocked) {
+      addIssue('SIMULATED_FREEZE_CREATE_DRAFT_NOT_BLOCKED', {
+        response: simulatedFreezeCreateDraft
+      });
+    }
+
+    result.after_counts = getCounts_();
+    result.after_totals = getTotals_();
+
+    result.checks.counts_unchanged =
+      result.after_counts.billings === result.before_counts.billings &&
+      result.after_counts.billing_items === result.before_counts.billing_items &&
+      result.after_counts.billing_adjustments === result.before_counts.billing_adjustments &&
+      result.after_counts.payments === result.before_counts.payments;
+
+    if (!result.checks.counts_unchanged) {
+      addIssue('FINANCE_BILLING_COUNTS_CHANGED_DURING_FREEZE_GUARD_TEST', {
+        before: result.before_counts,
+        after: result.after_counts
+      });
+    }
+
+    result.checks.totals_unchanged =
+      JSON.stringify(result.after_totals) === JSON.stringify(result.before_totals);
+
+    if (!result.checks.totals_unchanged) {
+      addIssue('FINANCE_BILLING_TOTALS_CHANGED_DURING_FREEZE_GUARD_TEST', {
+        before: result.before_totals,
+        after: result.after_totals
+      });
+    }
+
+    result.issue_count = result.issues.length;
+    result.success = result.issue_count === 0;
+
+    Logger.log(JSON.stringify(result));
+    return result;
+
+  } catch (err) {
+    const errorResult = {
+      success: false,
+      stage: '8B-10-FinanceBillingService-FreezeGuard',
+      checked_at: typeof nowIso === 'function' ? nowIso() : new Date().toISOString(),
+      message: err && err.message ? err.message : String(err || 'Unknown error'),
+      issue_count: 1,
+      issues: [
+        {
+          issue: 'FINANCE_BILLING_FREEZE_GUARD_TEST_ERROR',
+          message: err && err.message ? err.message : String(err || 'Unknown error')
+        }
+      ]
+    };
+
+    Logger.log(JSON.stringify(errorResult));
     return errorResult;
   }
 }

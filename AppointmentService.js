@@ -436,6 +436,20 @@ function checkPatientOpenAppointment(patientId, excludeAppointmentId, options) {
 }
 
 function createAppointment(data) {
+  const freezeCheck = repoCheckProductionMutationAllowed_({
+    operation: 'CREATE_APPOINTMENT',
+    module: 'AppointmentService',
+    action: 'createAppointment',
+    __test_freeze_enabled: data && data.__test_freeze_enabled === true
+  });
+
+  if (!freezeCheck.allowed) {
+    return {
+      success: false,
+      message: freezeCheck.message
+    };
+  }
+
   const lock = LockService.getScriptLock();
 
   try {
@@ -514,6 +528,20 @@ function createAppointment(data) {
 }
 
 function updateAppointment(data) {
+  const freezeCheck = repoCheckProductionMutationAllowed_({
+    operation: 'UPDATE_APPOINTMENT',
+    module: 'AppointmentService',
+    action: 'updateAppointment',
+    __test_freeze_enabled: data && data.__test_freeze_enabled === true
+  });
+
+  if (!freezeCheck.allowed) {
+    return {
+      success: false,
+      message: freezeCheck.message
+    };
+  }
+
   const lock = LockService.getScriptLock();
 
   try {
@@ -621,7 +649,21 @@ function updateAppointment(data) {
   }
 }
 
-function cancelAppointment(id) {
+function cancelAppointment(id, options) {
+  const freezeCheck = repoCheckProductionMutationAllowed_({
+    operation: 'CANCEL_APPOINTMENT',
+    module: 'AppointmentService',
+    action: 'cancelAppointment',
+    __test_freeze_enabled: options && options.__test_freeze_enabled === true
+  });
+
+  if (!freezeCheck.allowed) {
+    return {
+      success: false,
+      message: freezeCheck.message
+    };
+  }
+
   const lock = LockService.getScriptLock();
 
   try {
@@ -682,7 +724,21 @@ function cancelAppointment(id) {
   }
 }
 
-function restoreAppointment(id) {
+function restoreAppointment(id, options) {
+  const freezeCheck = repoCheckProductionMutationAllowed_({
+    operation: 'RESTORE_APPOINTMENT',
+    module: 'AppointmentService',
+    action: 'restoreAppointment',
+    __test_freeze_enabled: options && options.__test_freeze_enabled === true
+  });
+
+  if (!freezeCheck.allowed) {
+    return {
+      success: false,
+      message: freezeCheck.message
+    };
+  }
+
   const lock = LockService.getScriptLock();
 
   try {
@@ -1323,6 +1379,278 @@ function testAppointmentServicePhase6GUiReadLog() {
     };
 
     Logger.log(JSON.stringify(errorResult, null, 2));
+    return errorResult;
+  }
+}
+
+function testCutoverPhase8BAppointmentFreezeGuardLog() {
+  const result = {
+    success: true,
+    stage: '8B-4-AppointmentService-FreezeGuard',
+    checked_at: typeof nowIso === 'function' ? nowIso() : new Date().toISOString(),
+    flags: {
+      default_backend_mode: typeof dbGetBackendMode_ === 'function' ? dbGetBackendMode_() : '',
+      ui_read_backend_mode: typeof repoGetUiReadBackendMode_ === 'function'
+        ? repoGetUiReadBackendMode_()
+        : '',
+      ui_read_supabase_test_enabled: typeof repoIsUiReadSupabaseTestEnabled_ === 'function'
+        ? repoIsUiReadSupabaseTestEnabled_()
+        : null,
+      supabase_staging_write_test_enabled: typeof repoIsSupabaseStagingWriteTestEnabled_ === 'function'
+        ? repoIsSupabaseStagingWriteTestEnabled_()
+        : null,
+      production_mutation_freeze_enabled: typeof repoIsProductionMutationFreezeEnabled_ === 'function'
+        ? repoIsProductionMutationFreezeEnabled_()
+        : null
+    },
+    before_counts: {},
+    after_counts: {},
+    checks: {
+      default_off_create_validation_reached: false,
+      default_off_update_validation_reached: false,
+      default_off_cancel_normal_flow_reached: false,
+      default_off_restore_normal_flow_reached: false,
+      simulated_freeze_create_blocked: false,
+      simulated_freeze_update_blocked: false,
+      simulated_freeze_cancel_blocked: false,
+      simulated_freeze_restore_blocked: false,
+      counts_unchanged: false
+    },
+    messages: {},
+    issue_count: 0,
+    issues: []
+  };
+
+  function addIssue(issue, details) {
+    result.issues.push(Object.assign({
+      issue: issue
+    }, details || {}));
+  }
+
+  function getAppointmentCount_() {
+    return getAppointmentsRaw({
+      backend_mode: 'spreadsheet'
+    }).length;
+  }
+
+  function isFreezeMessage_(res) {
+    return !!(
+      res &&
+      res.success === false &&
+      String(res.message || '').indexOf('Sistem sedang dalam proses migrasi database') !== -1
+    );
+  }
+
+  try {
+    result.before_counts.appointments = getAppointmentCount_();
+
+    if (
+      result.flags.default_backend_mode !== 'spreadsheet' ||
+      result.flags.ui_read_backend_mode !== 'spreadsheet' ||
+      result.flags.ui_read_supabase_test_enabled !== false ||
+      result.flags.supabase_staging_write_test_enabled !== false ||
+      result.flags.production_mutation_freeze_enabled !== false
+    ) {
+      addIssue('FLAGS_NOT_SAFE_DEFAULT_OFF', result.flags);
+    }
+
+    const defaultOffCreate = createAppointment({
+      patient_id: '',
+      appointment_date: '',
+      appointment_time: '',
+      complaint: '',
+      status: ''
+    });
+
+    result.messages.default_off_create = defaultOffCreate && defaultOffCreate.message
+      ? defaultOffCreate.message
+      : '';
+
+    result.checks.default_off_create_validation_reached = !!(
+      defaultOffCreate &&
+      defaultOffCreate.success === false &&
+      defaultOffCreate.message === 'Validasi gagal'
+    );
+
+    if (!result.checks.default_off_create_validation_reached) {
+      addIssue('DEFAULT_OFF_CREATE_DID_NOT_REACH_VALIDATION', {
+        response: defaultOffCreate
+      });
+    }
+
+    const defaultOffUpdate = updateAppointment({
+      appointment_id: '',
+      patient_id: '',
+      appointment_date: '',
+      appointment_time: '',
+      complaint: '',
+      status: ''
+    });
+
+    result.messages.default_off_update = defaultOffUpdate && defaultOffUpdate.message
+      ? defaultOffUpdate.message
+      : '';
+
+    result.checks.default_off_update_validation_reached = !!(
+      defaultOffUpdate &&
+      defaultOffUpdate.success === false &&
+      (
+        defaultOffUpdate.message === 'Appointment ID tidak ditemukan' ||
+        defaultOffUpdate.message === 'Validasi gagal' ||
+        defaultOffUpdate.message === 'Data appointment tidak ditemukan'
+      )
+    );
+
+    if (!result.checks.default_off_update_validation_reached) {
+      addIssue('DEFAULT_OFF_UPDATE_DID_NOT_REACH_NORMAL_FLOW', {
+        response: defaultOffUpdate
+      });
+    }
+
+    const defaultOffCancel = cancelAppointment('APT-8B-NOT-FOUND');
+
+    result.messages.default_off_cancel = defaultOffCancel && defaultOffCancel.message
+      ? defaultOffCancel.message
+      : '';
+
+    result.checks.default_off_cancel_normal_flow_reached = !!(
+      defaultOffCancel &&
+      defaultOffCancel.success === false &&
+      defaultOffCancel.message === 'Data appointment tidak ditemukan'
+    );
+
+    if (!result.checks.default_off_cancel_normal_flow_reached) {
+      addIssue('DEFAULT_OFF_CANCEL_DID_NOT_REACH_NORMAL_FLOW', {
+        response: defaultOffCancel
+      });
+    }
+
+    const defaultOffRestore = restoreAppointment('APT-8B-NOT-FOUND');
+
+    result.messages.default_off_restore = defaultOffRestore && defaultOffRestore.message
+      ? defaultOffRestore.message
+      : '';
+
+    result.checks.default_off_restore_normal_flow_reached = !!(
+      defaultOffRestore &&
+      defaultOffRestore.success === false &&
+      defaultOffRestore.message === 'Data appointment tidak ditemukan'
+    );
+
+    if (!result.checks.default_off_restore_normal_flow_reached) {
+      addIssue('DEFAULT_OFF_RESTORE_DID_NOT_REACH_NORMAL_FLOW', {
+        response: defaultOffRestore
+      });
+    }
+
+    const simulatedFreezeCreate = createAppointment({
+      __test_freeze_enabled: true,
+      patient_id: '',
+      appointment_date: '',
+      appointment_time: '',
+      complaint: '',
+      status: ''
+    });
+
+    result.messages.simulated_freeze_create = simulatedFreezeCreate && simulatedFreezeCreate.message
+      ? simulatedFreezeCreate.message
+      : '';
+
+    result.checks.simulated_freeze_create_blocked = isFreezeMessage_(simulatedFreezeCreate);
+
+    if (!result.checks.simulated_freeze_create_blocked) {
+      addIssue('SIMULATED_FREEZE_CREATE_NOT_BLOCKED', {
+        response: simulatedFreezeCreate
+      });
+    }
+
+    const simulatedFreezeUpdate = updateAppointment({
+      __test_freeze_enabled: true,
+      appointment_id: 'APT-0001',
+      patient_id: 'PAT-0001',
+      appointment_date: '2027-01-01',
+      appointment_time: '09:00',
+      complaint: 'SHOULD NOT UPDATE',
+      status: 'scheduled'
+    });
+
+    result.messages.simulated_freeze_update = simulatedFreezeUpdate && simulatedFreezeUpdate.message
+      ? simulatedFreezeUpdate.message
+      : '';
+
+    result.checks.simulated_freeze_update_blocked = isFreezeMessage_(simulatedFreezeUpdate);
+
+    if (!result.checks.simulated_freeze_update_blocked) {
+      addIssue('SIMULATED_FREEZE_UPDATE_NOT_BLOCKED', {
+        response: simulatedFreezeUpdate
+      });
+    }
+
+    const simulatedFreezeCancel = cancelAppointment('APT-0001', {
+      __test_freeze_enabled: true
+    });
+
+    result.messages.simulated_freeze_cancel = simulatedFreezeCancel && simulatedFreezeCancel.message
+      ? simulatedFreezeCancel.message
+      : '';
+
+    result.checks.simulated_freeze_cancel_blocked = isFreezeMessage_(simulatedFreezeCancel);
+
+    if (!result.checks.simulated_freeze_cancel_blocked) {
+      addIssue('SIMULATED_FREEZE_CANCEL_NOT_BLOCKED', {
+        response: simulatedFreezeCancel
+      });
+    }
+
+    const simulatedFreezeRestore = restoreAppointment('APT-0001', {
+      __test_freeze_enabled: true
+    });
+
+    result.messages.simulated_freeze_restore = simulatedFreezeRestore && simulatedFreezeRestore.message
+      ? simulatedFreezeRestore.message
+      : '';
+
+    result.checks.simulated_freeze_restore_blocked = isFreezeMessage_(simulatedFreezeRestore);
+
+    if (!result.checks.simulated_freeze_restore_blocked) {
+      addIssue('SIMULATED_FREEZE_RESTORE_NOT_BLOCKED', {
+        response: simulatedFreezeRestore
+      });
+    }
+
+    result.after_counts.appointments = getAppointmentCount_();
+
+    result.checks.counts_unchanged = result.after_counts.appointments === result.before_counts.appointments;
+
+    if (!result.checks.counts_unchanged) {
+      addIssue('APPOINTMENT_COUNT_CHANGED_DURING_FREEZE_GUARD_TEST', {
+        before: result.before_counts,
+        after: result.after_counts
+      });
+    }
+
+    result.issue_count = result.issues.length;
+    result.success = result.issue_count === 0;
+
+    Logger.log(JSON.stringify(result));
+    return result;
+
+  } catch (err) {
+    const errorResult = {
+      success: false,
+      stage: '8B-4-AppointmentService-FreezeGuard',
+      checked_at: typeof nowIso === 'function' ? nowIso() : new Date().toISOString(),
+      message: err && err.message ? err.message : String(err || 'Unknown error'),
+      issue_count: 1,
+      issues: [
+        {
+          issue: 'APPOINTMENT_FREEZE_GUARD_TEST_ERROR',
+          message: err && err.message ? err.message : String(err || 'Unknown error')
+        }
+      ]
+    };
+
+    Logger.log(JSON.stringify(errorResult));
     return errorResult;
   }
 }

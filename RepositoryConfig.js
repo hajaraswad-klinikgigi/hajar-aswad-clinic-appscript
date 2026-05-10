@@ -449,3 +449,227 @@ function repoBuildConfigSummary_() {
     };
   });
 }
+
+/* =========================================================
+   PRODUCTION MUTATION FREEZE / MAINTENANCE GUARD - PHASE 8B
+   ========================================================= */
+
+/**
+ * Freeze sementara untuk cutover/final migration.
+ *
+ * AMAN:
+ * - Default false = aplikasi production berjalan normal.
+ * - Jika true = semua mutation production wajib diblokir oleh service guard.
+ * - Tidak mengubah backend default.
+ * - Tidak mengarahkan CRUD ke Supabase.
+ * - Tidak memengaruhi read-only UI.
+ * - Akan dipakai saat final migration/cutover window.
+ */
+const REPO_PRODUCTION_MUTATION_FREEZE_ENABLED = false;
+
+const REPO_PRODUCTION_MUTATION_FREEZE_MESSAGE =
+  'Sistem sedang dalam proses migrasi database. Perubahan data sementara dinonaktifkan. Silakan coba kembali setelah proses selesai.';
+
+function repoIsProductionMutationFreezeEnabled_(options) {
+  const opts = options || {};
+
+  /*
+   * __test_freeze_enabled hanya untuk unit/manual test 8B.
+   * Service production tidak perlu mengirim flag ini.
+   */
+  if (opts.__test_freeze_enabled === true) {
+    return true;
+  }
+
+  return REPO_PRODUCTION_MUTATION_FREEZE_ENABLED === true;
+}
+
+function repoGetProductionMutationFreezeMessage_() {
+  return REPO_PRODUCTION_MUTATION_FREEZE_MESSAGE;
+}
+
+function repoAssertProductionMutationAllowed_(options) {
+  const opts = options || {};
+  const operationName = String(opts.operation || 'PRODUCTION_MUTATION').trim() || 'PRODUCTION_MUTATION';
+  const moduleName = String(opts.module || '').trim();
+  const actionName = String(opts.action || '').trim();
+
+  if (repoIsProductionMutationFreezeEnabled_(opts)) {
+    const context = [];
+
+    if (moduleName) context.push('module=' + moduleName);
+    if (actionName) context.push('action=' + actionName);
+
+    throw new Error(
+      operationName + ' diblokir. ' +
+      repoGetProductionMutationFreezeMessage_() +
+      (context.length ? ' [' + context.join(', ') + ']' : '')
+    );
+  }
+
+  return true;
+}
+
+function repoCheckProductionMutationAllowed_(options) {
+  try {
+    repoAssertProductionMutationAllowed_(options);
+
+    return {
+      allowed: true,
+      message: ''
+    };
+
+  } catch (err) {
+    return {
+      allowed: false,
+      message: err && err.message ? err.message : String(err || '')
+    };
+  }
+}
+
+function testCutoverPhase8BFreezeGuardScaffoldLog() {
+  const result = {
+    success: true,
+    stage: '8B-1-Freeze-Guard-Scaffold',
+    checked_at: typeof nowIso === 'function' ? nowIso() : new Date().toISOString(),
+    flags: {
+      default_backend_mode: typeof repoGetDefaultBackendMode_ === 'function'
+        ? repoGetDefaultBackendMode_()
+        : '',
+      ui_read_backend_mode: typeof repoGetUiReadBackendMode_ === 'function'
+        ? repoGetUiReadBackendMode_()
+        : '',
+      ui_read_supabase_test_enabled: typeof repoIsUiReadSupabaseTestEnabled_ === 'function'
+        ? repoIsUiReadSupabaseTestEnabled_()
+        : null,
+      supabase_staging_write_test_enabled: typeof repoIsSupabaseStagingWriteTestEnabled_ === 'function'
+        ? repoIsSupabaseStagingWriteTestEnabled_()
+        : null,
+      production_mutation_freeze_enabled: repoIsProductionMutationFreezeEnabled_()
+    },
+    guard_checks: {},
+    checks_summary: {
+      passed: 0,
+      failed: 0
+    },
+    failed_checks: [],
+    issue_count: 0,
+    issues: []
+  };
+
+  function addCheck(name, success, details) {
+    if (success) {
+      result.checks_summary.passed++;
+      return;
+    }
+
+    result.checks_summary.failed++;
+    result.failed_checks.push({
+      name: name,
+      details: details || {}
+    });
+
+    result.issues.push({
+      check: name,
+      issue: 'CHECK_FAILED',
+      details: details || {}
+    });
+  }
+
+  try {
+    addCheck('DEFAULT_BACKEND_STILL_SPREADSHEET',
+      result.flags.default_backend_mode === REPO_BACKEND_MODES.SPREADSHEET,
+      result.flags
+    );
+
+    addCheck('UI_READ_BACKEND_STILL_SPREADSHEET',
+      result.flags.ui_read_backend_mode === REPO_BACKEND_MODES.SPREADSHEET &&
+        result.flags.ui_read_supabase_test_enabled === false,
+      result.flags
+    );
+
+    addCheck('SUPABASE_STAGING_WRITE_FLAG_FALSE',
+      result.flags.supabase_staging_write_test_enabled === false,
+      result.flags
+    );
+
+    addCheck('PRODUCTION_FREEZE_FLAG_DEFAULT_OFF',
+      result.flags.production_mutation_freeze_enabled === false,
+      result.flags
+    );
+
+    const defaultOffCheck = repoCheckProductionMutationAllowed_({
+      operation: 'TEST_8B_DEFAULT_OFF_MUTATION',
+      module: '8B',
+      action: 'default_off_should_allow'
+    });
+
+    result.guard_checks.default_off_allows_mutation = defaultOffCheck;
+
+    addCheck('DEFAULT_OFF_FREEZE_GUARD_ALLOWS_MUTATION',
+      defaultOffCheck.allowed === true,
+      defaultOffCheck
+    );
+
+    const simulatedFreezeCheck = repoCheckProductionMutationAllowed_({
+      operation: 'TEST_8B_SIMULATED_FREEZE_MUTATION',
+      module: '8B',
+      action: 'simulated_freeze_should_block',
+      __test_freeze_enabled: true
+    });
+
+    result.guard_checks.simulated_freeze_blocks_mutation = simulatedFreezeCheck;
+
+    addCheck('SIMULATED_FREEZE_GUARD_BLOCKS_MUTATION',
+      simulatedFreezeCheck.allowed === false &&
+        String(simulatedFreezeCheck.message || '').indexOf('Sistem sedang dalam proses migrasi database') !== -1,
+      simulatedFreezeCheck
+    );
+
+    const supabaseWriteGuard = typeof repoCheckSupabaseStagingWriteAllowed_ === 'function'
+      ? repoCheckSupabaseStagingWriteAllowed_({
+          backend_mode: REPO_BACKEND_MODES.SUPABASE,
+          write_intent: typeof repoGetSupabaseStagingWriteIntent_ === 'function'
+            ? repoGetSupabaseStagingWriteIntent_()
+            : '',
+          stage: '8B',
+          table_name: REPO_TABLES.PATIENTS,
+          operation: 'TEST_8B_SUPABASE_WRITE_GUARD'
+        })
+      : {
+          allowed: false,
+          message: 'repoCheckSupabaseStagingWriteAllowed_ tidak tersedia'
+        };
+
+    result.guard_checks.supabase_staging_write_still_blocked = supabaseWriteGuard;
+
+    addCheck('SUPABASE_STAGING_WRITE_STILL_BLOCKED',
+      supabaseWriteGuard.allowed === false,
+      supabaseWriteGuard
+    );
+
+    result.issue_count = result.issues.length;
+    result.success = result.issue_count === 0;
+
+    Logger.log(JSON.stringify(result));
+    return result;
+
+  } catch (err) {
+    const errorResult = {
+      success: false,
+      stage: '8B-1-Freeze-Guard-Scaffold',
+      checked_at: typeof nowIso === 'function' ? nowIso() : new Date().toISOString(),
+      message: err && err.message ? err.message : String(err || 'Unknown error'),
+      issue_count: 1,
+      issues: [
+        {
+          issue: 'FREEZE_GUARD_SCAFFOLD_TEST_ERROR',
+          message: err && err.message ? err.message : String(err || 'Unknown error')
+        }
+      ]
+    };
+
+    Logger.log(JSON.stringify(errorResult));
+    return errorResult;
+  }
+}
