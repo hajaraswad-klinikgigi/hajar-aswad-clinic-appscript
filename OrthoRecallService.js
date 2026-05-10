@@ -799,6 +799,23 @@ function cancelOrthoRecallProgram(payload) {
 }
 
 function refreshAllOrthoRecallStatuses(options) {
+  /*
+   * Cutover/Supabase read mode:
+   * Refresh status recall adalah mutation ke Spreadsheet lama.
+   * Saat UI/backend read sudah Supabase, function ini harus langsung skip
+   * sebelum masuk production freeze guard, supaya test dan UI read path
+   * tidak menganggap refresh sebagai mutation gagal.
+   */
+  if (isOrthoRecallServiceUiReadSupabaseMode_(options)) {
+    return {
+      success: true,
+      message: 'Refresh status recall dilewati pada mode Supabase read-only',
+      updated_count: 0,
+      skipped: true,
+      reason: 'SUPABASE_READ_MODE_SKIP_MUTATION'
+    };
+  }
+
   const freezeCheck = repoCheckProductionMutationAllowed_({
     operation: 'REFRESH_ORTHO_RECALL_STATUSES',
     module: 'OrthoRecallService',
@@ -811,15 +828,6 @@ function refreshAllOrthoRecallStatuses(options) {
       success: false,
       message: freezeCheck.message,
       updated_count: 0
-    };
-  }
-
-  if (isOrthoRecallServiceUiReadSupabaseMode_(options)) {
-    return {
-      success: true,
-      message: 'Refresh status recall dilewati pada mode Supabase read-only',
-      updated_count: 0,
-      skipped: true
     };
   }
 

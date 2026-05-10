@@ -87,7 +87,7 @@ const REPO_BACKEND_MODES = Object.freeze({
   SUPABASE: 'supabase'
 });
 
-const REPO_DEFAULT_BACKEND_MODE = REPO_BACKEND_MODES.SPREADSHEET;
+const REPO_DEFAULT_BACKEND_MODE = REPO_BACKEND_MODES.SUPABASE;
 
 function repoNormalizeBackendMode_(backendMode) {
   const raw = String(backendMode || REPO_DEFAULT_BACKEND_MODE || '').trim().toLowerCase();
@@ -350,9 +350,11 @@ function repoIsUiReadSupabaseTestEnabled_() {
 }
 
 function repoGetUiReadBackendMode_() {
-  return repoIsUiReadSupabaseTestEnabled_()
-    ? REPO_BACKEND_MODES.SUPABASE
-    : REPO_BACKEND_MODES.SPREADSHEET;
+  if (repoIsUiReadSupabaseTestEnabled_()) {
+    return REPO_BACKEND_MODES.SUPABASE;
+  }
+
+  return repoGetDefaultBackendMode_();
 }
 
 function repoBuildUiReadOptions_(extraOptions) {
@@ -465,7 +467,7 @@ function repoBuildConfigSummary_() {
  * - Tidak memengaruhi read-only UI.
  * - Akan dipakai saat final migration/cutover window.
  */
-const REPO_PRODUCTION_MUTATION_FREEZE_ENABLED = false;
+const REPO_PRODUCTION_MUTATION_FREEZE_ENABLED = true;
 
 const REPO_PRODUCTION_MUTATION_FREEZE_MESSAGE =
   'Sistem sedang dalam proses migrasi database. Perubahan data sementara dinonaktifkan. Silakan coba kembali setelah proses selesai.';
@@ -693,7 +695,7 @@ function testCutoverPhase8BFreezeGuardScaffoldLog() {
  *   4. intent eksplisit benar,
  *   5. stage eksplisit 8C/8D.
  */
-const REPO_SUPABASE_FINAL_MIGRATION_RESEED_ENABLED = false;
+const REPO_SUPABASE_FINAL_MIGRATION_RESEED_ENABLED = true;
 
 const REPO_SUPABASE_FINAL_MIGRATION_INTENT =
   'SUPABASE_FINAL_MIGRATION_RESEED_FOR_CUTOVER';

@@ -13,9 +13,17 @@
  */
 const DATA_ACCESS_BACKEND_MODE = 'spreadsheet';
 
+function dbGetDefaultBackendMode_() {
+  if (typeof repoGetDefaultBackendMode_ === 'function') {
+    return repoGetDefaultBackendMode_();
+  }
+
+  return DATA_ACCESS_BACKEND_MODE;
+}
+
 function dbNormalizeBackendMode_(backendMode) {
   if (typeof repoNormalizeBackendMode_ === 'function') {
-    return repoNormalizeBackendMode_(backendMode || DATA_ACCESS_BACKEND_MODE);
+    return repoNormalizeBackendMode_(backendMode || dbGetDefaultBackendMode_());
   }
 
   const raw = String(backendMode || DATA_ACCESS_BACKEND_MODE || '').trim().toLowerCase();
@@ -34,7 +42,7 @@ function dbNormalizeBackendMode_(backendMode) {
 function dbBuildAccessOptions_(options) {
   const rawOptions = Object.assign({}, options || {});
   const backendMode = dbNormalizeBackendMode_(
-    rawOptions.backend_mode || rawOptions.backendMode || DATA_ACCESS_BACKEND_MODE
+    rawOptions.backend_mode || rawOptions.backendMode || dbGetDefaultBackendMode_()
   );
 
   return Object.assign({}, rawOptions, {
