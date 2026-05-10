@@ -87,7 +87,7 @@ const REPO_BACKEND_MODES = Object.freeze({
   SUPABASE: 'supabase'
 });
 
-const REPO_DEFAULT_BACKEND_MODE = REPO_BACKEND_MODES.SUPABASE;
+const REPO_DEFAULT_BACKEND_MODE = REPO_BACKEND_MODES.SPREADSHEET;
 
 function repoNormalizeBackendMode_(backendMode) {
   const raw = String(backendMode || REPO_DEFAULT_BACKEND_MODE || '').trim().toLowerCase();
@@ -467,7 +467,7 @@ function repoBuildConfigSummary_() {
  * - Tidak memengaruhi read-only UI.
  * - Akan dipakai saat final migration/cutover window.
  */
-const REPO_PRODUCTION_MUTATION_FREEZE_ENABLED = true;
+const REPO_PRODUCTION_MUTATION_FREEZE_ENABLED = false;
 
 const REPO_PRODUCTION_MUTATION_FREEZE_MESSAGE =
   'Sistem sedang dalam proses migrasi database. Perubahan data sementara dinonaktifkan. Silakan coba kembali setelah proses selesai.';

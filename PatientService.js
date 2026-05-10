@@ -222,6 +222,7 @@ function getPatientById(patientId, options) {
 
 function getMedicalRecordsByPatientId(patientId, options) {
   const normalizedPatientId = String(patientId || '').trim();
+  const opts = getPatientServiceUiReadOptions_(options);
 
   if (!normalizedPatientId) return [];
 
@@ -233,7 +234,7 @@ function getMedicalRecordsByPatientId(patientId, options) {
   ) {
     rows = PatientRepository.listMedicalRecordsByPatientId(
       normalizedPatientId,
-      getPatientServiceUiReadOptions_(options)
+      opts
     ) || [];
   } else {
     rows = (getRowsAsObjects('MedicalRecords') || []).filter(function(row) {
@@ -241,7 +242,11 @@ function getMedicalRecordsByPatientId(patientId, options) {
     });
   }
 
-  return rows
+  const enrichedRows = typeof migration8E4C_enrichMedicalRecordRowsForClient_ === 'function'
+    ? migration8E4C_enrichMedicalRecordRowsForClient_(rows, opts)
+    : rows;
+
+  return enrichedRows
     .map(function(row) {
       return normalizePatientForClient(row);
     })
@@ -252,6 +257,7 @@ function getMedicalRecordsByPatientId(patientId, options) {
 
 function getTreatmentsByPatientId(patientId, options) {
   const normalizedPatientId = String(patientId || '').trim();
+  const opts = getPatientServiceUiReadOptions_(options);
 
   if (!normalizedPatientId) return [];
 
@@ -264,7 +270,6 @@ function getTreatmentsByPatientId(patientId, options) {
     typeof PatientRepository.listTreatmentsByPatientIdFromContext === 'function' &&
     typeof PatientRepository.listTreatmentItemsByTreatmentIdFromContext === 'function'
   ) {
-    const opts = getPatientServiceUiReadOptions_(options);
     const ctx = PatientRepository.buildRawContext(Object.assign({}, opts, {
       only: {
         treatments: true,
@@ -315,7 +320,13 @@ function getTreatmentsByPatientId(patientId, options) {
     });
   }
 
-  return patientTreatments
+  const enrichedTreatments = typeof migration8E4C_enrichTreatmentRowsForClient_ === 'function'
+    ? migration8E4C_enrichTreatmentRowsForClient_(patientTreatments, opts, {
+        itemsByTreatmentId: itemsMap
+      })
+    : patientTreatments;
+
+  return enrichedTreatments
     .map(function(row) {
       const normalizedTreatment = normalizePatientForClient(row);
       const treatmentId = String(row.treatment_id || '').trim();

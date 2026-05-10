@@ -269,7 +269,13 @@ function buildPatientOrthoRecallSummary(row, options) {
     };
   }
 
-  const normalized = normalizeOrthoRecallRow(row);
+  const opts = getOrthoRecallServiceUiReadOptions_(options);
+
+  const enrichedRow = typeof migration8E4C_enrichOrthoRecallRowForClient_ === 'function'
+    ? migration8E4C_enrichOrthoRecallRowForClient_(row, opts)
+    : row;
+
+  const normalized = normalizeOrthoRecallRow(enrichedRow);
   const installDate = String(normalized.install_date || '').slice(0, 10);
   const nextDueDate = String(normalized.next_due_date || '').slice(0, 10);
   const targetMonths = Number(normalized.target_months || 6);
@@ -285,7 +291,7 @@ function buildPatientOrthoRecallSummary(row, options) {
   return {
     has_recall: true,
     has_active_program: programStatus === 'active',
-    total_records: getOrthoRecallRowsByPatientId(normalized.patient_id, options).length,
+    total_records: getOrthoRecallRowsByPatientId(normalized.patient_id, opts).length,
     current: normalized
   };
 }
@@ -310,7 +316,8 @@ function getPatientOrthoRecallSummary(patientId, options) {
 }
 
 function getOrthoRecallById(orthoRecallId, options) {
-  const row = findOrthoRecallById(orthoRecallId, options);
+  const opts = getOrthoRecallServiceUiReadOptions_(options);
+  const row = findOrthoRecallById(orthoRecallId, opts);
 
   if (!row) {
     return {
@@ -319,9 +326,13 @@ function getOrthoRecallById(orthoRecallId, options) {
     };
   }
 
+  const enrichedRow = typeof migration8E4C_enrichOrthoRecallRowForClient_ === 'function'
+    ? migration8E4C_enrichOrthoRecallRowForClient_(row, opts)
+    : row;
+
   return {
     success: true,
-    data: normalizeOrthoRecallRow(row)
+    data: normalizeOrthoRecallRow(enrichedRow)
   };
 }
 
@@ -877,7 +888,13 @@ function getOrthoRecallList(options) {
     refreshAllOrthoRecallStatuses(opts);
   }
 
-  const rows = getOrthoRecallRaw(opts)
+  const rawRows = getOrthoRecallRaw(opts);
+
+  const enrichedRows = typeof migration8E4C_enrichOrthoRecallRowsForClient_ === 'function'
+    ? migration8E4C_enrichOrthoRecallRowsForClient_(rawRows, opts)
+    : rawRows;
+
+  const rows = enrichedRows
     .map(function(row) {
       return normalizeOrthoRecallRow(row);
     })

@@ -484,6 +484,7 @@ function getDashboardOwnerSummary(period) {
 
   const cacheKey = buildCacheKey([
     'dashboardOwnerSummary',
+    'uiMap8E4C',
     'dashFeedback1d',
     dashboardBackendMode,
     normalizedPeriod
@@ -515,6 +516,18 @@ function getDashboardOwnerSummary(period) {
     ? (OrthoRecallRepository.getOrthoRecallRaw(dashboardReadOptions) || [])
     : getDashboardRowsByTable_(REPO_TABLES.ORTHO_RECALL || 'OrthoRecall');
 
+  const enrichedAppointmentsRaw = typeof migration8E4C_enrichAppointmentRowsForClient_ === 'function'
+    ? migration8E4C_enrichAppointmentRowsForClient_(appointmentsRaw, dashboardReadOptions)
+    : appointmentsRaw;
+
+  const enrichedTreatmentsRaw = typeof migration8E4C_enrichTreatmentRowsForClient_ === 'function'
+    ? migration8E4C_enrichTreatmentRowsForClient_(treatmentsRaw, dashboardReadOptions)
+    : treatmentsRaw;
+
+  const enrichedRecallRaw = typeof migration8E4C_enrichOrthoRecallRowsForClient_ === 'function'
+    ? migration8E4C_enrichOrthoRecallRowsForClient_(recallRaw, dashboardReadOptions)
+    : recallRaw;
+
   const activePatients = [];
   const newPatients = [];
 
@@ -530,10 +543,10 @@ function getDashboardOwnerSummary(period) {
     }
   });
 
-  const appointments = appointmentsRaw.map(normalizeDashboardAppointment);
-  const treatments = treatmentsRaw.map(normalizeDashboardTreatment);
+  const appointments = enrichedAppointmentsRaw.map(normalizeDashboardAppointment);
+  const treatments = enrichedTreatmentsRaw.map(normalizeDashboardTreatment);
   const treatmentItems = treatmentItemsRaw.map(normalizeDashboardTreatmentItem);
-  const recalls = recallRaw.map(normalizeDashboardRecall);
+  const recalls = enrichedRecallRaw.map(normalizeDashboardRecall);
 
   const apptPeriod = [];
   const scheduled = [];
