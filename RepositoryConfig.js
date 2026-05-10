@@ -673,3 +673,266 @@ function testCutoverPhase8BFreezeGuardScaffoldLog() {
     return errorResult;
   }
 }
+
+/* =========================================================
+   SUPABASE FINAL MIGRATION / RESEED GUARD - PHASE 8C
+   ========================================================= */
+
+/**
+ * Guard khusus untuk final migration / reseed menjelang cutover.
+ *
+ * AMAN:
+ * - Default false = semua operasi final migration/reseed diblokir.
+ * - Tidak mengubah backend default.
+ * - Tidak mengaktifkan Supabase sebagai production backend.
+ * - Tidak melakukan cutover.
+ * - Operasi final migration nanti hanya boleh berjalan jika:
+ *   1. flag final migration true,
+ *   2. production mutation freeze true,
+ *   3. backend_mode supabase,
+ *   4. intent eksplisit benar,
+ *   5. stage eksplisit 8C/8D.
+ */
+const REPO_SUPABASE_FINAL_MIGRATION_RESEED_ENABLED = false;
+
+const REPO_SUPABASE_FINAL_MIGRATION_INTENT =
+  'SUPABASE_FINAL_MIGRATION_RESEED_FOR_CUTOVER';
+
+function repoIsSupabaseFinalMigrationReseedEnabled_() {
+  return REPO_SUPABASE_FINAL_MIGRATION_RESEED_ENABLED === true;
+}
+
+function repoGetSupabaseFinalMigrationIntent_() {
+  return REPO_SUPABASE_FINAL_MIGRATION_INTENT;
+}
+
+function repoNormalizeFinalMigrationStage_(stage) {
+  return String(stage || '').trim().toUpperCase();
+}
+
+function repoAssertSupabaseFinalMigrationAllowed_(options) {
+  const opts = Object.assign({}, options || {});
+  const operationName = String(opts.operation || 'SUPABASE_FINAL_MIGRATION').trim() || 'SUPABASE_FINAL_MIGRATION';
+  const backendMode = repoNormalizeBackendMode_(opts.backend_mode || opts.backendMode || '');
+  const intent = String(opts.intent || opts.migration_intent || opts.write_intent || '').trim();
+  const stage = repoNormalizeFinalMigrationStage_(opts.stage);
+  const tableName = String(opts.table_name || opts.tableName || '').trim();
+  const issues = [];
+
+  if (!repoIsSupabaseFinalMigrationReseedEnabled_()) {
+    issues.push('REPO_SUPABASE_FINAL_MIGRATION_RESEED_ENABLED masih false');
+  }
+
+  if (!repoIsProductionMutationFreezeEnabled_()) {
+    issues.push('REPO_PRODUCTION_MUTATION_FREEZE_ENABLED harus true sebelum final migration/reseed');
+  }
+
+  if (backendMode !== REPO_BACKEND_MODES.SUPABASE) {
+    issues.push('backend_mode harus supabase untuk final migration/reseed');
+  }
+
+  if (intent !== REPO_SUPABASE_FINAL_MIGRATION_INTENT) {
+    issues.push('final migration intent tidak valid atau kosong');
+  }
+
+  if (stage !== '8C' && stage !== '8D') {
+    issues.push('stage final migration harus eksplisit 8C atau 8D');
+  }
+
+  if (tableName) {
+    try {
+      repoNormalizeTableName_(tableName);
+    } catch (errTable) {
+      issues.push('table_name tidak terdaftar di RepositoryConfig: ' + tableName);
+    }
+  }
+
+  if (issues.length) {
+    throw new Error(operationName + ' diblokir. ' + issues.join(' | '));
+  }
+
+  return true;
+}
+
+function repoCheckSupabaseFinalMigrationAllowed_(options) {
+  try {
+    repoAssertSupabaseFinalMigrationAllowed_(options);
+
+    return {
+      allowed: true,
+      message: ''
+    };
+
+  } catch (err) {
+    return {
+      allowed: false,
+      message: err && err.message ? err.message : String(err || '')
+    };
+  }
+}
+
+function testCutoverPhase8CFinalMigrationGuardScaffoldLog() {
+  const result = {
+    success: true,
+    stage: '8C-1-FinalMigration-Guard-Scaffold',
+    checked_at: typeof nowIso === 'function' ? nowIso() : new Date().toISOString(),
+    flags: {
+      default_backend_mode: typeof repoGetDefaultBackendMode_ === 'function'
+        ? repoGetDefaultBackendMode_()
+        : '',
+      ui_read_backend_mode: typeof repoGetUiReadBackendMode_ === 'function'
+        ? repoGetUiReadBackendMode_()
+        : '',
+      ui_read_supabase_test_enabled: typeof repoIsUiReadSupabaseTestEnabled_ === 'function'
+        ? repoIsUiReadSupabaseTestEnabled_()
+        : null,
+      supabase_staging_write_test_enabled: typeof repoIsSupabaseStagingWriteTestEnabled_ === 'function'
+        ? repoIsSupabaseStagingWriteTestEnabled_()
+        : null,
+      production_mutation_freeze_enabled: typeof repoIsProductionMutationFreezeEnabled_ === 'function'
+        ? repoIsProductionMutationFreezeEnabled_()
+        : null,
+      supabase_final_migration_reseed_enabled: repoIsSupabaseFinalMigrationReseedEnabled_()
+    },
+    guard_checks: {},
+    checks_summary: {
+      passed: 0,
+      failed: 0
+    },
+    failed_checks: [],
+    issue_count: 0,
+    issues: []
+  };
+
+  function addCheck(name, success, details) {
+    if (success) {
+      result.checks_summary.passed++;
+      return;
+    }
+
+    result.checks_summary.failed++;
+    result.failed_checks.push({
+      name: name,
+      details: details || {}
+    });
+
+    result.issues.push({
+      check: name,
+      issue: 'CHECK_FAILED',
+      details: details || {}
+    });
+  }
+
+  try {
+    addCheck('DEFAULT_BACKEND_STILL_SPREADSHEET',
+      result.flags.default_backend_mode === REPO_BACKEND_MODES.SPREADSHEET,
+      result.flags
+    );
+
+    addCheck('UI_READ_BACKEND_STILL_SPREADSHEET',
+      result.flags.ui_read_backend_mode === REPO_BACKEND_MODES.SPREADSHEET &&
+        result.flags.ui_read_supabase_test_enabled === false,
+      result.flags
+    );
+
+    addCheck('SUPABASE_STAGING_WRITE_FLAG_FALSE',
+      result.flags.supabase_staging_write_test_enabled === false,
+      result.flags
+    );
+
+    addCheck('PRODUCTION_FREEZE_FLAG_DEFAULT_OFF',
+      result.flags.production_mutation_freeze_enabled === false,
+      result.flags
+    );
+
+    addCheck('FINAL_MIGRATION_RESEED_FLAG_DEFAULT_OFF',
+      result.flags.supabase_final_migration_reseed_enabled === false,
+      result.flags
+    );
+
+    const defaultOffGuard = repoCheckSupabaseFinalMigrationAllowed_({
+      operation: 'TEST_8C_FINAL_MIGRATION_RESEED',
+      backend_mode: REPO_BACKEND_MODES.SUPABASE,
+      intent: REPO_SUPABASE_FINAL_MIGRATION_INTENT,
+      stage: '8C',
+      table_name: REPO_TABLES.PATIENTS
+    });
+
+    result.guard_checks.default_off_blocks_final_migration = defaultOffGuard;
+
+    addCheck('FINAL_MIGRATION_GUARD_DEFAULT_OFF_BLOCKS',
+      defaultOffGuard.allowed === false &&
+        String(defaultOffGuard.message || '').indexOf('REPO_SUPABASE_FINAL_MIGRATION_RESEED_ENABLED masih false') !== -1,
+      defaultOffGuard
+    );
+
+    const wrongIntentGuard = repoCheckSupabaseFinalMigrationAllowed_({
+      operation: 'TEST_8C_WRONG_INTENT',
+      backend_mode: REPO_BACKEND_MODES.SUPABASE,
+      intent: 'WRONG_INTENT',
+      stage: '8C',
+      table_name: REPO_TABLES.PATIENTS
+    });
+
+    result.guard_checks.wrong_intent_blocked = wrongIntentGuard;
+
+    addCheck('FINAL_MIGRATION_GUARD_WRONG_INTENT_BLOCKS',
+      wrongIntentGuard.allowed === false,
+      wrongIntentGuard
+    );
+
+    const wrongStageGuard = repoCheckSupabaseFinalMigrationAllowed_({
+      operation: 'TEST_8C_WRONG_STAGE',
+      backend_mode: REPO_BACKEND_MODES.SUPABASE,
+      intent: REPO_SUPABASE_FINAL_MIGRATION_INTENT,
+      stage: '7G',
+      table_name: REPO_TABLES.PATIENTS
+    });
+
+    result.guard_checks.wrong_stage_blocked = wrongStageGuard;
+
+    addCheck('FINAL_MIGRATION_GUARD_WRONG_STAGE_BLOCKS',
+      wrongStageGuard.allowed === false,
+      wrongStageGuard
+    );
+
+    const wrongBackendGuard = repoCheckSupabaseFinalMigrationAllowed_({
+      operation: 'TEST_8C_WRONG_BACKEND',
+      backend_mode: REPO_BACKEND_MODES.SPREADSHEET,
+      intent: REPO_SUPABASE_FINAL_MIGRATION_INTENT,
+      stage: '8C',
+      table_name: REPO_TABLES.PATIENTS
+    });
+
+    result.guard_checks.wrong_backend_blocked = wrongBackendGuard;
+
+    addCheck('FINAL_MIGRATION_GUARD_WRONG_BACKEND_BLOCKS',
+      wrongBackendGuard.allowed === false,
+      wrongBackendGuard
+    );
+
+    result.issue_count = result.issues.length;
+    result.success = result.issue_count === 0;
+
+    Logger.log(JSON.stringify(result));
+    return result;
+
+  } catch (err) {
+    const errorResult = {
+      success: false,
+      stage: '8C-1-FinalMigration-Guard-Scaffold',
+      checked_at: typeof nowIso === 'function' ? nowIso() : new Date().toISOString(),
+      message: err && err.message ? err.message : String(err || 'Unknown error'),
+      issue_count: 1,
+      issues: [
+        {
+          issue: 'FINAL_MIGRATION_GUARD_SCAFFOLD_TEST_ERROR',
+          message: err && err.message ? err.message : String(err || 'Unknown error')
+        }
+      ]
+    };
+
+    Logger.log(JSON.stringify(errorResult));
+    return errorResult;
+  }
+}
