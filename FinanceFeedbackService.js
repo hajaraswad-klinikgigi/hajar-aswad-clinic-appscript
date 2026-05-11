@@ -129,7 +129,7 @@ function ensureBillingFeedbackTokenForBilling_(billingId, options) {
       updated_at: now
     };
 
-    appendObject('BillingFeedbacks', feedback);
+    dbInsert_('BillingFeedbacks', feedback);
 
     if (typeof hardenFinanceTextColumnsForObjectRow_ === 'function') {
       const hardenFeedbackRowRes = hardenFinanceTextColumnsForObjectRow_(
@@ -182,7 +182,7 @@ function ensureBillingFeedbackTokenForBilling_(billingId, options) {
         ? String(feedback.feedback_id || '').trim()
         : normalizedBillingId;
 
-      const ok = updateObjectById('BillingFeedbacks', updateKey, updateValue, patch);
+      const ok = dbUpdateById_('BillingFeedbacks', updateKey, updateValue, patch);
 
       if (!ok) {
         return {
@@ -528,7 +528,7 @@ function submitBillingFeedback(payload) {
       updated_at: now
     };
 
-    const ok = updateObjectById('BillingFeedbacks', 'feedback_id', feedback.feedback_id, updated);
+    const ok = dbUpdateById_('BillingFeedbacks', 'feedback_id', feedback.feedback_id, updated);
 
     if (!ok) {
       return {

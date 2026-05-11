@@ -107,9 +107,7 @@ function getPatientServiceUiReadBackendMode_(options) {
 }
 
 function getPatientServiceSpreadsheetWriteReadOptions_() {
-  return {
-    backend_mode: 'spreadsheet'
-  };
+  return repoBuildUiReadOptions_({});
 }
 
 function getPatientsRaw(options) {
@@ -934,7 +932,7 @@ function createPatient(data) {
       updated_at: nowIso()
     };
 
-    appendObject('Patients', patient);
+    dbInsert_('Patients', patient);
 
     return {
       success: true,
@@ -1060,7 +1058,7 @@ function updatePatient(data) {
       updated_at: nowIso()
     };
 
-    const ok = updateObjectById('Patients', 'patient_id', data.patient_id, updated);
+    const ok = dbUpdateById_('Patients', 'patient_id', data.patient_id, updated);
 
     if (!ok) {
       return {
@@ -1114,7 +1112,7 @@ function deactivatePatient(patientId) {
     };
   }
 
-  const ok = updateObjectById('Patients', 'patient_id', patientId, {
+  const ok = dbUpdateById_('Patients', 'patient_id', patientId, {
     is_active: false,
     updated_at: nowIso()
   });

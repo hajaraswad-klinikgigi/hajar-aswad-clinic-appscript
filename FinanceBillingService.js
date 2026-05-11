@@ -29,9 +29,7 @@ function isFinanceBillingUiReadSupabaseMode_(options) {
 }
 
 function getFinanceBillingSpreadsheetReadOptions_(options) {
-  const opts = Object.assign({}, options || {});
-  opts.backend_mode = 'spreadsheet';
-  return opts;
+  return repoBuildUiReadOptions_(options || {});
 }
 
 /* =========================================================
@@ -335,7 +333,7 @@ function recalculateBillingTotalsUnlocked_(billingId, options) {
     updated_at: nowIso()
   };
 
-  const ok = updateObjectById('Billings', 'billing_id', normalizedBillingId, updated);
+  const ok = dbUpdateById_('Billings', 'billing_id', normalizedBillingId, updated);
 
   if (!ok) {
     return {
@@ -528,7 +526,7 @@ function createDraftBillingFromTreatment_(treatment, treatmentItems) {
     updated_at: now
   };
 
-  appendObject('Billings', billing);
+  dbInsert_('Billings', billing);
 
   const billingItems = sourceItems.map(function(item) {
     return {
@@ -547,7 +545,7 @@ function createDraftBillingFromTreatment_(treatment, treatmentItems) {
   });
 
   billingItems.forEach(function(item) {
-    appendObject('BillingItems', item);
+    dbInsert_('BillingItems', item);
   });
 
   return {
@@ -980,7 +978,7 @@ function updateBillingTotalsAfterDiscountUnlocked_(billingId, billing, totals, u
     }
   }
 
-  const ok = updateObjectById('Billings', 'billing_id', normalizedBillingId, updated);
+  const ok = dbUpdateById_('Billings', 'billing_id', normalizedBillingId, updated);
 
   if (!ok) {
     return {
@@ -1284,7 +1282,7 @@ function updateBillingTotalsFromCalculatedTotalsUnlocked_(billingId, billing, to
     updated_at: nowIso()
   };
 
-  const ok = updateObjectById('Billings', 'billing_id', normalizedBillingId, updated);
+  const ok = dbUpdateById_('Billings', 'billing_id', normalizedBillingId, updated);
 
   if (!ok) {
     return {

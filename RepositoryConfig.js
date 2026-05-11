@@ -81,7 +81,7 @@ const REPO_BACKEND_MODES = Object.freeze({
  * - SPREADSHEET: aplikasi pakai Google Sheets (mode saat ini)
  * - SUPABASE: aplikasi pakai Supabase (setelah final cutover)
  */
-const REPO_DEFAULT_BACKEND_MODE = REPO_BACKEND_MODES.SPREADSHEET;
+const REPO_DEFAULT_BACKEND_MODE = REPO_BACKEND_MODES.SUPABASE;
 
 function repoNormalizeBackendMode_(backendMode) {
   const raw = String(backendMode || REPO_DEFAULT_BACKEND_MODE || '').trim().toLowerCase();

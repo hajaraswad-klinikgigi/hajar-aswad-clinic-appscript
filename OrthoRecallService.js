@@ -36,9 +36,7 @@ function isOrthoRecallServiceUiReadSupabaseMode_(options) {
 }
 
 function getOrthoRecallServiceSpreadsheetWriteReadOptions_() {
-  return {
-    backend_mode: 'spreadsheet'
-  };
+  return repoBuildUiReadOptions_({});
 }
 
 function getOrthoRecallRaw(options) {
@@ -458,7 +456,7 @@ function createOrthoRecallFromInstall(payload) {
   }
 
   const record = buildOrthoRecallRecordFromInstall(payload);
-  appendObject('OrthoRecall', record);
+  dbInsert_('OrthoRecall', record);
   clearPatientDetailBundleCache(patientId);
 
   return {
@@ -490,7 +488,7 @@ function createOrthoRecallFromControlFallback(payload) {
   }
 
   const record = buildOrthoRecallRecordFromControlFallback(payload);
-  appendObject('OrthoRecall', record);
+  dbInsert_('OrthoRecall', record);
   clearPatientDetailBundleCache(patientId);
 
   return {
@@ -537,7 +535,7 @@ function updateOrthoRecallFromControl(payload) {
     updated_at: nowIso()
   };
 
-  const ok = updateObjectById('OrthoRecall', 'ortho_recall_id', existing.ortho_recall_id, updated);
+  const ok = dbUpdateById_('OrthoRecall', 'ortho_recall_id', existing.ortho_recall_id, updated);
 
   if (!ok) {
     return {
@@ -612,7 +610,7 @@ function saveOrthoRecallContact(payload) {
     updated_at: nowIso()
   };
 
-  const ok = updateObjectById('OrthoRecall', 'ortho_recall_id', orthoRecallId, updated);
+  const ok = dbUpdateById_('OrthoRecall', 'ortho_recall_id', orthoRecallId, updated);
 
   if (!ok) {
     return {
@@ -708,7 +706,7 @@ function completeOrthoRecallProgram(payload) {
     updated_at: nowIso()
   };
 
-  const ok = updateObjectById('OrthoRecall', 'ortho_recall_id', orthoRecallId, updated);
+  const ok = dbUpdateById_('OrthoRecall', 'ortho_recall_id', orthoRecallId, updated);
 
   if (!ok) {
     return {
@@ -789,7 +787,7 @@ function cancelOrthoRecallProgram(payload) {
     updated_at: nowIso()
   };
 
-  const ok = updateObjectById('OrthoRecall', 'ortho_recall_id', orthoRecallId, updated);
+  const ok = dbUpdateById_('OrthoRecall', 'ortho_recall_id', orthoRecallId, updated);
 
   if (!ok) {
     return {
@@ -863,7 +861,7 @@ function refreshAllOrthoRecallStatuses(options) {
     );
 
     if (String(row.followup_status || '').trim().toLowerCase() !== nextStatus) {
-      updateObjectById('OrthoRecall', 'ortho_recall_id', orthoRecallId, {
+      dbUpdateById_('OrthoRecall', 'ortho_recall_id', orthoRecallId, {
         followup_status: nextStatus,
         updated_at: nowIso()
       });
@@ -956,7 +954,7 @@ function syncOrthoRecallPhonesFromPatients(options) {
       return;
     }
 
-    updateObjectById('OrthoRecall', 'ortho_recall_id', recallId, {
+    dbUpdateById_('OrthoRecall', 'ortho_recall_id', recallId, {
       phone: forceRecallPhoneText(correctPhone),
       updated_at: nowIso()
     });

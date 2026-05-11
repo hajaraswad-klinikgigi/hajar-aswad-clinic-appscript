@@ -319,7 +319,7 @@ function createPatientPhoto(data) {
       updated_at: nowIso()
     };
 
-    appendObject('PatientPhotos', photo);
+    dbInsert_('PatientPhotos', photo);
 
     clearPatientDetailBundleCache(patientId);
 
@@ -530,7 +530,7 @@ function createPatientPhotoUpload(payload) {
       updated_at: nowIso()
     };
 
-    appendObject('PatientPhotos', photo);
+    dbInsert_('PatientPhotos', photo);
 
     clearPatientDetailBundleCache(patientId);
 
@@ -629,7 +629,7 @@ function deletePatientPhoto(payload) {
 
     const patientId = String(photo.patient_id || '').trim();
 
-    const ok = updateObjectById('PatientPhotos', 'photo_id', photoId, {
+    const ok = dbUpdateById_('PatientPhotos', 'photo_id', photoId, {
       is_active: false,
       updated_at: nowIso(),
       deleted_at: nowIso()

@@ -36,9 +36,7 @@ function isAppointmentServiceUiReadSupabaseMode_(options) {
 }
 
 function getAppointmentServiceSpreadsheetWriteReadOptions_() {
-  return {
-    backend_mode: 'spreadsheet'
-  };
+  return repoBuildUiReadOptions_({});
 }
 
 function getAppointmentsRaw(options) {
@@ -163,6 +161,11 @@ function getOpenAppointmentsByPatientMap(options) {
  * - rows (object per row)
  */
 function getAppointmentsSheetSnapshot() {
+  if (repoIsSupabaseBackendMode_({})) {
+    const rows = dbFindAll_('Appointments', {}) || [];
+    return { sheet: null, headers: [], values: [], rows: rows };
+  }
+
   const sheet = getSheet('Appointments');
   const values = sheet.getDataRange().getValues();
   const headers = values.length ? values[0] : [];
@@ -202,6 +205,11 @@ function hasOpenAppointmentForPatientFromRows(rows, patientId, excludeAppointmen
 }
 
 function appendAppointmentRowFromSnapshot(snapshot, obj) {
+  if (!snapshot.sheet) {
+    dbInsert_('Appointments', obj);
+    return;
+  }
+
   const headers = snapshot.headers || [];
   const sheet = snapshot.sheet;
 
@@ -218,6 +226,11 @@ function appendAppointmentRowFromSnapshot(snapshot, obj) {
 }
 
 function updateAppointmentRowFromSnapshot(snapshot, appointmentId, updatedObj) {
+  if (!snapshot.sheet) {
+    dbUpdateById_('Appointments', 'appointment_id', appointmentId, updatedObj);
+    return true;
+  }
+
   const headers = snapshot.headers || [];
   const values = snapshot.values || [];
   const sheet = snapshot.sheet;

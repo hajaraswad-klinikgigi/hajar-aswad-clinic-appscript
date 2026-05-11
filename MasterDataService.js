@@ -229,7 +229,7 @@ function createServiceCatalog(data) {
     is_ortho_control: false
   };
 
-  appendObject('ServiceCatalog', service);
+  dbInsert_('ServiceCatalog', service);
 
   return {
     success: true,
@@ -278,7 +278,7 @@ function updateServiceCatalog(data) {
     is_ortho_control: normalizeBooleanCell(existing.is_ortho_control)
   };
 
-  const ok = updateObjectById('ServiceCatalog', 'service_id', data.service_id, updated);
+  const ok = dbUpdateById_('ServiceCatalog', 'service_id', data.service_id, updated);
 
   if (!ok) {
     return {

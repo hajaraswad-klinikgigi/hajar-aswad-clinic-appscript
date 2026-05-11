@@ -515,7 +515,7 @@ function createOrReplaceBillingInstallmentPlan(payload) {
       updated_at: updatedAt
     };
 
-    const billingUpdateOk = updateObjectById(
+    const billingUpdateOk = dbUpdateById_(
       getBillingSheetNameForInstallment_(),
       'billing_id',
       billingId,
@@ -669,7 +669,7 @@ function clearBillingInstallmentPlan(payload) {
       updated_at: updatedAt
     };
 
-    const billingUpdateOk = updateObjectById('Billings', 'billing_id', billingId, billingPatch);
+    const billingUpdateOk = dbUpdateById_('Billings', 'billing_id', billingId, billingPatch);
 
     if (!billingUpdateOk) {
       return {
@@ -803,7 +803,7 @@ function recalculateBillingInstallmentPayments(billingId) {
     };
 
     if (shouldUpdate && installmentId) {
-      updateObjectById(
+      dbUpdateById_(
         getBillingInstallmentSheetName_(),
         'installment_id',
         installmentId,
@@ -1011,7 +1011,7 @@ function syncBillingInstallmentsAfterBillingTotalChange_(billingId, options) {
       const reduction = Math.min(reducibleAmount, excess);
       const nextAmountDue = financeRoundAmount_(amountDue - reduction);
 
-      updateObjectById('BillingInstallments', 'installment_id', installmentId, {
+      dbUpdateById_('BillingInstallments', 'installment_id', installmentId, {
         amount_due: nextAmountDue,
         updated_at: nowIso()
       });
@@ -1077,7 +1077,7 @@ function syncBillingInstallmentsAfterBillingTotalChange_(billingId, options) {
     const amountDueBefore = financeRoundAmount_(targetRow.amount_due);
     const amountDueAfter = financeRoundAmount_(amountDueBefore + deficit);
 
-    updateObjectById('BillingInstallments', 'installment_id', targetInstallmentId, {
+    dbUpdateById_('BillingInstallments', 'installment_id', targetInstallmentId, {
       amount_due: amountDueAfter,
       updated_at: nowIso()
     });
@@ -1246,7 +1246,7 @@ function renumberBillingInstallments_(billingId) {
     if (!installmentId) return;
 
     if (currentNo !== expectedNo) {
-      updateObjectById('BillingInstallments', 'installment_id', installmentId, {
+      dbUpdateById_('BillingInstallments', 'installment_id', installmentId, {
         installment_no: expectedNo,
         updated_at: nowIso()
       });
@@ -1285,7 +1285,7 @@ function updateBillingInstallmentMetaAfterSync_(billingId) {
       financeNormalizeDateOnlyYmd_(rows[0].due_date || '') ||
       getFinanceTodayYmd_();
 
-    updateObjectById('Billings', 'billing_id', normalizedBillingId, {
+    dbUpdateById_('Billings', 'billing_id', normalizedBillingId, {
       payment_type: 'installment',
       payment_terms: 'installment',
       due_date: firstDueDate,
@@ -1306,7 +1306,7 @@ function updateBillingInstallmentMetaAfterSync_(billingId) {
     financeNormalizeDateOnlyYmd_(billing.billing_date || '') ||
     getFinanceTodayYmd_();
 
-  updateObjectById('Billings', 'billing_id', normalizedBillingId, {
+  dbUpdateById_('Billings', 'billing_id', normalizedBillingId, {
     payment_type: 'full',
     payment_terms: 'full',
     due_date: fallbackDueDate,

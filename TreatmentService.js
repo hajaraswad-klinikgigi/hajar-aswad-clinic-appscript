@@ -32,9 +32,7 @@ function getTreatmentServiceUiReadBackendMode_(options) {
 }
 
 function getTreatmentServiceSpreadsheetWriteReadOptions_() {
-  return {
-    backend_mode: 'spreadsheet'
-  };
+  return repoBuildUiReadOptions_({});
 }
 
 function getTreatmentsRaw(options) {
@@ -636,10 +634,10 @@ function createTreatment(payload) {
       updated_at: nowIso()
     };
 
-    appendObject('Treatments', treatment);
+    dbInsert_('Treatments', treatment);
 
     normalizedItems.forEach(function(item) {
-      appendObject('TreatmentItems', item);
+      dbInsert_('TreatmentItems', item);
     });
 
     const medicalRecord = {
@@ -656,9 +654,9 @@ function createTreatment(payload) {
       created_at: nowIso()
     };
 
-    appendObject('MedicalRecords', medicalRecord);
+    dbInsert_('MedicalRecords', medicalRecord);
 
-    updateObjectById('Appointments', 'appointment_id', payload.appointment_id, {
+    dbUpdateById_('Appointments', 'appointment_id', payload.appointment_id, {
       status: 'completed',
       updated_at: nowIso()
     });

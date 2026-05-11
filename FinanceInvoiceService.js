@@ -83,7 +83,7 @@ function updateBillingInvoiceFieldsWithShortLock_(billingId, updated, actionLabe
     lock.waitLock(10000);
     locked = true;
 
-    const ok = updateObjectById(
+    const ok = dbUpdateById_(
       'Billings',
       'billing_id',
       normalizedBillingId,
@@ -1510,7 +1510,7 @@ function markBillingInvoiceStaleAfterDataChange_(billingId, options) {
     updated_at: nowIso()
   };
 
-  const ok = updateObjectById('Billings', 'billing_id', normalizedBillingId, updated);
+  const ok = dbUpdateById_('Billings', 'billing_id', normalizedBillingId, updated);
 
   if (!ok) {
     return {

@@ -413,7 +413,7 @@ function updateBillingTotalsAfterPaymentUnlocked_(billingId, billing, totals, up
     }
   }
 
-  const ok = updateObjectById('Billings', 'billing_id', normalizedBillingId, updated);
+  const ok = dbUpdateById_('Billings', 'billing_id', normalizedBillingId, updated);
 
   if (!ok) {
     return {
