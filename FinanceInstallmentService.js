@@ -514,7 +514,7 @@ function createOrReplaceBillingInstallmentPlan(payload) {
         amount_due: amountDue,
         paid_amount: paidAmount,
         status: calculateInstallmentStatus_(row.due_date, amountDue, paidAmount),
-        paid_at: ''
+        paid_at: null
       });
     });
 

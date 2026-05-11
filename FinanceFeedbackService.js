@@ -122,7 +122,7 @@ function ensureBillingFeedbackTokenForBilling_(billingId, options) {
       clinic_cleanliness: '',
       waiting_time: '',
       comment: '',
-      submitted_at: '',
+      submitted_at: null,
       patient_id: String(billing.patient_id || '').trim(),
       patient_name: String(billing.patient_name || '').trim(),
       created_at: now,

@@ -785,7 +785,7 @@ function cancelOrthoRecallProgram(payload) {
   const updated = {
     program_status: 'cancelled',
     followup_status: 'done',
-    completed_at: '',
+    completed_at: null,
     notes: buildOrthoRecallProgramNote(existing.notes, 'Program cancelled', reason),
     updated_at: nowIso()
   };
