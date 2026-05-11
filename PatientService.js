@@ -596,6 +596,9 @@ function normalizePhoneForCompare(phone) {
 function forceSheetText(value) {
   const s = String(value || '').trim();
   if (!s) return '';
+  if (typeof repoIsSupabaseBackendMode_ === 'function' && repoIsSupabaseBackendMode_({})) {
+    return s;
+  }
   return "'" + s;
 }
 

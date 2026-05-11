@@ -95,9 +95,12 @@ function forceRecallPhoneText(value) {
   const phone = normalizeRecallPhoneDisplay(value);
   if (!phone) return '';
 
-  // Pakai helper yang sudah kita punya di PatientService.gs
   if (typeof forceSheetText === 'function') {
     return forceSheetText(phone);
+  }
+
+  if (typeof repoIsSupabaseBackendMode_ === 'function' && repoIsSupabaseBackendMode_({})) {
+    return phone;
   }
 
   return "'" + phone;
