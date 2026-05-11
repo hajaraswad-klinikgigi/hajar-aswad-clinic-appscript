@@ -138,7 +138,11 @@ function supabaseInsert_(table, data) {
     throw new Error('Supabase INSERT failed for ' + table + ': HTTP ' + result.status_code + ' - ' + JSON.stringify(result.body));
   }
 
-  return Array.isArray(result.body) && result.body.length === 1 ? result.body[0] : result.body;
+  // Kalau input data adalah object tunggal, return object pertama dari response array
+  if (!Array.isArray(data) && Array.isArray(result.body) && result.body.length > 0) {
+    return result.body[0];
+  }
+  return result.body;
 }
 
 /**
@@ -167,7 +171,11 @@ function supabaseUpdate_(table, filters, patch) {
     throw new Error('Supabase UPDATE failed for ' + table + ': HTTP ' + result.status_code + ' - ' + JSON.stringify(result.body));
   }
 
-  return Array.isArray(result.body) && result.body.length === 1 ? result.body[0] : result.body;
+  // Update biasanya single record, return object pertama
+  if (Array.isArray(result.body) && result.body.length > 0) {
+    return result.body[0];
+  }
+  return result.body;
 }
 
 /**

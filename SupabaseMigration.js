@@ -127,7 +127,7 @@ function migrateSingleSheet_(ss, sheetName, tableName) {
     var batchSize = 500;
     for (var start = 0; start < rows.length; start += batchSize) {
       var batch = rows.slice(start, start + batchSize);
-      var insertResult = supabaseInsert_(tableName, batch);
+      var insertResult = migrationSupabaseInsert_(tableName, batch);
       if (!insertResult.success) {
         result.error = insertResult.error;
         return result;
@@ -210,7 +210,7 @@ function cleanValue_(val, key) {
 // =============================================
 // INTERNAL: kirim data ke Supabase
 // =============================================
-function supabaseInsert_(tableName, rows) {
+function migrationSupabaseInsert_(tableName, rows) {
   var url = MIGRATION_SUPABASE_URL + '/rest/v1/' + tableName;
 
   var options = {
