@@ -261,11 +261,7 @@ function getAppointments(options) {
 
   const rows = getAppointmentsRaw(opts);
 
-  const enrichedRows = typeof migration8E4C_enrichAppointmentRowsForClient_ === 'function'
-    ? migration8E4C_enrichAppointmentRowsForClient_(rows, opts)
-    : rows;
-
-  const normalized = enrichedRows.map(function(row) {
+  const normalized = rows.map(function(row) {
     return normalizeAppointmentForClient(row);
   });
 
@@ -380,13 +376,9 @@ function getAppointmentById(appointmentId, options) {
     };
   }
 
-  const enrichedRow = typeof migration8E4C_enrichAppointmentRowForClient_ === 'function'
-    ? migration8E4C_enrichAppointmentRowForClient_(row, opts)
-    : row;
-
   return {
     success: true,
-    data: normalizeAppointmentForClient(enrichedRow)
+    data: normalizeAppointmentForClient(row)
   };
 }
 

@@ -154,3 +154,34 @@ function debugSupabaseInsertDirect() {
     supabaseDelete_('patients', { patient_id: 'eq.' + testPatientId });
   } catch (e) {}
 }
+
+function checkDataNeedsEnrichment() {
+  Logger.log('=== Cek apakah data perlu enrichment ===');
+
+  var supabaseOpts = { backend_mode: 'supabase' };
+
+  // Cek appointments
+  var appointments = dbFindAll_('Appointments', supabaseOpts);
+  var apptsTanpaName = appointments.filter(function(a) {
+    return !a.patient_name || String(a.patient_name).trim() === '';
+  });
+  Logger.log('Appointments tanpa patient_name: ' + apptsTanpaName.length + ' dari ' + appointments.length);
+
+  // Cek treatments  
+  var treatments = dbFindAll_('Treatments', supabaseOpts);
+  var treatTanpaName = treatments.filter(function(t) {
+    return !t.patient_name || String(t.patient_name).trim() === '';
+  });
+  var treatTanpaDoctor = treatments.filter(function(t) {
+    return !t.doctor_name || String(t.doctor_name).trim() === '';
+  });
+  Logger.log('Treatments tanpa patient_name: ' + treatTanpaName.length + ' dari ' + treatments.length);
+  Logger.log('Treatments tanpa doctor_name: ' + treatTanpaDoctor.length + ' dari ' + treatments.length);
+
+  // Cek ortho_recalls
+  var recalls = dbFindAll_('OrthoRecall', supabaseOpts);
+  var recallsTanpaPhone = recalls.filter(function(r) {
+    return !r.phone || String(r.phone).trim() === '';
+  });
+  Logger.log('OrthoRecalls tanpa phone: ' + recallsTanpaPhone.length + ' dari ' + recalls.length);
+}
