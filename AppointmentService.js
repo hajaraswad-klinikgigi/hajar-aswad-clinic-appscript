@@ -161,7 +161,7 @@ function getOpenAppointmentsByPatientMap(options) {
  * - rows (object per row)
  */
 function getAppointmentsSheetSnapshot() {
-  if (repoIsSupabaseBackendMode_({})) {
+  if (repoIsSupabaseBackendMode_()) {
     const rows = dbFindAll_('Appointments', {}) || [];
     return { sheet: null, headers: [], values: [], rows: rows };
   }
@@ -1388,6 +1388,152 @@ function testAppointmentServicePhase6GUiReadLog() {
     const errorResult = {
       success: false,
       stage: '6G-AppointmentService',
+      checked_at: typeof nowIso === 'function' ? nowIso() : new Date().toISOString(),
+      message: err && err.message ? err.message : String(err || 'Unknown error')
+    };
+
+    Logger.log(JSON.stringify(errorResult, null, 2));
+    return errorResult;
+  }
+}
+
+function testAppointmentServicePhase6GWriteLog() {
+  const result = {
+    success: true,
+    stage: '6G-AppointmentService-Write',
+    checked_at: typeof nowIso === 'function' ? nowIso() : new Date().toISOString(),
+    backend_mode: typeof dbGetBackendMode_ === 'function' ? dbGetBackendMode_() : '',
+    issue_count: 0,
+    issues: [],
+    steps: {}
+  };
+
+  let createdAppointmentId = null;
+
+  try {
+    const patients = typeof getPatientsRaw === 'function' ? getPatientsRaw() : [];
+    const testPatient = patients.length ? patients[0] : null;
+
+    if (!testPatient || !testPatient.patient_id) {
+      result.issues.push({ issue: 'NO_PATIENT_AVAILABLE_FOR_WRITE_TEST' });
+      result.issue_count = result.issues.length;
+      result.success = false;
+      Logger.log(JSON.stringify(result, null, 2));
+      return result;
+    }
+
+    const testPatientId = String(testPatient.patient_id).trim();
+    result.steps.test_patient_id = testPatientId;
+
+    // Step 1: Create
+    const createRes = createAppointment({
+      patient_id: testPatientId,
+      appointment_date: '2099-12-31',
+      appointment_time: '09:00',
+      complaint: 'TEST WRITE PHASE 6 - HAPUS JIKA MUNCUL',
+      status: 'scheduled'
+    });
+
+    result.steps.create = {
+      success: !!(createRes && createRes.success),
+      message: createRes && createRes.message ? createRes.message : ''
+    };
+
+    if (!createRes || !createRes.success) {
+      result.issues.push({ issue: 'CREATE_APPOINTMENT_FAILED', message: result.steps.create.message });
+      result.issue_count = result.issues.length;
+      result.success = false;
+      Logger.log(JSON.stringify(result, null, 2));
+      return result;
+    }
+
+    createdAppointmentId = createRes.data && createRes.data.appointment_id
+      ? String(createRes.data.appointment_id).trim()
+      : '';
+
+    result.steps.created_appointment_id = createdAppointmentId;
+
+    if (!createdAppointmentId) {
+      result.issues.push({ issue: 'CREATED_APPOINTMENT_ID_MISSING' });
+      result.issue_count = result.issues.length;
+      result.success = false;
+      Logger.log(JSON.stringify(result, null, 2));
+      return result;
+    }
+
+    // Step 2: Read back
+    const readBack = getAppointmentById(createdAppointmentId);
+    result.steps.read_back = {
+      success: !!(readBack && readBack.success && readBack.data),
+      status: readBack && readBack.data ? readBack.data.status : ''
+    };
+
+    if (!result.steps.read_back.success) {
+      result.issues.push({ issue: 'READ_BACK_AFTER_CREATE_FAILED' });
+    }
+
+    // Step 3: Cancel
+    const cancelRes = cancelAppointment(createdAppointmentId);
+    result.steps.cancel = {
+      success: !!(cancelRes && cancelRes.success),
+      message: cancelRes && cancelRes.message ? cancelRes.message : ''
+    };
+
+    if (!cancelRes || !cancelRes.success) {
+      result.issues.push({ issue: 'CANCEL_APPOINTMENT_FAILED', message: result.steps.cancel.message });
+    }
+
+    // Step 4: Verify cancelled
+    const afterCancel = getAppointmentById(createdAppointmentId);
+    result.steps.verify_cancelled = {
+      status: afterCancel && afterCancel.data ? afterCancel.data.status : '',
+      ok: !!(afterCancel && afterCancel.data && afterCancel.data.status === 'cancelled')
+    };
+
+    if (!result.steps.verify_cancelled.ok) {
+      result.issues.push({ issue: 'STATUS_NOT_CANCELLED_AFTER_CANCEL' });
+    }
+
+    // Step 5: Restore
+    const restoreRes = restoreAppointment(createdAppointmentId);
+    result.steps.restore = {
+      success: !!(restoreRes && restoreRes.success),
+      message: restoreRes && restoreRes.message ? restoreRes.message : ''
+    };
+
+    if (!restoreRes || !restoreRes.success) {
+      result.issues.push({ issue: 'RESTORE_APPOINTMENT_FAILED', message: result.steps.restore.message });
+    }
+
+    // Step 6: Verify restored
+    const afterRestore = getAppointmentById(createdAppointmentId);
+    result.steps.verify_restored = {
+      status: afterRestore && afterRestore.data ? afterRestore.data.status : '',
+      ok: !!(afterRestore && afterRestore.data && afterRestore.data.status === 'scheduled')
+    };
+
+    if (!result.steps.verify_restored.ok) {
+      result.issues.push({ issue: 'STATUS_NOT_SCHEDULED_AFTER_RESTORE' });
+    }
+
+    // Cleanup: cancel test appointment supaya tidak mengganggu
+    cancelAppointment(createdAppointmentId);
+    result.steps.cleanup = 'cancelled (test appointment dibersihkan)';
+
+    result.issue_count = result.issues.length;
+    result.success = result.issue_count === 0;
+
+    Logger.log(JSON.stringify(result, null, 2));
+    return result;
+
+  } catch (err) {
+    if (createdAppointmentId) {
+      try { cancelAppointment(createdAppointmentId); } catch (e) {}
+    }
+
+    const errorResult = {
+      success: false,
+      stage: '6G-AppointmentService-Write',
       checked_at: typeof nowIso === 'function' ? nowIso() : new Date().toISOString(),
       message: err && err.message ? err.message : String(err || 'Unknown error')
     };
