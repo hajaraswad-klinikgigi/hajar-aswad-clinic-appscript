@@ -216,8 +216,18 @@ function getBillingPaymentModeSuggestion(billingId) {
 }
 
 function appendBillingPaymentFast_(payment) {
-  const sheetName = 'Payments';
   const row = payment || {};
+
+  if (repoIsSupabaseBackendMode_()) {
+    try {
+      dbInsert_('Payments', row);
+      return { success: true, message: 'Pembayaran berhasil ditambahkan', data: { row_number: null } };
+    } catch (err) {
+      return { success: false, message: 'Gagal menyimpan pembayaran: ' + (err && err.message ? err.message : String(err || '')) };
+    }
+  }
+
+  const sheetName = 'Payments';
   const sheet = getSheet(sheetName);
 
   if (!sheet) {

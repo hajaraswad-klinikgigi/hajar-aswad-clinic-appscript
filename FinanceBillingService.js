@@ -996,8 +996,18 @@ function updateBillingTotalsAfterDiscountUnlocked_(billingId, billing, totals, u
 }
 
 function appendBillingAdjustmentForDiscountFast_(adjustment) {
-  const sheetName = 'BillingAdjustments';
   const row = adjustment || {};
+
+  if (repoIsSupabaseBackendMode_()) {
+    try {
+      dbInsert_('BillingAdjustments', row);
+      return { success: true, message: 'Diskon berhasil ditambahkan', data: { row_number: null } };
+    } catch (err) {
+      return { success: false, message: 'Gagal menyimpan diskon: ' + (err && err.message ? err.message : String(err || '')) };
+    }
+  }
+
+  const sheetName = 'BillingAdjustments';
   const sheet = getSheet(sheetName);
 
   if (!sheet) {

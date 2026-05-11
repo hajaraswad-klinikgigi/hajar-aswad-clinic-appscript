@@ -59,13 +59,28 @@ function getBillingPaidTotalForInstallment_(billingId) {
 
 function deleteBillingInstallmentsByBillingId_(billingId, options) {
   const opts = options || {};
-  const shouldEnsureSetup = opts.ensure_setup !== false;
   const normalizedBillingId = String(billingId || '').trim();
 
   if (!normalizedBillingId) {
     return 0;
   }
 
+  if (repoIsSupabaseBackendMode_()) {
+    try {
+      const existing = dbFindWhere_('BillingInstallments', function(row) {
+        return String(row.billing_id || '').trim() === normalizedBillingId;
+      });
+      existing.forEach(function(row) {
+        const id = String(row.installment_id || '').trim();
+        if (id) dbDeleteById_('BillingInstallments', 'installment_id', id);
+      });
+      return existing.length;
+    } catch (err) {
+      return 0;
+    }
+  }
+
+  const shouldEnsureSetup = opts.ensure_setup !== false;
   if (shouldEnsureSetup) {
     setupFinanceStage1Sheets();
   }
@@ -208,7 +223,7 @@ function buildBillingInstallmentRows_(payload) {
       amount_due: financeRoundAmount_(item.amount_due),
       paid_amount: 0,
       status: 'unpaid',
-      paid_at: '',
+      paid_at: null,
       notes: String(item.notes || '').trim(),
       created_at: now,
       updated_at: now
@@ -225,6 +240,17 @@ function appendBillingInstallmentRowsBatch_(rows) {
       message: 'Tidak ada row cicilan yang perlu ditambahkan',
       appended_rows: 0
     };
+  }
+
+  if (repoIsSupabaseBackendMode_()) {
+    try {
+      list.forEach(function(row) {
+        dbInsert_('BillingInstallments', row);
+      });
+      return { success: true, message: 'Cicilan berhasil ditambahkan', appended_rows: list.length };
+    } catch (err) {
+      return { success: false, message: 'Gagal menyimpan cicilan: ' + (err && err.message ? err.message : String(err || '')) };
+    }
   }
 
   const sheetName = getBillingInstallmentSheetName_();
