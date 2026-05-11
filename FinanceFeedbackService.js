@@ -131,7 +131,7 @@ function ensureBillingFeedbackTokenForBilling_(billingId, options) {
 
     dbInsert_('BillingFeedbacks', feedback);
 
-    if (typeof hardenFinanceTextColumnsForObjectRow_ === 'function' && !repoIsSupabaseBackendMode_({})) {
+    if (typeof hardenFinanceTextColumnsForObjectRow_ === 'function' && !repoIsSupabaseBackendMode_()) {
       const hardenFeedbackRowRes = hardenFinanceTextColumnsForObjectRow_(
         'BillingFeedbacks',
         'feedback_id',
@@ -193,7 +193,7 @@ function ensureBillingFeedbackTokenForBilling_(billingId, options) {
 
       feedback = Object.assign({}, feedback, patch);
 
-      if (typeof hardenFinanceTextColumnsForObjectRow_ === 'function' && !repoIsSupabaseBackendMode_({})) {
+      if (typeof hardenFinanceTextColumnsForObjectRow_ === 'function' && !repoIsSupabaseBackendMode_()) {
         const hardenFeedbackUpdateRes = hardenFinanceTextColumnsForObjectRow_(
           'BillingFeedbacks',
           'feedback_id',
@@ -539,7 +539,7 @@ function submitBillingFeedback(payload) {
 
     const savedFeedback = Object.assign({}, feedback, updated);
 
-    if (typeof hardenFinanceTextColumnsForObjectRow_ === 'function' && !repoIsSupabaseBackendMode_({})) {
+    if (typeof hardenFinanceTextColumnsForObjectRow_ === 'function' && !repoIsSupabaseBackendMode_()) {
       const hardenSubmittedFeedbackRes = hardenFinanceTextColumnsForObjectRow_(
         'BillingFeedbacks',
         'feedback_id',

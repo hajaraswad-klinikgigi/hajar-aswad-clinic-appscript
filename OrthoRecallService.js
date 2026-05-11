@@ -99,7 +99,7 @@ function forceRecallPhoneText(value) {
     return forceSheetText(phone);
   }
 
-  if (typeof repoIsSupabaseBackendMode_ === 'function' && repoIsSupabaseBackendMode_({})) {
+  if (typeof repoIsSupabaseBackendMode_ === 'function' && repoIsSupabaseBackendMode_()) {
     return phone;
   }
 

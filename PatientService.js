@@ -596,7 +596,7 @@ function normalizePhoneForCompare(phone) {
 function forceSheetText(value) {
   const s = String(value || '').trim();
   if (!s) return '';
-  if (typeof repoIsSupabaseBackendMode_ === 'function' && repoIsSupabaseBackendMode_({})) {
+  if (typeof repoIsSupabaseBackendMode_ === 'function' && repoIsSupabaseBackendMode_()) {
     return s;
   }
   return "'" + s;
@@ -946,7 +946,7 @@ function createPatient(data) {
   } catch (err) {
     return {
       success: false,
-      message: 'Terjadi kesalahan saat menambahkan pasien'
+      message: 'Terjadi kesalahan saat menambahkan pasien: ' + (err && err.message ? err.message : String(err))
     };
   } finally {
     lock.releaseLock();
@@ -1081,7 +1081,7 @@ function updatePatient(data) {
   } catch (err) {
     return {
       success: false,
-      message: 'Terjadi kesalahan saat memperbarui data pasien'
+      message: 'Terjadi kesalahan saat memperbarui data pasien: ' + (err && err.message ? err.message : String(err))
     };
   } finally {
     lock.releaseLock();
