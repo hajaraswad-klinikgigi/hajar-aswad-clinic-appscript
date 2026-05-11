@@ -637,7 +637,10 @@ function createTreatment(payload) {
     dbInsert_('Treatments', treatment);
 
     normalizedItems.forEach(function(item) {
-      dbInsert_('TreatmentItems', item);
+      var itemRow = Object.assign({}, item);
+      delete itemRow.is_ortho_install;
+      delete itemRow.is_ortho_control;
+      dbInsert_('TreatmentItems', itemRow);
     });
 
     const medicalRecord = {
@@ -704,7 +707,7 @@ function createTreatment(payload) {
   } catch (err) {
     return {
       success: false,
-      message: 'Terjadi kesalahan saat menyimpan treatment'
+      message: 'Terjadi kesalahan saat menyimpan treatment: ' + (err && err.message ? err.message : String(err || ''))
     };
   } finally {
     lock.releaseLock();
