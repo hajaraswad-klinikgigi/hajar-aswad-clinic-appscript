@@ -1515,7 +1515,7 @@ function addBillingDiscount(payload) {
   }
 }
 
-function testFinanceBillingServicePhase6GUiReadLog() {
+function testFinanceBillingServiceReadLog() {
   const result = {
     success: true,
     stage: '6G-FinanceBillingService',
@@ -1637,7 +1637,7 @@ function testFinanceBillingServicePhase6GUiReadLog() {
   }
 }
 
-function testCutoverPhase8BFinanceBillingFreezeGuardLog() {
+function testFinanceBillingFreezeGuardLog() {
   const result = {
     success: true,
     stage: '8B-10-FinanceBillingService-FreezeGuard',

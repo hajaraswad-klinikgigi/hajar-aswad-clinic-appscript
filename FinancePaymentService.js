@@ -768,7 +768,7 @@ function saveBillingPayment(payload) {
   return recordBillingPayment(payload);
 }
 
-function testCutoverPhase8BFinancePaymentFreezeGuardLog() {
+function testFinancePaymentFreezeGuardLog() {
   const result = {
     success: true,
     stage: '8B-7-FinancePaymentService-FreezeGuard',

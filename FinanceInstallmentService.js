@@ -1329,16 +1329,6 @@ function updateBillingInstallmentMetaAfterSync_(billingId) {
    Tidak dipanggil otomatis oleh UI Finance.
    ========================================================= */
 
-function testInspectBillingInstallmentSyncManual() {
-  const billingId = 'ISI_BILLING_ID_DI_SINI';
-
-  Logger.log(JSON.stringify(
-    inspectBillingInstallmentSync_(billingId),
-    null,
-    2
-  ));
-}
-
 function inspectBillingInstallmentSync_(billingId) {
   const normalizedBillingId = String(billingId || '').trim();
 

@@ -710,7 +710,7 @@ function getFinanceReportUiReadBackendMode_(options) {
   return String(opts.backend_mode || 'spreadsheet').trim().toLowerCase();
 }
 
-function testFinanceReportServicePhase6GUiReadLog() {
+function testFinanceReportServiceReadLog() {
   const result = {
     success: true,
     stage: '6G-FinanceReportService',

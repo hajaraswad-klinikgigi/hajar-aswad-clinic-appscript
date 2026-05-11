@@ -659,7 +659,7 @@ function deletePatientPhoto(payload) {
   }
 }
 
-function testCutoverPhase8BPatientPhotoFreezeGuardLog() {
+function testPatientPhotoFreezeGuardLog() {
   const result = {
     success: true,
     stage: '8B-11-PatientPhotoService-FreezeGuard',

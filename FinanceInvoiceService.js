@@ -1621,7 +1621,7 @@ function getBillingInvoiceDeliveryInfo(payload) {
   };
 }
 
-function testCutoverPhase8BFinanceInvoiceFreezeGuardLog() {
+function testFinanceInvoiceFreezeGuardLog() {
   const result = {
     success: true,
     stage: '8B-8-FinanceInvoiceService-FreezeGuard',

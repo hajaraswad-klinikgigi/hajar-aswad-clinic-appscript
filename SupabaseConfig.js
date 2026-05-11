@@ -91,35 +91,3 @@ function assertSupabaseStagingConfig_() {
   return config;
 }
 
-function testSupabaseStagingConfig5J() {
-  const result = {
-    success: true,
-    checked_at: typeof nowIso === 'function'
-      ? nowIso()
-      : new Date().toISOString(),
-    issue_count: 0,
-    issues: [],
-    config_status: {}
-  };
-
-  try {
-    assertSupabaseStagingConfig_();
-
-    result.config_status = getSupabaseStagingConfigStatus_();
-
-    Logger.log(JSON.stringify(result, null, 2));
-    return result;
-
-  } catch (err) {
-    result.success = false;
-    result.issues.push({
-      issue: 'SUPABASE_STAGING_CONFIG_INVALID',
-      message: err && err.message ? err.message : String(err || 'Unknown error')
-    });
-    result.issue_count = result.issues.length;
-    result.config_status = getSupabaseStagingConfigStatus_();
-
-    Logger.log(JSON.stringify(result, null, 2));
-    return result;
-  }
-}

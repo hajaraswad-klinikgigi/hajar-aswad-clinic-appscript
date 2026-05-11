@@ -580,54 +580,7 @@ function submitBillingFeedback(payload) {
    Tidak dipanggil otomatis oleh UI Finance.
    ========================================================= */
 
-function testEnsureBillingFeedbackTokenManual() {
-  const billingId = 'ISI_BILLING_ID_DI_SINI';
-
-  if (!billingId || billingId === 'ISI_BILLING_ID_DI_SINI') {
-    const result = {
-      success: false,
-      message: 'Isi billingId terlebih dahulu untuk menjalankan test token feedback manual'
-    };
-
-    Logger.log(JSON.stringify(result, null, 2));
-    return result;
-  }
-
-  const result = ensureBillingFeedbackTokenForBilling(billingId, {
-    ensure_setup: true
-  });
-
-  Logger.log(JSON.stringify(result, null, 2));
-  return result;
-}
-
-function testGetBillingFeedbackByBillingIdManual() {
-  const billingId = 'ISI_BILLING_ID_DI_SINI';
-
-  if (!billingId || billingId === 'ISI_BILLING_ID_DI_SINI') {
-    const result = {
-      success: false,
-      message: 'Isi billingId terlebih dahulu untuk menjalankan test feedback billing manual'
-    };
-
-    Logger.log(JSON.stringify(result, null, 2));
-    return result;
-  }
-
-  const result = getBillingFeedbackByBillingId(billingId);
-
-  Logger.log(JSON.stringify(result, null, 2));
-  return result;
-}
-
-function testGetBillingFeedbackSummaryToday() {
-  const result = getBillingFeedbackSummary('today');
-
-  Logger.log(JSON.stringify(result, null, 2));
-  return result;
-}
-
-function testCutoverPhase8BFinanceFeedbackFreezeGuardLog() {
+function testFinanceFeedbackFreezeGuardLog() {
   const result = {
     success: true,
     stage: '8B-9-FinanceFeedbackService-FreezeGuard',

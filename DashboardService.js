@@ -669,7 +669,7 @@ function getDashboardOwnerSummary(period) {
   return result;
 }
 
-function testDashboardServicePhase6GUiReadLog() {
+function testDashboardServiceReadLog() {
   const result = {
     success: true,
     stage: '6G-DashboardService',
