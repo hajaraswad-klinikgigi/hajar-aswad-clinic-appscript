@@ -41,12 +41,16 @@ function getAuthSessionCacheKey_(sessionToken) {
   return 'AUTH_SESSION_' + hashPassword(String(sessionToken || '')).slice(0, 64);
 }
 
+function getUsersRaw_() {
+  return dbFindAll_('Users') || [];
+}
+
 function findUserRawById_(userId) {
   const normalizedUserId = String(userId || '').trim();
 
   if (!normalizedUserId) return null;
 
-  return getRowsAsObjects('Users').find(function(row) {
+  return getUsersRaw_().find(function(row) {
     return String(row.user_id || '').trim() === normalizedUserId;
   }) || null;
 }
@@ -56,7 +60,7 @@ function findUserRawByUsername_(username) {
 
   if (!normalizedUsername) return null;
 
-  return getRowsAsObjects('Users').find(function(row) {
+  return getUsersRaw_().find(function(row) {
     return String(row.username || '').trim().toLowerCase() === normalizedUsername;
   }) || null;
 }
@@ -260,7 +264,7 @@ function logoutAuthSession(sessionToken) {
 }
 
 function loginUser(username, password) {
-  const users = getRowsAsObjects('Users');
+  const users = getUsersRaw_();
 
   const normalizedUsername = String(username || '').trim().toLowerCase();
   const passwordHash = hashPassword(password);
