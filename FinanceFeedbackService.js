@@ -73,7 +73,7 @@ function ensureBillingFeedbackTokenForBilling(billingId, options) {
   } catch (err) {
     return {
       success: false,
-      message: 'Terjadi kesalahan saat menyiapkan link feedback: ' + (err && err.message ? err.message : err)
+      message: 'Terjadi kesalahan saat menyiapkan link feedback: ' + (err && err.message ? err.message : String(err || ''))
     };
   } finally {
     if (lock && lockAcquired) {
@@ -116,7 +116,7 @@ function ensureBillingFeedbackTokenForBilling_(billingId, options) {
       billing_id: normalizedBillingId,
       feedback_token: generateBillingFeedbackToken_(),
       feedback_status: 'pending',
-      rating: '',
+      rating: null,
       service_quality: '',
       staff_friendliness: '',
       clinic_cleanliness: '',
