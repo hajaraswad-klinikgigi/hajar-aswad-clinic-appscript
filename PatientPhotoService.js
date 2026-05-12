@@ -1,5 +1,5 @@
 function getPatientPhotosRaw() {
-  return getRowsAsObjects('PatientPhotos') || [];
+  return dbFindAll_('PatientPhotos') || [];
 }
 
 function normalizePatientPhotoForClient(row) {
