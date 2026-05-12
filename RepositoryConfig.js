@@ -22,7 +22,8 @@ const REPO_TABLES = Object.freeze({
   BILLING_ADJUSTMENTS: 'BillingAdjustments',
   BILLING_INSTALLMENTS: 'BillingInstallments',
   PAYMENTS: 'Payments',
-  BILLING_FEEDBACKS: 'BillingFeedbacks'
+  BILLING_FEEDBACKS: 'BillingFeedbacks',
+  EXPENSES: 'Expenses'
 });
 
 /**
@@ -43,7 +44,8 @@ const REPO_TARGET_TABLES = Object.freeze({
   BillingAdjustments: 'billing_adjustments',
   BillingInstallments: 'billing_installments',
   Payments: 'payments',
-  BillingFeedbacks: 'billing_feedbacks'
+  BillingFeedbacks: 'billing_feedbacks',
+  Expenses: 'expenses'
 });
 
 /**
@@ -64,7 +66,8 @@ const REPO_PRIMARY_KEYS = Object.freeze({
   BillingAdjustments: 'adjustment_id',
   BillingInstallments: 'installment_id',
   Payments: 'payment_id',
-  BillingFeedbacks: 'feedback_id'
+  BillingFeedbacks: 'feedback_id',
+  Expenses: 'expense_id'
 });
 
 /* =========================================================
