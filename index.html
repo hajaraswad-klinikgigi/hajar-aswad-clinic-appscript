@@ -9,6 +9,7 @@
     <?!= include('style-appointments'); ?>
     <?!= include('style-recall'); ?>
     <?!= include('style-finance'); ?>
+    <?!= include('style-owner-report'); ?>
     <?!= include('style-modals'); ?>
     <?!= include('style-responsive'); ?>
   </head>
@@ -50,6 +51,7 @@
           <button type="button" id="menuAppointments" class="sidebar-menu" onclick="showAppointmentsPage(); closeSidebar();">Appointments</button>
           <button type="button" id="menuRecall" class="sidebar-menu" onclick="showRecallPage(); closeSidebar();">Recall</button>
           <button type="button" id="menuFinance" class="sidebar-menu" onclick="showFinancePage(); closeSidebar();">Finance</button>
+          <button type="button" id="menuOwnerReport" class="sidebar-menu" style="display:none;" onclick="showOwnerReportPage(); closeSidebar();">Report</button>
           <button type="button" onclick="logoutLocal()">Logout</button>
         </aside>
 
@@ -564,6 +566,7 @@
     <?!= include('appointments'); ?>
     <?!= include('recall'); ?>
     <?!= include('finance'); ?>
+    <?!= include('owner-report'); ?>
     <?!= include('scripts'); ?>
   </body>
 </html>

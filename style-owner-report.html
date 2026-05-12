@@ -1,0 +1,359 @@
+<style>
+  /* =========================================================
+     OWNER REPORT — SHELL & HEADER
+     ========================================================= */
+  .owner-shell {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+  }
+
+  .owner-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    gap: 16px;
+    flex-wrap: wrap;
+  }
+
+  .owner-eyebrow {
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+    color: #6b7280;
+    margin-bottom: 6px;
+  }
+
+  .owner-title {
+    margin: 0 0 4px 0;
+    font-size: 32px;
+    font-weight: 900;
+    line-height: 1.1;
+    letter-spacing: -0.03em;
+    color: #0f172a;
+  }
+
+  .owner-subtitle {
+    color: #64748b;
+    font-size: 14px;
+  }
+
+  /* =========================================================
+     TABS
+     ========================================================= */
+  .owner-tab-row {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+
+  .owner-tab-btn {
+    padding: 8px 20px;
+    border-radius: 30px;
+    border: 1.5px solid #dbe3ee;
+    background: #fff;
+    font-size: 14px;
+    font-weight: 600;
+    color: #6b7280;
+    cursor: pointer;
+    transition: all .15s;
+  }
+
+  .owner-tab-btn.active {
+    background: #0f172a;
+    border-color: #0f172a;
+    color: #fff;
+  }
+
+  .owner-date-input {
+    padding: 8px 12px;
+    border-radius: 12px;
+    border: 1.5px solid #dbe3ee;
+    font-size: 14px;
+    font-weight: 600;
+    color: #0f172a;
+    outline: none;
+    background: #fff;
+  }
+
+  .owner-refresh-btn {
+    padding: 8px 16px;
+    border-radius: 12px;
+    border: 1.5px solid #dbe3ee;
+    background: #fff;
+    font-size: 13px;
+    font-weight: 600;
+    color: #6b7280;
+    cursor: pointer;
+  }
+
+  .owner-refresh-btn:hover { background: #f1f5f9; }
+
+  /* =========================================================
+     KPI CARDS
+     ========================================================= */
+  .owner-kpi-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 14px;
+  }
+
+  .owner-kpi-card {
+    background: linear-gradient(180deg, #ffffff 0%, #fbfdff 100%);
+    border-radius: 18px;
+    padding: 20px;
+    box-shadow: 0 10px 26px rgba(15, 23, 42, 0.05);
+    border: 1px solid #eef2f7;
+  }
+
+  .owner-kpi-label {
+    font-size: 12px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .06em;
+    color: #6b7280;
+    margin-bottom: 8px;
+  }
+
+  .owner-kpi-value {
+    font-size: 26px;
+    font-weight: 900;
+    color: #0f172a;
+    line-height: 1.1;
+    word-break: break-word;
+  }
+
+  .owner-kpi-diff {
+    margin-top: 8px;
+    font-size: 13px;
+    font-weight: 700;
+  }
+
+  .owner-kpi-diff.up   { color: #16a34a; }
+  .owner-kpi-diff.down { color: #dc2626; }
+  .owner-kpi-diff.flat { color: #6b7280; }
+
+  .owner-kpi-green  { background: linear-gradient(180deg, #f0fdf4 0%, #f7fee7 100%); }
+  .owner-kpi-green .owner-kpi-value { color: #166534; }
+
+  .owner-kpi-red    { background: linear-gradient(180deg, #fff7ed 0%, #fef2f2 100%); }
+  .owner-kpi-red .owner-kpi-value { color: #b91c1c; }
+
+  .owner-kpi-blue   { background: linear-gradient(180deg, #eff6ff 0%, #f0f9ff 100%); }
+  .owner-kpi-blue .owner-kpi-value { color: #1d4ed8; }
+
+  .owner-kpi-teal   { background: linear-gradient(180deg, #f0fdfa 0%, #ecfeff 100%); }
+  .owner-kpi-teal .owner-kpi-value { color: #0f766e; }
+
+  /* =========================================================
+     SECTIONS
+     ========================================================= */
+  .owner-section-title {
+    font-size: 16px;
+    font-weight: 800;
+    color: #0f172a;
+    margin: 0 0 4px 0;
+  }
+
+  .owner-section-subtitle {
+    font-size: 13px;
+    color: #6b7280;
+    margin-bottom: 14px;
+  }
+
+  .owner-section-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 12px;
+    margin-bottom: 14px;
+    flex-wrap: wrap;
+  }
+
+  /* =========================================================
+     EXPENSE KATEGORI CHIPS
+     ========================================================= */
+  .owner-cat-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+    gap: 10px;
+    margin-bottom: 16px;
+  }
+
+  .owner-cat-chip {
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    padding: 12px 14px;
+  }
+
+  .owner-cat-chip-label {
+    font-size: 11px;
+    font-weight: 700;
+    color: #6b7280;
+    text-transform: uppercase;
+    letter-spacing: .05em;
+    margin-bottom: 4px;
+  }
+
+  .owner-cat-chip-value {
+    font-size: 16px;
+    font-weight: 800;
+    color: #0f172a;
+  }
+
+  /* =========================================================
+     TREND TABLE (monthly/yearly breakdown)
+     ========================================================= */
+  .owner-trend-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+  }
+
+  .owner-trend-table th {
+    text-align: left;
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .06em;
+    color: #6b7280;
+    padding: 8px 12px;
+    border-bottom: 2px solid #f1f5f9;
+  }
+
+  .owner-trend-table td {
+    padding: 10px 12px;
+    border-bottom: 1px solid #f1f5f9;
+    color: #1e293b;
+  }
+
+  .owner-trend-table tr:last-child td { border-bottom: none; }
+
+  .owner-net-pos { color: #16a34a; font-weight: 700; }
+  .owner-net-neg { color: #dc2626; font-weight: 700; }
+
+  /* =========================================================
+     EXPENSE MODAL
+     ========================================================= */
+  .owner-modal-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(15,23,42,0.45);
+    z-index: 1000;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .owner-modal-overlay.open {
+    display: flex;
+  }
+
+  .owner-modal-box {
+    background: #fff;
+    border-radius: 20px;
+    padding: 28px;
+    width: 100%;
+    max-width: 480px;
+    max-height: 90vh;
+    overflow-y: auto;
+    box-shadow: 0 24px 60px rgba(15,23,42,0.18);
+    margin: 16px;
+  }
+
+  .owner-modal-title {
+    font-size: 20px;
+    font-weight: 800;
+    color: #0f172a;
+    margin: 0 0 20px 0;
+  }
+
+  .owner-form-group {
+    margin-bottom: 14px;
+  }
+
+  .owner-form-label {
+    display: block;
+    font-size: 12px;
+    font-weight: 700;
+    color: #374151;
+    margin-bottom: 6px;
+    text-transform: uppercase;
+    letter-spacing: .04em;
+  }
+
+  .owner-form-input,
+  .owner-form-select,
+  .owner-form-textarea {
+    width: 100%;
+    padding: 10px 12px;
+    border-radius: 10px;
+    border: 1.5px solid #dbe3ee;
+    font-size: 14px;
+    color: #0f172a;
+    outline: none;
+    background: #fff;
+    box-sizing: border-box;
+    font-family: inherit;
+  }
+
+  .owner-form-input:focus,
+  .owner-form-select:focus,
+  .owner-form-textarea:focus {
+    border-color: #0f172a;
+  }
+
+  .owner-form-textarea { resize: vertical; min-height: 60px; }
+
+  .owner-modal-actions {
+    display: flex;
+    gap: 10px;
+    justify-content: flex-end;
+    margin-top: 20px;
+  }
+
+  .owner-modal-alert {
+    padding: 10px 14px;
+    border-radius: 10px;
+    font-size: 13px;
+    font-weight: 600;
+    margin-bottom: 14px;
+    display: none;
+  }
+
+  .owner-modal-alert.error   { background: #fef2f2; color: #b91c1c; display: block; }
+  .owner-modal-alert.success { background: #f0fdf4; color: #166534; display: block; }
+
+  /* =========================================================
+     LOADING & EMPTY STATE
+     ========================================================= */
+  .owner-loading {
+    text-align: center;
+    padding: 40px 20px;
+    color: #6b7280;
+    font-size: 14px;
+  }
+
+  .owner-empty {
+    text-align: center;
+    padding: 24px;
+    color: #94a3b8;
+    font-size: 13px;
+  }
+
+  /* =========================================================
+     RESPONSIVE
+     ========================================================= */
+  @media (max-width: 640px) {
+    .owner-kpi-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .owner-kpi-value { font-size: 20px; }
+    .owner-title { font-size: 24px; }
+  }
+
+  @media (max-width: 400px) {
+    .owner-kpi-grid { grid-template-columns: 1fr; }
+  }
+</style>

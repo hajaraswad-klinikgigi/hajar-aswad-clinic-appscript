@@ -739,7 +739,9 @@ function showFinancePage() {
           <div class="finance-subtitle">Kelola billing, pembayaran, diskon, kas masuk, dan piutang sederhana</div>
         </div>
 
-        <div class="finance-period-filter-wrap">
+        <div style="display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap;">
+          <button class="btn btn-primary" onclick="openExpenseModal()">+ Tambah Pengeluaran</button>
+          <div class="finance-period-filter-wrap">
           <label class="finance-period-filter-label" for="financePeriodSelect">Periode</label>
 
           <select
@@ -751,6 +753,7 @@ function showFinancePage() {
             <option value="7days">7 Hari</option>
             <option value="30days">30 Hari</option>
           </select>
+          </div>
         </div>
       </div>
 
@@ -6879,4 +6882,164 @@ function submitFinanceInstallmentPlan(e) {
     .createOrReplaceBillingInstallmentPlan(payload);
 }
 
+/* =========================================================
+   EXPENSE FORM — tambah pengeluaran (accessible admin & owner)
+   ========================================================= */
+
+function openExpenseModal() {
+  const today = financeTodayYmd();
+  const el = function(id) { return document.getElementById(id); };
+
+  el('expDate').value        = today;
+  el('expCategory').value    = '';
+  el('expDoctorName').value  = '';
+  el('expDescription').value = '';
+  el('expAmount').value      = '';
+  el('expNotes').value       = '';
+
+  const alertEl = el('expenseModalAlert');
+  if (alertEl) { alertEl.className = 'owner-modal-alert'; alertEl.textContent = ''; }
+
+  const btn = el('expSubmitBtn');
+  if (btn) btn.disabled = false;
+
+  toggleExpenseDoctorField();
+
+  const modal = el('expenseModal');
+  if (modal) modal.classList.add('open');
+}
+
+function closeExpenseModal() {
+  const modal = document.getElementById('expenseModal');
+  if (modal) modal.classList.remove('open');
+}
+
+function toggleExpenseDoctorField() {
+  const cat = document.getElementById('expCategory');
+  const grp = document.getElementById('expDoctorFieldGroup');
+  if (!cat || !grp) return;
+  const doctorCats = ['doctor_salary','doctor_meal','doctor_standby'];
+  grp.style.display = doctorCats.indexOf(cat.value) !== -1 ? 'block' : 'none';
+}
+
+function setExpenseModalAlert(msg, type) {
+  const alertEl = document.getElementById('expenseModalAlert');
+  if (!alertEl) return;
+  alertEl.className = 'owner-modal-alert ' + (type || 'error');
+  alertEl.textContent = msg || '';
+}
+
+function submitExpense() {
+  const el  = function(id) { return document.getElementById(id); };
+  const btn = el('expSubmitBtn');
+  if (btn) btn.disabled = true;
+
+  const date        = (el('expDate')        || {}).value || '';
+  const category    = (el('expCategory')    || {}).value || '';
+  const doctorName  = (el('expDoctorName')  || {}).value || '';
+  const description = (el('expDescription') || {}).value || '';
+  const amount      = Number((el('expAmount') || {}).value || 0);
+  const notes       = (el('expNotes')       || {}).value || '';
+
+  if (!date)        { setExpenseModalAlert('Tanggal wajib diisi.'); if (btn) btn.disabled = false; return; }
+  if (!category)    { setExpenseModalAlert('Kategori wajib dipilih.'); if (btn) btn.disabled = false; return; }
+  if (!description) { setExpenseModalAlert('Keterangan wajib diisi.'); if (btn) btn.disabled = false; return; }
+  if (!amount || amount <= 0) { setExpenseModalAlert('Nominal harus lebih dari 0.'); if (btn) btn.disabled = false; return; }
+
+  const doctorCats = ['doctor_salary','doctor_meal','doctor_standby'];
+  if (doctorCats.indexOf(category) !== -1 && !doctorName) {
+    setExpenseModalAlert('Nama dokter wajib dipilih untuk kategori ini.');
+    if (btn) btn.disabled = false;
+    return;
+  }
+
+  google.script.run
+    .withSuccessHandler(function(res) {
+      if (!res || !res.success) {
+        const msg = res && res.message ? res.message : 'Gagal menyimpan.';
+        setExpenseModalAlert(msg);
+        showToast('Gagal: ' + msg, 'error');
+        if (btn) btn.disabled = false;
+        return;
+      }
+      closeExpenseModal();
+      showToast('Pengeluaran berhasil disimpan.', 'success');
+    })
+    .withFailureHandler(function(err) {
+      const msg = err && err.message ? err.message : String(err);
+      setExpenseModalAlert('Error: ' + msg);
+      showToast('Error: ' + msg, 'error');
+      if (btn) btn.disabled = false;
+    })
+    .addExpense(attachAuthContext({
+      expense_date: date,
+      category:     category,
+      doctor_name:  doctorName || null,
+      description:  description,
+      amount:       amount,
+      notes:        notes || null
+    }));
+}
+
 </script>
+
+<!-- EXPENSE MODAL -->
+<div class="owner-modal-overlay" id="expenseModal">
+  <div class="owner-modal-box">
+    <h3 class="owner-modal-title">Tambah Pengeluaran</h3>
+    <div class="owner-modal-alert" id="expenseModalAlert"></div>
+
+    <div class="owner-form-group">
+      <label class="owner-form-label">Tanggal *</label>
+      <input type="date" id="expDate" class="owner-form-input">
+    </div>
+
+    <div class="owner-form-group">
+      <label class="owner-form-label">Kategori *</label>
+      <select id="expCategory" class="owner-form-select" onchange="toggleExpenseDoctorField()">
+        <option value="">-- Pilih Kategori --</option>
+        <option value="doctor_salary">Gaji Dokter</option>
+        <option value="doctor_meal">Uang Makan Dokter</option>
+        <option value="doctor_standby">Uang Duduk (Standby) Dokter</option>
+        <option value="operational">Operasional Klinik</option>
+        <option value="utility">Utilitas (Listrik, Air, dll)</option>
+        <option value="owner_withdrawal">Penarikan Owner</option>
+        <option value="other">Lain-lain</option>
+      </select>
+    </div>
+
+    <div class="owner-form-group" id="expDoctorFieldGroup" style="display:none;">
+      <label class="owner-form-label">Nama Dokter *</label>
+      <select id="expDoctorName" class="owner-form-select">
+        <option value="">-- Pilih Dokter --</option>
+        <option value="drg. Selly">drg. Selly</option>
+        <option value="drg. Novira">drg. Novira</option>
+        <option value="drg. Nurdiana">drg. Nurdiana</option>
+        <option value="drg. Aisyah">drg. Aisyah</option>
+        <option value="drg. Mitha">drg. Mitha</option>
+        <option value="drg. Yuni">drg. Yuni</option>
+      </select>
+    </div>
+
+    <div class="owner-form-group">
+      <label class="owner-form-label">Keterangan *</label>
+      <input type="text" id="expDescription" class="owner-form-input"
+        placeholder="Contoh: Beli kapas, gaji dr. Selly Mei 2026...">
+    </div>
+
+    <div class="owner-form-group">
+      <label class="owner-form-label">Nominal (Rp) *</label>
+      <input type="number" id="expAmount" class="owner-form-input" placeholder="0" min="1">
+    </div>
+
+    <div class="owner-form-group">
+      <label class="owner-form-label">Catatan (opsional)</label>
+      <textarea id="expNotes" class="owner-form-textarea" placeholder="Catatan tambahan..."></textarea>
+    </div>
+
+    <div class="owner-modal-actions">
+      <button class="btn btn-secondary" onclick="closeExpenseModal()">Batal</button>
+      <button class="btn btn-primary" id="expSubmitBtn" onclick="submitExpense()">Simpan</button>
+    </div>
+  </div>
+</div>
