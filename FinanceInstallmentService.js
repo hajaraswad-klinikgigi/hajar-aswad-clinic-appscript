@@ -815,7 +815,7 @@ function recalculateBillingInstallmentPayments(billingId) {
     const existingPaidAt = String(formatCellValue(row.paid_at || '') || '').trim();
     const nextPaidAt = nextStatus === 'paid'
       ? (existingPaidAt || now)
-      : '';
+      : null;
 
     const shouldUpdate =
       !financeIsAmountEqual_(existingPaidAmount, paidAmount) ||
