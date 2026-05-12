@@ -844,9 +844,24 @@ function testFinanceReportServiceReadLog() {
    OWNER REPORT — INTERNAL HELPERS
    ========================================================= */
 
+function ownerFetchRawData_(startDate, endDate) {
+  const opts = repoBuildUiReadOptions_({});
+  return {
+    billings:       getBillingsRaw(opts),
+    payments:       getPaymentsRaw(opts),
+    treatments:     getTreatmentsRaw(opts),
+    treatmentItems: getTreatmentItemsRaw(opts),
+    expenses:       dbFindAll_('Expenses', { backend_mode: 'supabase' })
+  };
+}
+
 function ownerGetExpensesForRange_(startDate, endDate) {
   const all = dbFindAll_('Expenses', { backend_mode: 'supabase' });
-  return all.filter(function(e) {
+  return ownerFilterExpensesForRange_(all, startDate, endDate);
+}
+
+function ownerFilterExpensesForRange_(allExpenses, startDate, endDate) {
+  return allExpenses.filter(function(e) {
     const d = String(e.expense_date || '').slice(0, 10);
     return d >= startDate && d <= endDate;
   });
@@ -857,7 +872,7 @@ function ownerBuildExpenseSummary_(expenses) {
   const byCategory = {};
   categories.forEach(function(c) { byCategory[c] = 0; });
 
-  let total = 0;
+  var total = 0;
   expenses.forEach(function(e) {
     const amt = Number(e.amount || 0);
     total += amt;
@@ -869,35 +884,46 @@ function ownerBuildExpenseSummary_(expenses) {
   return { total_expense: total, by_category: byCategory };
 }
 
+// Fetch data dari Supabase sekali, kemudian filter untuk range tertentu (no additional API calls)
 function ownerBuildRevenueForRange_(startDate, endDate) {
   const opts = repoBuildUiReadOptions_({});
+  const rawData = {
+    billings:       getBillingsRaw(opts),
+    payments:       getPaymentsRaw(opts),
+    treatments:     getTreatmentsRaw(opts),
+    treatmentItems: getTreatmentItemsRaw(opts)
+  };
+  return ownerBuildRevenueFromRawData_(rawData, startDate, endDate);
+}
 
-  const billings = getBillingsRaw(opts).filter(function(b) {
+// Core compute — tidak ada API call, semua dari pre-fetched data
+function ownerBuildRevenueFromRawData_(rawData, startDate, endDate) {
+  const billings = rawData.billings.filter(function(b) {
     const d = financeExtractYmd_(b.billing_date);
     return d >= startDate && d <= endDate && String(b.billing_status || '').trim().toLowerCase() !== 'cancelled';
   });
 
-  const payments = getPaymentsRaw(opts).filter(function(p) {
+  const payments = rawData.payments.filter(function(p) {
     const d = financeExtractYmd_(p.payment_date);
     return d >= startDate && d <= endDate;
   });
 
-  const treatments = getTreatmentsRaw(opts).filter(function(t) {
+  const treatments = rawData.treatments.filter(function(t) {
     const d = financeExtractYmd_(t.treatment_date);
     return d >= startDate && d <= endDate;
   });
 
-  const treatmentItems = getTreatmentItemsRaw(opts).filter(function(ti) {
-    return treatments.some(function(t) {
-      return String(t.treatment_id || '') === String(ti.treatment_id || '');
-    });
+  const treatmentIdSet = {};
+  treatments.forEach(function(t) { treatmentIdSet[String(t.treatment_id || '')] = true; });
+
+  const treatmentItems = rawData.treatmentItems.filter(function(ti) {
+    return treatmentIdSet[String(ti.treatment_id || '')];
   });
 
   const totalBilling = billings.reduce(function(s, b) { return s + Number(b.grand_total || 0); }, 0);
   const totalCashIn  = payments.reduce(function(s, p) { return s + Number(p.amount || 0); }, 0);
   const patientCount = treatments.length;
 
-  // Per dokter
   const billingByTreatmentId = {};
   billings.forEach(function(b) {
     billingByTreatmentId[String(b.treatment_id || '')] = b;
@@ -924,7 +950,6 @@ function ownerBuildRevenueForRange_(startDate, endDate) {
     byDoctorMap[doc].total_cash_in += cashIn;
   });
 
-  // Per layanan
   const byServiceMap = {};
   treatmentItems.forEach(function(ti) {
     const name = String(ti.service_name || ti.item_name || 'Lainnya').trim();
@@ -935,7 +960,6 @@ function ownerBuildRevenueForRange_(startDate, endDate) {
     byServiceMap[name].total += Number(ti.subtotal || 0);
   });
 
-  // Per metode bayar
   const byPaymentMethod = { cash: 0, transfer: 0, other: 0 };
   payments.forEach(function(p) {
     const method = String(p.payment_method || '').trim().toLowerCase();
@@ -945,12 +969,12 @@ function ownerBuildRevenueForRange_(startDate, endDate) {
   });
 
   return {
-    total_billing:      totalBilling,
-    total_cash_in:      totalCashIn,
-    patient_count:      patientCount,
-    by_doctor:          Object.values(byDoctorMap),
-    by_service:         Object.values(byServiceMap),
-    by_payment_method:  byPaymentMethod
+    total_billing:     totalBilling,
+    total_cash_in:     totalCashIn,
+    patient_count:     patientCount,
+    by_doctor:         Object.values(byDoctorMap),
+    by_service:        Object.values(byServiceMap),
+    by_payment_method: byPaymentMethod
   };
 }
 
@@ -1029,23 +1053,26 @@ function getOwnerMonthlyReport(payload) {
     const prevLastDay = new Date(prevYear, prevMonth, 0).getDate();
     const prevEnd   = prevYear + '-' + String(prevMonth).padStart(2, '0') + '-' + String(prevLastDay).padStart(2, '0');
 
-    const revenue    = ownerBuildRevenueForRange_(startDate, endDate);
-    const expenses   = ownerGetExpensesForRange_(startDate, endDate);
+    // Fetch semua data sekali — current + prev month dalam satu batch
+    const rawData = ownerFetchRawData_(prevStart, endDate);
+
+    const revenue    = ownerBuildRevenueFromRawData_(rawData, startDate, endDate);
+    const expenses   = ownerFilterExpensesForRange_(rawData.expenses, startDate, endDate);
     const expSummary = ownerBuildExpenseSummary_(expenses);
 
-    const prevRevenue    = ownerBuildRevenueForRange_(prevStart, prevEnd);
-    const prevExpenses   = ownerGetExpensesForRange_(prevStart, prevEnd);
+    const prevRevenue    = ownerBuildRevenueFromRawData_(rawData, prevStart, prevEnd);
+    const prevExpenses   = ownerFilterExpensesForRange_(rawData.expenses, prevStart, prevEnd);
     const prevExpSummary = ownerBuildExpenseSummary_(prevExpenses);
 
     const netCash     = revenue.total_cash_in - expSummary.total_expense;
     const prevNetCash = prevRevenue.total_cash_in - prevExpSummary.total_expense;
 
-    // Daily breakdown untuk chart
+    // Daily breakdown — pure in-memory, no API calls
     const dailyBreakdown = [];
     for (var d = 1; d <= lastDay; d++) {
       const dayStr = year + '-' + String(month).padStart(2, '0') + '-' + String(d).padStart(2, '0');
-      const dayRev = ownerBuildRevenueForRange_(dayStr, dayStr);
-      const dayExp = ownerBuildExpenseSummary_(ownerGetExpensesForRange_(dayStr, dayStr));
+      const dayRev = ownerBuildRevenueFromRawData_(rawData, dayStr, dayStr);
+      const dayExp = ownerBuildExpenseSummary_(ownerFilterExpensesForRange_(rawData.expenses, dayStr, dayStr));
       dailyBreakdown.push({
         date:    dayStr,
         revenue: dayRev.total_cash_in,
@@ -1108,18 +1135,21 @@ function getOwnerYearlyReport(payload) {
     const startDate = year + '-01-01';
     const endDate   = year + '-12-31';
 
-    const revenue    = ownerBuildRevenueForRange_(startDate, endDate);
-    const expenses   = ownerGetExpensesForRange_(startDate, endDate);
+    // Fetch semua data sekali untuk seluruh tahun
+    const rawData = ownerFetchRawData_(startDate, endDate);
+
+    const revenue    = ownerBuildRevenueFromRawData_(rawData, startDate, endDate);
+    const expenses   = ownerFilterExpensesForRange_(rawData.expenses, startDate, endDate);
     const expSummary = ownerBuildExpenseSummary_(expenses);
 
-    // Monthly breakdown untuk chart
+    // Monthly breakdown — pure in-memory, no API calls
     const monthlyBreakdown = [];
     for (var m = 1; m <= 12; m++) {
       const mStart = year + '-' + String(m).padStart(2, '0') + '-01';
       const mLastDay = new Date(year, m, 0).getDate();
       const mEnd   = year + '-' + String(m).padStart(2, '0') + '-' + String(mLastDay).padStart(2, '0');
-      const mRev   = ownerBuildRevenueForRange_(mStart, mEnd);
-      const mExp   = ownerBuildExpenseSummary_(ownerGetExpensesForRange_(mStart, mEnd));
+      const mRev   = ownerBuildRevenueFromRawData_(rawData, mStart, mEnd);
+      const mExp   = ownerBuildExpenseSummary_(ownerFilterExpensesForRange_(rawData.expenses, mStart, mEnd));
       monthlyBreakdown.push({
         month:   m,
         label:   ownerMonthLabel_(year, m),
