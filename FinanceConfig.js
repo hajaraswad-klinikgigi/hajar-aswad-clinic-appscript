@@ -2186,12 +2186,12 @@ function hardenFinanceTextColumnsForObjectRow_(sheetName, idHeader, idValue, sou
    Tidak dipanggil otomatis oleh UI Finance.
    ========================================================= */
 
-const FINANCE_ENABLE_H94B_DEV_AUTO_REGRESSION = false;
+const FINANCE_ENABLE_DEV_AUTO_REGRESSION = false;
 
-function runFinanceH94BAutoCheck() {
+function runFinanceAutoCheck() {
   const enabled =
-    typeof FINANCE_ENABLE_H94B_DEV_AUTO_REGRESSION !== 'undefined' &&
-    FINANCE_ENABLE_H94B_DEV_AUTO_REGRESSION === true;
+    typeof FINANCE_ENABLE_DEV_AUTO_REGRESSION !== 'undefined' &&
+    FINANCE_ENABLE_DEV_AUTO_REGRESSION === true;
 
   if (!enabled) {
     const result = {
@@ -2199,7 +2199,7 @@ function runFinanceH94BAutoCheck() {
       skipped: true,
       dev_only: true,
       message: 'H9-4B auto regression tidak dijalankan karena flag DEV nonaktif.',
-      instruction: 'Ubah FINANCE_ENABLE_H94B_DEV_AUTO_REGRESSION menjadi true hanya saat development/manual regression, lalu kembalikan ke false.',
+      instruction: 'Ubah FINANCE_ENABLE_DEV_AUTO_REGRESSION menjadi true hanya saat development/manual regression, lalu kembalikan ke false.',
       checked_at: nowIso()
     };
 
@@ -2207,10 +2207,10 @@ function runFinanceH94BAutoCheck() {
     return result;
   }
 
-  return runFinanceH94BAutoCheckUnsafe_();
+  return runFinanceAutoCheckUnsafe_();
 }
 
-function runFinanceH94BAutoCheckUnsafe_() {
+function runFinanceAutoCheckUnsafe_() {
   const result = {
     success: true,
     failed_count: 0,
@@ -2237,7 +2237,7 @@ function runFinanceH94BAutoCheckUnsafe_() {
     }
   }
 
-  function getFinanceH94BTestAuthContext_() {
+  function getFinanceAutoCheckAuthContext_() {
     const users = dbFindAll_('Users') || [];
 
     const user = users.find(function(row) {
@@ -2259,7 +2259,7 @@ function runFinanceH94BAutoCheckUnsafe_() {
   }
 
   try {
-    const authContext = getFinanceH94BTestAuthContext_();
+    const authContext = getFinanceAutoCheckAuthContext_();
 
     const summaryToday = getFinanceSummary(Object.assign({}, authContext, {
       period: 'today'

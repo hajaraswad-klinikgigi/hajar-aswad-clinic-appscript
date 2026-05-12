@@ -553,26 +553,4 @@ function testAppointmentRepositorySupabaseReadLog() {
   }
 }
 
-/* =========================================================
-   PHASE 7D - APPOINTMENT MUTATION PREFLIGHT
-   Read-only preflight. Aman dijalankan. Tidak menulis data.
-   ========================================================= */
-
-const APPOINTMENT_PHASE_7D_TEST_APPOINTMENT = Object.freeze({
-  APPOINTMENT_ID: 'APT-7D-TEST-001',
-  APPOINTMENT_DATE: '2026-12-31',
-  APPOINTMENT_DATE_UPDATED: '2027-01-02',
-  APPOINTMENT_TIME: '09:30',
-  APPOINTMENT_TIME_UPDATED: '10:45',
-  COMPLAINT: 'Keluhan dummy appointment Supabase staging 7D',
-  COMPLAINT_UPDATED: 'Keluhan dummy appointment Supabase staging 7D updated'
-});
-
-function normalizeAppointmentPhase7DStatus_(value) {
-  return String(value || '').trim().toLowerCase();
-}
-
-function normalizeAppointmentPhase7DText_(value) {
-  return String(value || '').trim();
-}
 
