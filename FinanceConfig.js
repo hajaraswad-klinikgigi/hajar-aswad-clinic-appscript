@@ -2238,7 +2238,7 @@ function runFinanceH94BAutoCheckUnsafe_() {
   }
 
   function getFinanceH94BTestAuthContext_() {
-    const users = getRowsAsObjects('Users');
+    const users = dbFindAll_('Users') || [];
 
     const user = users.find(function(row) {
       const role = String(row.role || '').trim().toLowerCase();
