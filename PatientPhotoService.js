@@ -332,7 +332,7 @@ function createPatientPhoto(data) {
   } catch (err) {
     return {
       success: false,
-      message: 'Terjadi kesalahan saat menambahkan foto pasien'
+      message: 'Terjadi kesalahan saat menambahkan foto pasien: ' + (err && err.message ? err.message : String(err || ''))
     };
   } finally {
     lock.releaseLock();
@@ -543,7 +543,7 @@ function createPatientPhotoUpload(payload) {
   } catch (err) {
     return {
       success: false,
-      message: 'Terjadi kesalahan saat upload foto pasien'
+      message: 'Terjadi kesalahan saat upload foto pasien: ' + (err && err.message ? err.message : String(err || ''))
     };
   } finally {
     lock.releaseLock();
@@ -652,7 +652,7 @@ function deletePatientPhoto(payload) {
   } catch (err) {
     return {
       success: false,
-      message: 'Terjadi kesalahan saat menghapus foto pasien'
+      message: 'Terjadi kesalahan saat menghapus foto pasien: ' + (err && err.message ? err.message : String(err || ''))
     };
   } finally {
     lock.releaseLock();

@@ -534,7 +534,7 @@ function createAppointment(data) {
   } catch (err) {
     return {
       success: false,
-      message: 'Terjadi kesalahan saat membuat appointment'
+      message: 'Terjadi kesalahan saat membuat appointment: ' + (err && err.message ? err.message : String(err || ''))
     };
   } finally {
     lock.releaseLock();
@@ -656,7 +656,7 @@ function updateAppointment(data) {
   } catch (err) {
     return {
       success: false,
-      message: 'Terjadi kesalahan saat memperbarui appointment'
+      message: 'Terjadi kesalahan saat memperbarui appointment: ' + (err && err.message ? err.message : String(err || ''))
     };
   } finally {
     lock.releaseLock();
@@ -731,7 +731,7 @@ function cancelAppointment(id, options) {
   } catch (err) {
     return {
       success: false,
-      message: 'Terjadi kesalahan saat membatalkan appointment'
+      message: 'Terjadi kesalahan saat membatalkan appointment: ' + (err && err.message ? err.message : String(err || ''))
     };
   } finally {
     lock.releaseLock();
@@ -804,7 +804,7 @@ function restoreAppointment(id, options) {
   } catch (err) {
     return {
       success: false,
-      message: 'Terjadi kesalahan saat merestore appointment'
+      message: 'Terjadi kesalahan saat merestore appointment: ' + (err && err.message ? err.message : String(err || ''))
     };
   } finally {
     lock.releaseLock();

@@ -13,11 +13,6 @@ function doGet(e) {
     return handleFeedbackApiGet_(params);
   }
 
-  const testModule = String(params.test_module || '').trim();
-  if (testModule) {
-    return handleModuleTestRunner_(testModule);
-  }
-
   const page = String(params.page || '').trim();
 
   if (page === 'billing-feedback') {
@@ -321,88 +316,6 @@ function putCachedJson(key, value, seconds) {
       err && err.message ? err.message : err
     );
     return false;
-  }
-}
-
-/* =========================================================
-   MODULE TEST RUNNER
-   Akses via: ?test_module=appointment|treatment|finance|ortho
-   ========================================================= */
-
-function handleModuleTestRunner_(module) {
-  const results = {};
-
-  try {
-    if (module === 'appointment') {
-      results.repo_read = typeof testAppointmentRepositorySupabaseReadLog === 'function'
-        ? testAppointmentRepositorySupabaseReadLog()
-        : { skipped: true, reason: 'function not found' };
-
-      results.service_read = typeof testAppointmentServiceReadLog === 'function'
-        ? testAppointmentServiceReadLog()
-        : { skipped: true, reason: 'function not found' };
-
-      results.service_write = typeof testAppointmentServiceWriteLog === 'function'
-        ? testAppointmentServiceWriteLog()
-        : { skipped: true, reason: 'function not found' };
-
-    } else if (module === 'treatment') {
-      results.repo_read = typeof testTreatmentRepositorySupabaseReadLog === 'function'
-        ? testTreatmentRepositorySupabaseReadLog()
-        : { skipped: true, reason: 'function not found' };
-
-      results.service_read = typeof testTreatmentServiceReadLog === 'function'
-        ? testTreatmentServiceReadLog()
-        : { skipped: true, reason: 'function not found' };
-
-    } else if (module === 'finance') {
-      results.repo_read = typeof testFinanceRepositorySupabaseReadLog === 'function'
-        ? testFinanceRepositorySupabaseReadLog()
-        : { skipped: true, reason: 'function not found' };
-
-      results.billing_read = typeof testFinanceBillingServiceReadLog === 'function'
-        ? testFinanceBillingServiceReadLog()
-        : { skipped: true, reason: 'function not found' };
-
-      results.report_read = typeof testFinanceReportServiceReadLog === 'function'
-        ? testFinanceReportServiceReadLog()
-        : { skipped: true, reason: 'function not found' };
-
-      results.rawdata_read = typeof testFinanceRawDataReadLog === 'function'
-        ? testFinanceRawDataReadLog()
-        : { skipped: true, reason: 'function not found' };
-
-    } else if (module === 'ortho') {
-      results.repo_read = typeof testOrthoRecallRepositorySupabaseReadLog === 'function'
-        ? testOrthoRecallRepositorySupabaseReadLog()
-        : { skipped: true, reason: 'function not found' };
-
-      results.service_read = typeof testOrthoRecallServiceReadLog === 'function'
-        ? testOrthoRecallServiceReadLog()
-        : { skipped: true, reason: 'function not found' };
-
-    } else {
-      return createJsonResponse_({ success: false, message: 'module tidak dikenal: ' + module });
-    }
-
-    const allSuccess = Object.keys(results).every(function(k) {
-      const r = results[k];
-      return r && (r.skipped || r.success === true);
-    });
-
-    return createJsonResponse_({
-      success: allSuccess,
-      module: module,
-      results: results
-    });
-
-  } catch (err) {
-    return createJsonResponse_({
-      success: false,
-      module: module,
-      error: err && err.message ? err.message : String(err || ''),
-      results: results
-    });
   }
 }
 
