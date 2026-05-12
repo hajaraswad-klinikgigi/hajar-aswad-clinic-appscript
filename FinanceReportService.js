@@ -839,3 +839,358 @@ function testFinanceReportServiceReadLog() {
     return errorResult;
   }
 }
+
+/* =========================================================
+   OWNER REPORT — INTERNAL HELPERS
+   ========================================================= */
+
+function ownerGetExpensesForRange_(startDate, endDate) {
+  const all = dbFindAll_('Expenses', { backend_mode: 'supabase' });
+  return all.filter(function(e) {
+    const d = String(e.expense_date || '').slice(0, 10);
+    return d >= startDate && d <= endDate;
+  });
+}
+
+function ownerBuildExpenseSummary_(expenses) {
+  const categories = ['doctor_salary','doctor_meal','doctor_standby','operational','utility','owner_withdrawal','other'];
+  const byCategory = {};
+  categories.forEach(function(c) { byCategory[c] = 0; });
+
+  let total = 0;
+  expenses.forEach(function(e) {
+    const amt = Number(e.amount || 0);
+    total += amt;
+    const cat = String(e.category || 'other').trim();
+    if (byCategory[cat] !== undefined) byCategory[cat] += amt;
+    else byCategory['other'] += amt;
+  });
+
+  return { total_expense: total, by_category: byCategory };
+}
+
+function ownerBuildRevenueForRange_(startDate, endDate) {
+  const opts = repoBuildUiReadOptions_({});
+
+  const billings = getBillingsRaw(opts).filter(function(b) {
+    const d = financeExtractYmd_(b.billing_date);
+    return d >= startDate && d <= endDate && String(b.billing_status || '').trim().toLowerCase() !== 'cancelled';
+  });
+
+  const payments = getPaymentsRaw(opts).filter(function(p) {
+    const d = financeExtractYmd_(p.payment_date);
+    return d >= startDate && d <= endDate;
+  });
+
+  const treatments = getTreatmentsRaw(opts).filter(function(t) {
+    const d = financeExtractYmd_(t.treatment_date);
+    return d >= startDate && d <= endDate;
+  });
+
+  const treatmentItems = getTreatmentItemsRaw(opts).filter(function(ti) {
+    return treatments.some(function(t) {
+      return String(t.treatment_id || '') === String(ti.treatment_id || '');
+    });
+  });
+
+  const totalBilling = billings.reduce(function(s, b) { return s + Number(b.grand_total || 0); }, 0);
+  const totalCashIn  = payments.reduce(function(s, p) { return s + Number(p.amount || 0); }, 0);
+  const patientCount = treatments.length;
+
+  // Per dokter
+  const billingByTreatmentId = {};
+  billings.forEach(function(b) {
+    billingByTreatmentId[String(b.treatment_id || '')] = b;
+  });
+
+  const paymentsByBillingId = {};
+  payments.forEach(function(p) {
+    const bid = String(p.billing_id || '');
+    paymentsByBillingId[bid] = (paymentsByBillingId[bid] || 0) + Number(p.amount || 0);
+  });
+
+  const byDoctorMap = {};
+  treatments.forEach(function(t) {
+    const doc = String(t.doctor_name || 'Tidak diketahui').trim();
+    const billing = billingByTreatmentId[String(t.treatment_id || '')];
+    const billingId = billing ? String(billing.billing_id || '') : '';
+    const cashIn = billingId ? (paymentsByBillingId[billingId] || 0) : 0;
+
+    if (!byDoctorMap[doc]) {
+      byDoctorMap[doc] = { doctor_name: doc, patient_count: 0, total_billing: 0, total_cash_in: 0 };
+    }
+    byDoctorMap[doc].patient_count++;
+    byDoctorMap[doc].total_billing += billing ? Number(billing.grand_total || 0) : 0;
+    byDoctorMap[doc].total_cash_in += cashIn;
+  });
+
+  // Per layanan
+  const byServiceMap = {};
+  treatmentItems.forEach(function(ti) {
+    const name = String(ti.service_name || ti.item_name || 'Lainnya').trim();
+    if (!byServiceMap[name]) {
+      byServiceMap[name] = { service_name: name, count: 0, total: 0 };
+    }
+    byServiceMap[name].count += Number(ti.qty || 1);
+    byServiceMap[name].total += Number(ti.subtotal || 0);
+  });
+
+  // Per metode bayar
+  const byPaymentMethod = { cash: 0, transfer: 0, other: 0 };
+  payments.forEach(function(p) {
+    const method = String(p.payment_method || '').trim().toLowerCase();
+    if (method === 'cash') byPaymentMethod.cash += Number(p.amount || 0);
+    else if (method === 'transfer' || method === 'bank_transfer') byPaymentMethod.transfer += Number(p.amount || 0);
+    else byPaymentMethod.other += Number(p.amount || 0);
+  });
+
+  return {
+    total_billing:      totalBilling,
+    total_cash_in:      totalCashIn,
+    patient_count:      patientCount,
+    by_doctor:          Object.values(byDoctorMap),
+    by_service:         Object.values(byServiceMap),
+    by_payment_method:  byPaymentMethod
+  };
+}
+
+function ownerMonthLabel_(year, month) {
+  const names = ['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'];
+  return names[month - 1] + ' ' + year;
+}
+
+function ownerCalcDiffPercent_(current, previous) {
+  if (!previous) return null;
+  return Math.round(((current - previous) / previous) * 100);
+}
+
+/* =========================================================
+   OWNER REPORT — LAPORAN HARIAN
+   ========================================================= */
+
+function getOwnerDailyReport(payload) {
+  try {
+    const auth = readAuthSession_(payload);
+    if (!auth.success) return auth;
+
+    const date = String((payload && payload.date) || formatTodayYmd()).trim();
+    if (!date) return { success: false, message: 'Tanggal wajib diisi.' };
+
+    const revenue  = ownerBuildRevenueForRange_(date, date);
+    const expenses = ownerGetExpensesForRange_(date, date);
+    const expSummary = ownerBuildExpenseSummary_(expenses);
+
+    const piutangBillings = getBillingsRaw(repoBuildUiReadOptions_({})).filter(function(b) {
+      const d = financeExtractYmd_(b.billing_date);
+      return d === date &&
+        String(b.billing_status || '').trim().toLowerCase() !== 'cancelled' &&
+        Number(b.outstanding_total || 0) > 0;
+    });
+    const piutangBaru = piutangBillings.reduce(function(s, b) { return s + Number(b.outstanding_total || 0); }, 0);
+
+    return {
+      success: true,
+      data: {
+        date: date,
+        revenue: Object.assign({ piutang_baru: piutangBaru }, revenue),
+        expense: Object.assign({ items: expenses }, expSummary),
+        net: {
+          cash_in:       revenue.total_cash_in,
+          total_expense: expSummary.total_expense,
+          net_cash:      revenue.total_cash_in - expSummary.total_expense
+        }
+      }
+    };
+
+  } catch (err) {
+    return { success: false, message: 'Gagal membuat laporan harian: ' + (err.message || err) };
+  }
+}
+
+/* =========================================================
+   OWNER REPORT — LAPORAN BULANAN
+   ========================================================= */
+
+function getOwnerMonthlyReport(payload) {
+  try {
+    const auth = readAuthSession_(payload);
+    if (!auth.success) return auth;
+
+    const year  = Number((payload && payload.year)  || new Date().getFullYear());
+    const month = Number((payload && payload.month) || (new Date().getMonth() + 1));
+
+    const startDate = year + '-' + String(month).padStart(2, '0') + '-01';
+    const lastDay   = new Date(year, month, 0).getDate();
+    const endDate   = year + '-' + String(month).padStart(2, '0') + '-' + String(lastDay).padStart(2, '0');
+
+    const prevMonth = month === 1 ? 12 : month - 1;
+    const prevYear  = month === 1 ? year - 1 : year;
+    const prevStart = prevYear + '-' + String(prevMonth).padStart(2, '0') + '-01';
+    const prevLastDay = new Date(prevYear, prevMonth, 0).getDate();
+    const prevEnd   = prevYear + '-' + String(prevMonth).padStart(2, '0') + '-' + String(prevLastDay).padStart(2, '0');
+
+    const revenue    = ownerBuildRevenueForRange_(startDate, endDate);
+    const expenses   = ownerGetExpensesForRange_(startDate, endDate);
+    const expSummary = ownerBuildExpenseSummary_(expenses);
+
+    const prevRevenue    = ownerBuildRevenueForRange_(prevStart, prevEnd);
+    const prevExpenses   = ownerGetExpensesForRange_(prevStart, prevEnd);
+    const prevExpSummary = ownerBuildExpenseSummary_(prevExpenses);
+
+    const netCash     = revenue.total_cash_in - expSummary.total_expense;
+    const prevNetCash = prevRevenue.total_cash_in - prevExpSummary.total_expense;
+
+    // Daily breakdown untuk chart
+    const dailyBreakdown = [];
+    for (var d = 1; d <= lastDay; d++) {
+      const dayStr = year + '-' + String(month).padStart(2, '0') + '-' + String(d).padStart(2, '0');
+      const dayRev = ownerBuildRevenueForRange_(dayStr, dayStr);
+      const dayExp = ownerBuildExpenseSummary_(ownerGetExpensesForRange_(dayStr, dayStr));
+      dailyBreakdown.push({
+        date:    dayStr,
+        revenue: dayRev.total_cash_in,
+        expense: dayExp.total_expense,
+        net:     dayRev.total_cash_in - dayExp.total_expense
+      });
+    }
+
+    return {
+      success: true,
+      data: {
+        period: { year: year, month: month, label: ownerMonthLabel_(year, month) },
+        revenue: {
+          total_billing:  revenue.total_billing,
+          total_cash_in:  revenue.total_cash_in,
+          patient_count:  revenue.patient_count
+        },
+        expense: {
+          total_expense: expSummary.total_expense,
+          by_category:   expSummary.by_category
+        },
+        net: {
+          cash_in:       revenue.total_cash_in,
+          total_expense: expSummary.total_expense,
+          net_cash:      netCash
+        },
+        comparison: {
+          prev_month: {
+            revenue: prevRevenue.total_cash_in,
+            expense: prevExpSummary.total_expense,
+            net:     prevNetCash
+          },
+          diff_percent: {
+            revenue: ownerCalcDiffPercent_(revenue.total_cash_in, prevRevenue.total_cash_in),
+            expense: ownerCalcDiffPercent_(expSummary.total_expense, prevExpSummary.total_expense),
+            net:     ownerCalcDiffPercent_(netCash, prevNetCash)
+          }
+        },
+        by_doctor:       revenue.by_doctor,
+        by_service:      revenue.by_service,
+        daily_breakdown: dailyBreakdown
+      }
+    };
+
+  } catch (err) {
+    return { success: false, message: 'Gagal membuat laporan bulanan: ' + (err.message || err) };
+  }
+}
+
+/* =========================================================
+   OWNER REPORT — LAPORAN TAHUNAN
+   ========================================================= */
+
+function getOwnerYearlyReport(payload) {
+  try {
+    const auth = readAuthSession_(payload);
+    if (!auth.success) return auth;
+
+    const year = Number((payload && payload.year) || new Date().getFullYear());
+    const startDate = year + '-01-01';
+    const endDate   = year + '-12-31';
+
+    const revenue    = ownerBuildRevenueForRange_(startDate, endDate);
+    const expenses   = ownerGetExpensesForRange_(startDate, endDate);
+    const expSummary = ownerBuildExpenseSummary_(expenses);
+
+    // Monthly breakdown untuk chart
+    const monthlyBreakdown = [];
+    for (var m = 1; m <= 12; m++) {
+      const mStart = year + '-' + String(m).padStart(2, '0') + '-01';
+      const mLastDay = new Date(year, m, 0).getDate();
+      const mEnd   = year + '-' + String(m).padStart(2, '0') + '-' + String(mLastDay).padStart(2, '0');
+      const mRev   = ownerBuildRevenueForRange_(mStart, mEnd);
+      const mExp   = ownerBuildExpenseSummary_(ownerGetExpensesForRange_(mStart, mEnd));
+      monthlyBreakdown.push({
+        month:   m,
+        label:   ownerMonthLabel_(year, m),
+        revenue: mRev.total_cash_in,
+        expense: mExp.total_expense,
+        net:     mRev.total_cash_in - mExp.total_expense
+      });
+    }
+
+    return {
+      success: true,
+      data: {
+        period:  { year: year },
+        revenue: {
+          total_billing: revenue.total_billing,
+          total_cash_in: revenue.total_cash_in,
+          patient_count: revenue.patient_count
+        },
+        expense: {
+          total_expense: expSummary.total_expense,
+          by_category:   expSummary.by_category
+        },
+        net: {
+          cash_in:       revenue.total_cash_in,
+          total_expense: expSummary.total_expense,
+          net_cash:      revenue.total_cash_in - expSummary.total_expense
+        },
+        monthly_breakdown: monthlyBreakdown
+      }
+    };
+
+  } catch (err) {
+    return { success: false, message: 'Gagal membuat laporan tahunan: ' + (err.message || err) };
+  }
+}
+
+/* =========================================================
+   OWNER REPORT — BOOTSTRAP (semua data dalam 1 call)
+   ========================================================= */
+
+
+function getOwnerReportBootstrap(payload) {
+  try {
+    const auth = readAuthSession_(payload);
+    if (!auth.success) return auth;
+
+    const date  = String((payload && payload.date) || formatTodayYmd()).trim();
+    const now   = new Date();
+    const year  = now.getFullYear();
+    const month = now.getMonth() + 1;
+
+    const daily   = getOwnerDailyReport(Object.assign({}, payload, { date: date }));
+    const monthly = getOwnerMonthlyReport(Object.assign({}, payload, { year: year, month: month }));
+
+    const piutangBillings = getBillingsRaw(repoBuildUiReadOptions_({})).filter(function(b) {
+      return String(b.billing_status || '').trim().toLowerCase() !== 'cancelled' &&
+        Number(b.outstanding_total || 0) > 0;
+    });
+    const totalPiutang = piutangBillings.reduce(function(s, b) { return s + Number(b.outstanding_total || 0); }, 0);
+
+    return {
+      success: true,
+      data: {
+        daily:           daily.success  ? daily.data  : null,
+        monthly:         monthly.success ? monthly.data : null,
+        total_piutang:   totalPiutang,
+        piutang_count:   piutangBillings.length
+      }
+    };
+
+  } catch (err) {
+    return { success: false, message: 'Gagal bootstrap laporan owner: ' + (err.message || err) };
+  }
+}
