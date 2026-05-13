@@ -112,30 +112,30 @@ function renderFinancePaginationInfo(prefix, currentPage, totalPages, totalRows)
   var cnt = get(prefix + 'PaginationInfo');
   var prv = get(prefix + 'PrevBtn');
   var nxt = get(prefix + 'NextBtn');
-  if (inp) inp.value = page;
+  if (inp) inp.textContent = page;
   if (tot) tot.textContent = pages;
   if (cnt) cnt.textContent = count + ' records';
   if (prv) prv.disabled = page <= 1;
   if (nxt) nxt.disabled = page >= pages;
 }
 
-function goToFinanceBillingPage(input) {
+function goToFinanceBillingPage(el) {
   var totalPages = Math.ceil(filteredFinanceBillings.length / financePageSize) || 1;
-  var page = parseInt(input.value, 10);
+  var page = parseInt(el.textContent, 10);
   if (isNaN(page) || page < 1) page = 1;
   if (page > totalPages) page = totalPages;
-  input.value = page;
+  el.textContent = page;
   if (financeCurrentPage === page) return;
   financeCurrentPage = page;
   renderFinanceBillingTable();
 }
 
-function goToFinanceReceivablePage(input) {
+function goToFinanceReceivablePage(el) {
   var totalPages = Math.ceil(filteredFinanceReceivables.length / financeReceivablePageSize) || 1;
-  var page = parseInt(input.value, 10);
+  var page = parseInt(el.textContent, 10);
   if (isNaN(page) || page < 1) page = 1;
   if (page > totalPages) page = totalPages;
-  input.value = page;
+  el.textContent = page;
   if (financeReceivableCurrentPage === page) return;
   financeReceivableCurrentPage = page;
   renderFinanceReceivableTable();
@@ -851,9 +851,10 @@ function showFinancePage() {
               <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"></polyline></svg>
             </button>
             <span class="pagination-label">Page</span>
-            <input type="number" class="pagination-input" id="financeReceivableCurrentPage" value="1" min="1"
-              onkeydown="if(event.key==='Enter'){goToFinanceReceivablePage(this);this.blur();}"
-              onblur="goToFinanceReceivablePage(this)" onwheel="this.blur()">
+            <span class="pagination-current" id="financeReceivableCurrentPage" contenteditable="true"
+              onkeydown="if(event.key==='Enter'){goToFinanceReceivablePage(this);this.blur();event.preventDefault();}"
+              onblur="goToFinanceReceivablePage(this)"
+              onfocus="var r=document.createRange(),s=window.getSelection();r.selectNodeContents(this);s.removeAllRanges();s.addRange(r);">1</span>
             <span class="pagination-sep">of</span>
             <span class="pagination-total" id="financeReceivableTotalPages">1</span>
             <button type="button" class="pagination-arrow" id="financeReceivableNextBtn" onclick="nextFinanceReceivablePage()" aria-label="Halaman berikutnya">
@@ -926,9 +927,10 @@ function showFinancePage() {
               <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"></polyline></svg>
             </button>
             <span class="pagination-label">Page</span>
-            <input type="number" class="pagination-input" id="financeBillingCurrentPage" value="1" min="1"
-              onkeydown="if(event.key==='Enter'){goToFinanceBillingPage(this);this.blur();}"
-              onblur="goToFinanceBillingPage(this)" onwheel="this.blur()">
+            <span class="pagination-current" id="financeBillingCurrentPage" contenteditable="true"
+              onkeydown="if(event.key==='Enter'){goToFinanceBillingPage(this);this.blur();event.preventDefault();}"
+              onblur="goToFinanceBillingPage(this)"
+              onfocus="var r=document.createRange(),s=window.getSelection();r.selectNodeContents(this);s.removeAllRanges();s.addRange(r);">1</span>
             <span class="pagination-sep">of</span>
             <span class="pagination-total" id="financeBillingTotalPages">1</span>
             <button type="button" class="pagination-arrow" id="financeBillingNextBtn" onclick="nextFinanceBillingPage()" aria-label="Halaman berikutnya">

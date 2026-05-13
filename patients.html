@@ -107,9 +107,10 @@
                 <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"></polyline></svg>
               </button>
               <span class="pagination-label">Page</span>
-              <input type="number" class="pagination-input" id="patientCurrentPage" value="1" min="1"
-                onkeydown="if(event.key==='Enter'){goToPatientPage(this);this.blur();}"
-                onblur="goToPatientPage(this)" onwheel="this.blur()">
+              <span class="pagination-current" id="patientCurrentPage" contenteditable="true"
+                onkeydown="if(event.key==='Enter'){goToPatientPage(this);this.blur();event.preventDefault();}"
+                onblur="goToPatientPage(this)"
+                onfocus="var r=document.createRange(),s=window.getSelection();r.selectNodeContents(this);s.removeAllRanges();s.addRange(r);">1</span>
               <span class="pagination-sep">of</span>
               <span class="pagination-total" id="patientTotalPages">1</span>
               <button type="button" class="pagination-arrow" id="patientNextBtn" onclick="nextPatientPage()" aria-label="Halaman berikutnya">
@@ -446,20 +447,20 @@
 
   function renderPatientPaginationState(current, total, count) {
     var el = function(id) { return document.getElementById(id); };
-    var inp = el('patientCurrentPage'); if (inp) inp.value = current || 0;
+    var inp = el('patientCurrentPage'); if (inp) inp.textContent = current || 0;
     if (el('patientTotalPages'))     el('patientTotalPages').textContent     = total || 0;
     if (el('patientPaginationInfo')) el('patientPaginationInfo').textContent = (count || 0) + ' records';
     var prev = el('patientPrevBtn'); if (prev) prev.disabled = current <= 1;
     var next = el('patientNextBtn'); if (next) next.disabled = current >= total;
   }
 
-  function goToPatientPage(input) {
+  function goToPatientPage(el) {
     var totalPages = Math.ceil(filteredPatients.length / patientPageSize) || 1;
-    var page = parseInt(input.value, 10);
+    var page = parseInt(el.textContent, 10);
     if (isNaN(page) || page < 1) page = 1;
     if (page > totalPages) page = totalPages;
-    input.value = page;
-    if (patientCurrentPage === page) return;
+    el.textContent = page;
+    if (patientCurrentPage === page) { el.textContent = page; return; }
     patientCurrentPage = page;
     renderPatientsTable();
   }
