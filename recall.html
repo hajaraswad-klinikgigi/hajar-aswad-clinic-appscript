@@ -322,7 +322,7 @@
           return row;
         });
 
-        applyRecallFilters(false);
+        applyRecallFilters(true);
       })
       .withFailureHandler(function(err) {
         recallListLoadingInFlight = false;
@@ -857,7 +857,8 @@
 
   function renderRecallPaginationState(current, total, count) {
     var el = function(id) { return document.getElementById(id); };
-    var inp = el('recallCurrentPage'); if (inp) inp.textContent = current || 0;
+    var inp = el('recallCurrentPage');
+    if (inp && document.activeElement !== inp) inp.textContent = current || 0;
     if (el('recallTotalPages'))   el('recallTotalPages').textContent   = total || 0;
     if (el('recallPaginationInfo')) el('recallPaginationInfo').textContent = (count || 0) + ' records';
     var prev = el('recallPrevBtn'); if (prev) prev.disabled = current <= 1;

@@ -447,7 +447,8 @@
 
   function renderPatientPaginationState(current, total, count) {
     var el = function(id) { return document.getElementById(id); };
-    var inp = el('patientCurrentPage'); if (inp) inp.textContent = current || 0;
+    var inp = el('patientCurrentPage');
+    if (inp && document.activeElement !== inp) inp.textContent = current || 0;
     if (el('patientTotalPages'))     el('patientTotalPages').textContent     = total || 0;
     if (el('patientPaginationInfo')) el('patientPaginationInfo').textContent = (count || 0) + ' records';
     var prev = el('patientPrevBtn'); if (prev) prev.disabled = current <= 1;

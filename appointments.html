@@ -1043,7 +1043,8 @@
 
   function renderAppointmentPaginationState(current, total, count) {
     var el = function(id) { return document.getElementById(id); };
-    var inp = el('appointmentCurrentPage'); if (inp) inp.textContent = current || 0;
+    var inp = el('appointmentCurrentPage');
+    if (inp && document.activeElement !== inp) inp.textContent = current || 0;
     if (el('appointmentTotalPages'))   el('appointmentTotalPages').textContent   = total || 0;
     if (el('appointmentPaginationInfo')) el('appointmentPaginationInfo').textContent = (count || 0) + ' records';
     var prev = el('appointmentPrevBtn'); if (prev) prev.disabled = current <= 1;

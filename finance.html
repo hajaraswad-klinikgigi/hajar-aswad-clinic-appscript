@@ -112,7 +112,7 @@ function renderFinancePaginationInfo(prefix, currentPage, totalPages, totalRows)
   var cnt = get(prefix + 'PaginationInfo');
   var prv = get(prefix + 'PrevBtn');
   var nxt = get(prefix + 'NextBtn');
-  if (inp) inp.textContent = page;
+  if (inp && document.activeElement !== inp) inp.textContent = page;
   if (tot) tot.textContent = pages;
   if (cnt) cnt.textContent = count + ' records';
   if (prv) prv.disabled = page <= 1;
