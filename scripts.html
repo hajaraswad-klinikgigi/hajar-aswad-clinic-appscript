@@ -77,9 +77,6 @@
     }
 
     document.getElementById('roleText').innerText = role || '-';
-
-    const ownerMenu = document.getElementById('menuOwnerReport');
-    if (ownerMenu) ownerMenu.style.display = role === 'owner' ? 'block' : 'none';
   }
 
   function getCurrentUserRole() {

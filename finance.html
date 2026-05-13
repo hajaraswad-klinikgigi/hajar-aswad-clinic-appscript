@@ -1,5 +1,6 @@
 <script>
 let financePeriod = 'today';
+let financeActiveLaporan = false;
 let allFinanceBillings = [];
 let filteredFinanceBillings = [];
 let financeCurrentPage = 1;
@@ -739,25 +740,30 @@ function showFinancePage() {
           <div class="finance-subtitle">Kelola billing, pembayaran, diskon, kas masuk, dan piutang sederhana</div>
         </div>
 
-        <div style="display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap;">
-          <button class="btn btn-primary" onclick="openExpenseModal()">+ Tambah Pengeluaran</button>
-          <div class="finance-period-filter-wrap">
-          <label class="finance-period-filter-label" for="financePeriodSelect">Periode</label>
-
-          <select
-            id="financePeriodSelect"
-            class="finance-period-select"
-            onchange="changeFinancePeriod(this)"
-          >
-            <option value="today">Hari Ini</option>
-            <option value="7days">7 Hari</option>
-            <option value="30days">30 Hari</option>
-          </select>
+        <div style="display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap;" id="financeHeaderRight">
+          <div class="finance-period-filter-wrap" id="financePeriodWrap">
+            <label class="finance-period-filter-label" for="financePeriodSelect">Periode</label>
+            <select
+              id="financePeriodSelect"
+              class="finance-period-select"
+              onchange="changeFinancePeriod(this)"
+            >
+              <option value="today">Hari Ini</option>
+              <option value="7days">7 Hari</option>
+              <option value="30days">30 Hari</option>
+            </select>
           </div>
         </div>
       </div>
 
       <div id="financePeriodInfo" class="finance-period-info"></div>
+
+      <div class="finance-tab-nav">
+        <button class="finance-tab-btn active" id="financeTabBtnBilling" onclick="switchFinanceTab('billing')">Billing & Piutang</button>
+        <button class="finance-tab-btn" id="financeTabBtnLaporan" onclick="switchFinanceTab('laporan')">Laporan</button>
+      </div>
+
+      <div id="financeTabBilling">
 
       <div class="content-card finance-receivable-card">
         <div class="finance-table-head">
@@ -1041,11 +1047,20 @@ function showFinancePage() {
         </div>
       </div>
     </div>
+
+      </div><!-- /financeTabBilling -->
+
+      <div id="financeTabLaporan" style="display:none;">
+        <div class="owner-loading" style="padding:40px 0;">Klik tab ini untuk memuat laporan.</div>
+      </div>
+
+    </div>
   `;
 
   const periodSelect = document.getElementById('financePeriodSelect');
   if (periodSelect) periodSelect.value = financePeriod;
 
+  financeActiveLaporan = false;
   loadFinancePageBootstrap();
 }
 
@@ -6883,6 +6898,138 @@ function submitFinanceInstallmentPlan(e) {
 }
 
 /* =========================================================
+   EDIT EXPENSE
+   ========================================================= */
+
+function openEditExpenseModal(expenseId, category, description, amount, doctorName, notes, expenseDate) {
+  const el = function(id) { return document.getElementById(id); };
+
+  el('editExpId').value          = expenseId || '';
+  el('editExpDate').value        = expenseDate || '';
+  el('editExpCategory').value    = category || '';
+  el('editExpDescription').value = description || '';
+  el('editExpAmount').value      = amount || '';
+  el('editExpDoctorName').value  = doctorName || '';
+  el('editExpNotes').value       = notes || '';
+
+  const alertEl = el('editExpenseAlert');
+  if (alertEl) { alertEl.className = 'owner-modal-alert'; alertEl.textContent = ''; }
+
+  const btn = el('editExpSubmitBtn');
+  if (btn) btn.disabled = false;
+
+  toggleEditExpenseDoctorField();
+
+  const modal = el('editExpenseModal');
+  if (modal) modal.classList.add('open');
+}
+
+function closeEditExpenseModal() {
+  const modal = document.getElementById('editExpenseModal');
+  if (modal) modal.classList.remove('open');
+}
+
+function toggleEditExpenseDoctorField() {
+  const cat = document.getElementById('editExpCategory');
+  const grp = document.getElementById('editExpDoctorFieldGroup');
+  if (!cat || !grp) return;
+  const doctorCats = ['doctor_salary','doctor_meal','doctor_standby'];
+  grp.style.display = doctorCats.indexOf(cat.value) !== -1 ? 'block' : 'none';
+}
+
+function setEditExpenseAlert(msg, type) {
+  const alertEl = document.getElementById('editExpenseAlert');
+  if (!alertEl) return;
+  alertEl.className = 'owner-modal-alert ' + (type || 'error');
+  alertEl.textContent = msg || '';
+}
+
+function submitEditExpense() {
+  const el  = function(id) { return document.getElementById(id); };
+  const btn = el('editExpSubmitBtn');
+  if (btn) btn.disabled = true;
+
+  const expenseId   = (el('editExpId')          || {}).value || '';
+  const date        = (el('editExpDate')         || {}).value || '';
+  const category    = (el('editExpCategory')     || {}).value || '';
+  const doctorName  = (el('editExpDoctorName')   || {}).value || '';
+  const description = (el('editExpDescription')  || {}).value || '';
+  const amount      = Number((el('editExpAmount') || {}).value || 0);
+  const notes       = (el('editExpNotes')        || {}).value || '';
+
+  if (!expenseId)   { setEditExpenseAlert('ID pengeluaran tidak ditemukan.'); if (btn) btn.disabled = false; return; }
+  if (!date)        { setEditExpenseAlert('Tanggal wajib diisi.'); if (btn) btn.disabled = false; return; }
+  if (!category)    { setEditExpenseAlert('Kategori wajib dipilih.'); if (btn) btn.disabled = false; return; }
+  if (!description) { setEditExpenseAlert('Keterangan wajib diisi.'); if (btn) btn.disabled = false; return; }
+  if (!amount || amount <= 0) { setEditExpenseAlert('Nominal harus lebih dari 0.'); if (btn) btn.disabled = false; return; }
+
+  const doctorCats = ['doctor_salary','doctor_meal','doctor_standby'];
+  if (doctorCats.indexOf(category) !== -1 && !doctorName) {
+    setEditExpenseAlert('Nama dokter wajib dipilih untuk kategori ini.');
+    if (btn) btn.disabled = false;
+    return;
+  }
+
+  google.script.run
+    .withSuccessHandler(function(res) {
+      if (!res || !res.success) {
+        const msg = res && res.message ? res.message : 'Gagal menyimpan.';
+        setEditExpenseAlert(msg);
+        showToast('Gagal: ' + msg, 'error');
+        if (btn) btn.disabled = false;
+        return;
+      }
+      closeEditExpenseModal();
+      showToast('Pengeluaran berhasil diperbarui.', 'success');
+      if (typeof ownerLoadReport === 'function') ownerLoadReport();
+    })
+    .withFailureHandler(function(err) {
+      const msg = err && err.message ? err.message : String(err);
+      setEditExpenseAlert('Error: ' + msg);
+      showToast('Error: ' + msg, 'error');
+      if (btn) btn.disabled = false;
+    })
+    .updateExpense(attachAuthContext({
+      expense_id:   expenseId,
+      expense_date: date,
+      category:     category,
+      doctor_name:  doctorName || null,
+      description:  description,
+      amount:       amount,
+      notes:        notes || null
+    }));
+}
+
+/* =========================================================
+   FINANCE TAB NAVIGATION
+   ========================================================= */
+
+function switchFinanceTab(tab) {
+  const isBilling = tab === 'billing';
+
+  const btnBilling = document.getElementById('financeTabBtnBilling');
+  const btnLaporan = document.getElementById('financeTabBtnLaporan');
+  const divBilling = document.getElementById('financeTabBilling');
+  const divLaporan = document.getElementById('financeTabLaporan');
+  const periodWrap = document.getElementById('financePeriodWrap');
+  const periodInfo = document.getElementById('financePeriodInfo');
+
+  if (btnBilling) btnBilling.classList.toggle('active', isBilling);
+  if (btnLaporan) btnLaporan.classList.toggle('active', !isBilling);
+  if (divBilling) divBilling.style.display = isBilling ? '' : 'none';
+  if (divLaporan) divLaporan.style.display = isBilling ? 'none' : '';
+  if (periodWrap) periodWrap.style.display = isBilling ? '' : 'none';
+  if (periodInfo) periodInfo.style.display = isBilling ? '' : 'none';
+
+  if (!isBilling && !financeActiveLaporan) {
+    financeActiveLaporan = true;
+    if (typeof ownerRenderInContainer === 'function') {
+      ownerRenderInContainer('financeTabLaporan');
+    }
+  }
+}
+
+/* =========================================================
    EXPENSE FORM — tambah pengeluaran (accessible admin & owner)
    ========================================================= */
 
@@ -7040,6 +7187,67 @@ function submitExpense() {
     <div class="owner-modal-actions">
       <button class="btn btn-secondary" onclick="closeExpenseModal()">Batal</button>
       <button class="btn btn-primary" id="expSubmitBtn" onclick="submitExpense()">Simpan</button>
+    </div>
+  </div>
+</div>
+
+<!-- EDIT EXPENSE MODAL -->
+<div class="owner-modal-overlay" id="editExpenseModal">
+  <div class="owner-modal-box">
+    <h3 class="owner-modal-title">Edit Pengeluaran</h3>
+    <div class="owner-modal-alert" id="editExpenseAlert"></div>
+    <input type="hidden" id="editExpId">
+
+    <div class="owner-form-group">
+      <label class="owner-form-label">Tanggal *</label>
+      <input type="date" id="editExpDate" class="owner-form-input">
+    </div>
+
+    <div class="owner-form-group">
+      <label class="owner-form-label">Kategori *</label>
+      <select id="editExpCategory" class="owner-form-select" onchange="toggleEditExpenseDoctorField()">
+        <option value="">-- Pilih Kategori --</option>
+        <option value="doctor_salary">Gaji Dokter</option>
+        <option value="doctor_meal">Uang Makan Dokter</option>
+        <option value="doctor_standby">Uang Duduk (Standby) Dokter</option>
+        <option value="operational">Operasional Klinik</option>
+        <option value="utility">Utilitas (Listrik, Air, dll)</option>
+        <option value="owner_withdrawal">Penarikan Owner</option>
+        <option value="other">Lain-lain</option>
+      </select>
+    </div>
+
+    <div class="owner-form-group" id="editExpDoctorFieldGroup" style="display:none;">
+      <label class="owner-form-label">Nama Dokter *</label>
+      <select id="editExpDoctorName" class="owner-form-select">
+        <option value="">-- Pilih Dokter --</option>
+        <option value="drg. Selly">drg. Selly</option>
+        <option value="drg. Novira">drg. Novira</option>
+        <option value="drg. Nurdiana">drg. Nurdiana</option>
+        <option value="drg. Aisyah">drg. Aisyah</option>
+        <option value="drg. Mitha">drg. Mitha</option>
+        <option value="drg. Yuni">drg. Yuni</option>
+      </select>
+    </div>
+
+    <div class="owner-form-group">
+      <label class="owner-form-label">Keterangan *</label>
+      <input type="text" id="editExpDescription" class="owner-form-input">
+    </div>
+
+    <div class="owner-form-group">
+      <label class="owner-form-label">Nominal (Rp) *</label>
+      <input type="number" id="editExpAmount" class="owner-form-input" min="1">
+    </div>
+
+    <div class="owner-form-group">
+      <label class="owner-form-label">Catatan (opsional)</label>
+      <textarea id="editExpNotes" class="owner-form-textarea"></textarea>
+    </div>
+
+    <div class="owner-modal-actions">
+      <button class="btn btn-secondary" onclick="closeEditExpenseModal()">Batal</button>
+      <button class="btn btn-primary" id="editExpSubmitBtn" onclick="submitEditExpense()">Simpan Perubahan</button>
     </div>
   </div>
 </div>

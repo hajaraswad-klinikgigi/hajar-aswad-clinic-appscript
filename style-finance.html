@@ -10,6 +10,64 @@
     gap: 20px;
   }
 
+  /* =========================================================
+     TAB NAVIGATION — Billing & Piutang | Laporan
+     ========================================================= */
+  .finance-tab-nav {
+    display: flex;
+    gap: 0;
+    border-bottom: 2px solid #e2e8f0;
+    margin-bottom: 4px;
+  }
+
+  .finance-tab-btn {
+    padding: 10px 22px;
+    border: none;
+    border-bottom: 3px solid transparent;
+    margin-bottom: -2px;
+    background: none;
+    font-size: 14px;
+    font-weight: 600;
+    color: #6b7280;
+    cursor: pointer;
+    transition: color .15s, border-color .15s;
+  }
+
+  .finance-tab-btn:hover { color: #0f172a; }
+
+  .finance-tab-btn.active {
+    color: #0f766e;
+    border-bottom-color: #0f766e;
+  }
+
+  /* Sub-tab (Harian/Bulanan/Tahunan) — lebih kecil, tanpa garis bawah tebal */
+  .finance-tab-nav-sub {
+    border-bottom: 1px solid #e2e8f0;
+    margin-bottom: 0;
+  }
+
+  .finance-tab-nav-sub .finance-tab-btn {
+    padding: 8px 16px;
+    font-size: 13px;
+  }
+
+  /* Container kontrol laporan (sub-tab + date picker + refresh) */
+  .owner-report-controls {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    flex-wrap: wrap;
+    margin-bottom: 16px;
+  }
+
+  .owner-report-ctrl-right {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    flex-wrap: wrap;
+  }
+
   .finance-header {
     display: flex;
     justify-content: space-between;
