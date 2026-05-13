@@ -310,15 +310,16 @@ function ownerRenderDaily(data) {
           </tr></thead>
           <tbody>
             ${items.map(function(e){
-              const esc = escapeAppHtml;
+              const esc    = escapeAppHtml;
+              const escPrm = typeof escapeFinanceOnclickParam === 'function' ? escapeFinanceOnclickParam : escapeAppHtml;
               const editArgs = [
-                esc(e.expense_id||''),
-                esc(e.category||''),
-                esc(e.description||''),
-                esc(e.amount||0),
-                esc(e.doctor_name||''),
-                esc(e.notes||''),
-                esc(String(e.expense_date||'').slice(0,10))
+                escPrm(e.expense_id||''),
+                escPrm(e.category||''),
+                escPrm(e.description||''),
+                escPrm(e.amount||0),
+                escPrm(e.doctor_name||''),
+                escPrm(e.notes||''),
+                escPrm(String(e.expense_date||'').slice(0,10))
               ].join("','");
               return`<tr>
                 <td>${esc(OWNER_CATEGORY_LABELS[e.category]||e.category||'-')}</td>

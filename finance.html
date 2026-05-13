@@ -7111,6 +7111,7 @@ function submitExpense() {
       }
       closeExpenseModal();
       showToast('Pengeluaran berhasil disimpan.', 'success');
+      if (typeof ownerLoadReport === 'function') ownerLoadReport();
     })
     .withFailureHandler(function(err) {
       const msg = err && err.message ? err.message : String(err);
