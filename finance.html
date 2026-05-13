@@ -754,6 +754,7 @@ function showFinancePage() {
               <option value="30days">30 Hari</option>
             </select>
           </div>
+          <button type="button" id="financeAddExpBtn" class="action-btn" onclick="openExpenseModal()" style="display:none;">+ Pengeluaran</button>
         </div>
       </div>
 
@@ -7102,12 +7103,15 @@ function switchFinanceTab(tab) {
   const periodWrap = document.getElementById('financePeriodWrap');
   const periodInfo = document.getElementById('financePeriodInfo');
 
+  const addExpBtn = document.getElementById('financeAddExpBtn');
+
   if (btnBilling) btnBilling.classList.toggle('active', isBilling);
   if (btnLaporan) btnLaporan.classList.toggle('active', !isBilling);
   if (divBilling) divBilling.style.display = isBilling ? '' : 'none';
   if (divLaporan) divLaporan.style.display = isBilling ? 'none' : '';
   if (periodWrap) periodWrap.style.display = isBilling ? '' : 'none';
   if (periodInfo) periodInfo.style.display = isBilling ? '' : 'none';
+  if (addExpBtn)  addExpBtn.style.display  = isBilling ? 'none' : '';
 
   if (!isBilling && !financeActiveLaporan) {
     financeActiveLaporan = true;

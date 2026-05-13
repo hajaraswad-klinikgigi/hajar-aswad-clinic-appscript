@@ -49,20 +49,6 @@
               <div class="recall-toolbar-actions">
                 <button
                   type="button"
-                  id="recallRefreshBtn"
-                  class="icon-btn refresh"
-                  onclick="loadRecallList()"
-                  title="Refresh data recall"
-                  aria-label="Refresh data recall"
-                >
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <polyline points="23 4 23 10 17 10"></polyline>
-                    <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path>
-                  </svg>
-                </button>
-
-                <button
-                  type="button"
                   id="recallFiltersToggleBtn"
                   class="recall-filter-chip"
                   onclick="toggleRecallFilters()"
@@ -277,7 +263,6 @@
     const tbody = document.getElementById('recallTableBody');
 
     recallListLoadingInFlight = true;
-    setRecallRefreshButtonState(true);
 
     if (tbody && (!allRecallRows || allRecallRows.length === 0)) {
       tbody.innerHTML = `
@@ -290,13 +275,12 @@
     google.script.run
       .withSuccessHandler(function(res) {
         recallListLoadingInFlight = false;
-        setRecallRefreshButtonState(false);
 
         if (!res || !res.success) {
           if (tbody) {
             tbody.innerHTML = renderRecallTableState(
               'Gagal memuat data recall',
-              (res && res.message) || 'Silakan klik Refresh untuk mencoba lagi.'
+              (res && res.message) || 'Silakan coba lagi nanti.'
             );
           }
 
@@ -326,7 +310,6 @@
       })
       .withFailureHandler(function(err) {
         recallListLoadingInFlight = false;
-        setRecallRefreshButtonState(false);
 
         if (tbody) {
           tbody.innerHTML = renderRecallTableState(
@@ -572,14 +555,6 @@
       title: 'Data recall tidak ditemukan',
       subtitle: 'Belum ada data recall sesuai kondisi saat ini.'
     };
-  }
-
-  function setRecallRefreshButtonState(isLoading) {
-    const btn = document.getElementById('recallRefreshBtn');
-    if (!btn) return;
-    btn.disabled = isLoading;
-    const svg = btn.querySelector('svg');
-    if (svg) svg.style.opacity = isLoading ? '0.35' : '1';
   }
 
   function isRecallWorkflowBusy() {
