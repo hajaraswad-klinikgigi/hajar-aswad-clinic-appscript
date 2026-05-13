@@ -880,6 +880,13 @@ function ownerPrintDailyReport() {
 
   /* ── HELPER: judul seksi ─────────────────────────────── */
   function sectionTitle(label) {
+    // Butuh minimal 55mm: title bar + header tabel + beberapa baris pertama
+    // Jika tidak cukup dan sudah melewati area header halaman → halaman baru
+    var remaining = doc.internal.pageSize.height - y - 15;
+    if (remaining < 55 && y > 60) {
+      doc.addPage();
+      y = MARGIN;
+    }
     doc.setFillColor(BLUE_L[0], BLUE_L[1], BLUE_L[2]);
     doc.rect(MARGIN, y, COL_W, 7, 'F');
     doc.setFontSize(8);
