@@ -1208,7 +1208,7 @@ function renderFinancePageBootstrapErrorState(message) {
     )
   );
 
-  financeSetText('financeReceivablePaginationInfo', 'Halaman 0 dari 0');
+  renderFinancePaginationInfo('financeReceivable', 0, 0, 0);
 }
 
 function changeFinancePeriod(el) {
@@ -2082,7 +2082,7 @@ function applyFinanceReceivablesResponse_(res) {
       )
     );
 
-    financeSetText('financeReceivablePaginationInfo', 'Halaman 0 dari 0');
+    renderFinancePaginationInfo('financeReceivable', 0, 0, 0);
     return false;
   }
 
@@ -4526,9 +4526,7 @@ function loadFinanceReceivables() {
           );
         }
 
-        if (paginationInfo) {
-          paginationInfo.innerText = 'Halaman 0 dari 0';
-        }
+        renderFinancePaginationInfo('financeReceivable', 0, 0, 0);
 
         showToast(message, 'error');
         return;
@@ -4580,9 +4578,7 @@ function loadFinanceReceivables() {
         );
       }
 
-      if (paginationInfo) {
-        paginationInfo.innerText = 'Halaman 0 dari 0';
-      }
+      renderFinancePaginationInfo('financeReceivable', 0, 0, 0);
 
       showToast(message, 'error');
     })
