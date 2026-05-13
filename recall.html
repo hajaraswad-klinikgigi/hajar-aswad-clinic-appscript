@@ -246,6 +246,12 @@
 
     recallFiltersExpanded = false;
     updateRecallFilterControls();
+
+    // Stale-while-revalidate: tampilkan data lama langsung jika ada
+    if (allRecallRows && allRecallRows.length > 0) {
+      applyRecallFilters();
+    }
+
     loadRecallList();
   }
 
@@ -262,7 +268,7 @@
     recallListLoadingInFlight = true;
     setRecallRefreshButtonState(true);
 
-    if (tbody) {
+    if (tbody && (!allRecallRows || allRecallRows.length === 0)) {
       tbody.innerHTML = `
         <tr>
           <td colspan="6">Memuat data...</td>
