@@ -102,9 +102,22 @@
           </div>
 
           <div class="pagination">
-            <button type="button" onclick="prevPatientPage()">Prev</button>
-            <div id="patientPaginationInfo" class="pagination-info">Halaman 1 dari 1</div>
-            <button type="button" onclick="nextPatientPage()">Next</button>
+            <div class="pagination-nav">
+              <button type="button" class="pagination-arrow" id="patientPrevBtn" onclick="prevPatientPage()" aria-label="Halaman sebelumnya">
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"></polyline></svg>
+              </button>
+              <span class="pagination-label">Page</span>
+              <span class="pagination-current" id="patientCurrentPage">1</span>
+              <span class="pagination-sep">of</span>
+              <span class="pagination-total" id="patientTotalPages">1</span>
+              <button type="button" class="pagination-arrow" id="patientNextBtn" onclick="nextPatientPage()" aria-label="Halaman berikutnya">
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"></polyline></svg>
+              </button>
+            </div>
+            <div class="pagination-meta">
+              <span class="pagination-rows-chip">5 rows</span>
+              <span class="pagination-count" id="patientPaginationInfo">-</span>
+            </div>
           </div>
         </div>
 
@@ -202,7 +215,7 @@
           </td>
         </tr>
       `;
-      info.innerText = 'Halaman 0 dari 0';
+      renderPatientPaginationState(0, 0, 0);
       return;
     }
 
@@ -354,7 +367,7 @@
       `;
     }).join('');
 
-    info.innerText = 'Halaman ' + patientCurrentPage + ' dari ' + totalPages;
+    renderPatientPaginationState(patientCurrentPage, totalPages, filteredPatients.length);
   }
 
   function isPatientActiveClient(value) {
@@ -427,6 +440,15 @@
       patientCurrentPage++;
       renderPatientsTable();
     }
+  }
+
+  function renderPatientPaginationState(current, total, count) {
+    var el = function(id) { return document.getElementById(id); };
+    if (el('patientCurrentPage'))  el('patientCurrentPage').textContent  = current || 0;
+    if (el('patientTotalPages'))   el('patientTotalPages').textContent   = total   || 0;
+    if (el('patientPaginationInfo')) el('patientPaginationInfo').textContent = (count || 0) + ' records';
+    var prev = el('patientPrevBtn'); if (prev) prev.disabled = current <= 1;
+    var next = el('patientNextBtn'); if (next) next.disabled = current >= total;
   }
   
   function getLocalPatientById(patientId) {

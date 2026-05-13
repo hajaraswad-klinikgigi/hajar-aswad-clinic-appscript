@@ -299,10 +299,23 @@
               </table>  
             </div>  
   
-            <div class="pagination appointments-pagination">  
-              <button type="button" onclick="prevAppointmentPage()">Prev</button>  
-              <div id="appointmentPaginationInfo" class="pagination-info">Halaman 1 dari 1</div>  
-              <button type="button" onclick="nextAppointmentPage()">Next</button>  
+            <div class="pagination appointments-pagination">
+              <div class="pagination-nav">
+                <button type="button" class="pagination-arrow" id="appointmentPrevBtn" onclick="prevAppointmentPage()" aria-label="Halaman sebelumnya">
+                  <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"></polyline></svg>
+                </button>
+                <span class="pagination-label">Page</span>
+                <span class="pagination-current" id="appointmentCurrentPage">1</span>
+                <span class="pagination-sep">of</span>
+                <span class="pagination-total" id="appointmentTotalPages">1</span>
+                <button type="button" class="pagination-arrow" id="appointmentNextBtn" onclick="nextAppointmentPage()" aria-label="Halaman berikutnya">
+                  <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"></polyline></svg>
+                </button>
+              </div>
+              <div class="pagination-meta">
+                <span class="pagination-rows-chip">5 rows</span>
+                <span class="pagination-count" id="appointmentPaginationInfo">-</span>
+              </div>
             </div>  
           </div>  
         </div>  
@@ -792,7 +805,7 @@
           </td>  
         </tr>  
       `;  
-      info.innerText = 'Halaman 0 dari 0';  
+      renderAppointmentPaginationState(0, 0, 0);
       return;  
     }  
   
@@ -945,7 +958,7 @@
       `;  
     }).join('');
       
-    info.innerText = 'Halaman ' + appointmentCurrentPage + ' dari ' + totalPages;  
+    renderAppointmentPaginationState(appointmentCurrentPage, totalPages, renderSource.length);
   }  
   
   function toggleAppointmentExpand(appointmentId) {  
@@ -1012,19 +1025,28 @@
     }  
   }  
   
-  function nextAppointmentPage() {  
-    if (isAppointmentsFullscreenMode) return;  
-  
-    const renderSource = getRenderedAppointmentsSource();  
-    const totalPages = Math.ceil(renderSource.length / appointmentPageSize) || 1;  
-  
-    if (appointmentCurrentPage < totalPages) {  
-      appointmentCurrentPage++;  
-      closeAllAppointmentExpandRows();  
-      renderAppointmentsTable(false);  
-    }  
-  }  
-  
+  function nextAppointmentPage() {
+    if (isAppointmentsFullscreenMode) return;
+
+    const renderSource = getRenderedAppointmentsSource();
+    const totalPages = Math.ceil(renderSource.length / appointmentPageSize) || 1;
+
+    if (appointmentCurrentPage < totalPages) {
+      appointmentCurrentPage++;
+      closeAllAppointmentExpandRows();
+      renderAppointmentsTable(false);
+    }
+  }
+
+  function renderAppointmentPaginationState(current, total, count) {
+    var el = function(id) { return document.getElementById(id); };
+    if (el('appointmentCurrentPage'))  el('appointmentCurrentPage').textContent  = current || 0;
+    if (el('appointmentTotalPages'))   el('appointmentTotalPages').textContent   = total   || 0;
+    if (el('appointmentPaginationInfo')) el('appointmentPaginationInfo').textContent = (count || 0) + ' records';
+    var prev = el('appointmentPrevBtn'); if (prev) prev.disabled = current <= 1;
+    var next = el('appointmentNextBtn'); if (next) next.disabled = current >= total;
+  }
+
   function openCreateAppointmentModal() {  
     appointmentFormMode = 'create';  
     appointmentPatientHasOpenAppointment = false;  
