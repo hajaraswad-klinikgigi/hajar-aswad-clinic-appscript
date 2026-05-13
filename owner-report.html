@@ -947,14 +947,15 @@ function ownerPrintDailyReport() {
       doc.autoTable({
         startY: y,
         head: [
-          [{
-            content: (d.doctor_name || '-') +
-                     '   •   ' + (d.patient_count || 0) + ' pasien' +
-                     '   •   Billing: ' + ownerFmtRp(d.total_billing) +
-                     '   •   Kas Masuk: ' + ownerFmtRp(d.total_cash_in),
-            colSpan: 4,
-            styles: { fillColor: BLUE, textColor: [255,255,255], fontStyle: 'bold', fontSize: 9, cellPadding: 3.5 },
-          }],
+          [
+            { content: (d.doctor_name || '-') + '   •   ' + (d.patient_count || 0) + ' pasien',
+              colSpan: 2,
+              styles: { fillColor: BLUE, textColor: [255,255,255], fontStyle: 'bold', fontSize: 9, cellPadding: 3.5, halign: 'left' } },
+            { content: ownerFmtRp(d.total_billing),
+              styles: { fillColor: BLUE, textColor: [255,255,255], fontStyle: 'bold', fontSize: 9, cellPadding: 3.5, halign: 'right' } },
+            { content: ownerFmtRp(d.total_cash_in),
+              styles: { fillColor: BLUE, textColor: [255,255,255], fontStyle: 'bold', fontSize: 9, cellPadding: 3.5, halign: 'right' } },
+          ],
           ['Pasien', 'Layanan / Treatment', 'Biaya', 'Bayar'],
         ],
         body: patients.length
