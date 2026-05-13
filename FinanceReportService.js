@@ -984,7 +984,15 @@ function ownerBuildRevenueFromRawData_(rawData, startDate, endDate) {
     byDoctorMap[doc].patient_count++;
     byDoctorMap[doc].total_billing += biaya;
     byDoctorMap[doc].total_cash_in += cashIn;
-    byDoctorMap[doc].patients.push({ patient_name: patientName, services: services, biaya: patientBiaya, bayar: patientBayar });
+    byDoctorMap[doc].patients.push({
+      patient_name: patientName,
+      services:     services,
+      biaya:        patientBiaya,
+      bayar:        patientBayar,
+      subtotal:     allBilling ? Number(allBilling.subtotal      || 0) : null,
+      discount:     allBilling ? Number(allBilling.discount_total || 0) : null,
+      has_billing:  !!allBilling
+    });
   });
 
   const byServiceMap = {};

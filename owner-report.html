@@ -53,6 +53,32 @@ function ownerNetClass(val) {
 /* =========================================================
    SHARED SECTION RENDERERS
    ========================================================= */
+function ownerFmtPatientBiaya(p) {
+  if (!p.has_billing) return '-';
+  const sub   = Number(p.subtotal || 0);
+  const disc  = Number(p.discount  || 0);
+  const grand = Number(p.biaya     || 0);
+
+  if (sub === 0 && grand === 0)
+    return '<span class="owner-tag-gratis">Gratis</span>';
+
+  if (sub > 0 && grand === 0)
+    return '<span class="owner-tag-diskon">Diskon penuh</span> ' +
+           '<span class="owner-price-strike">' + ownerFmtRp(sub) + '</span>';
+
+  if (disc > 0)
+    return ownerFmtRp(grand) +
+           '<div class="owner-discount-note">Diskon ' + ownerFmtRp(disc) +
+           ' dari ' + ownerFmtRp(sub) + '</div>';
+
+  return ownerFmtRp(grand);
+}
+
+function ownerFmtPatientBayar(p) {
+  if (!p.has_billing) return '-';
+  return ownerFmtRp(p.bayar);
+}
+
 function ownerRenderDoctorSection(byDoc, autoExpand) {
   const doctors = Array.isArray(byDoc) ? byDoc : [];
   if (!doctors.length) return '<div class="owner-empty">Tidak ada data treatment periode ini</div>';
@@ -80,8 +106,8 @@ function ownerRenderDoctorSection(byDoc, autoExpand) {
         <td class="owner-patient-name">${escapeAppHtml(p.patient_name||'-')}</td>
         <td></td>
         <td class="owner-patient-services">${escapeAppHtml(p.services||'-')}</td>
-        <td>${ownerFmtRp(p.biaya)}</td>
-        <td>${ownerFmtRp(p.bayar)}</td>
+        <td>${ownerFmtPatientBiaya(p)}</td>
+        <td>${ownerFmtPatientBayar(p)}</td>
       </tr>`;
     });
   });
