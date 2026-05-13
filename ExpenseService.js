@@ -240,6 +240,12 @@ function updateExpense(payload) {
     const existing = dbFindById_('Expenses', 'expense_id', expenseId, EXPENSE_OPTIONS);
     if (!existing) return { success: false, message: 'Data pengeluaran tidak ditemukan: ' + expenseId };
 
+    const today = formatTodayYmd();
+    const existingDate = String(existing.expense_date || '').slice(0, 10);
+    if (existingDate !== today) {
+      return { success: false, message: 'Pengeluaran tanggal lampau tidak dapat diubah.' };
+    }
+
     const patch = {};
 
     if (payload.expense_date !== undefined) {
@@ -298,6 +304,12 @@ function deleteExpense(payload) {
 
     const existing = dbFindById_('Expenses', 'expense_id', expenseId, EXPENSE_OPTIONS);
     if (!existing) return { success: false, message: 'Data pengeluaran tidak ditemukan: ' + expenseId };
+
+    const today = formatTodayYmd();
+    const existingDate = String(existing.expense_date || '').slice(0, 10);
+    if (existingDate !== today) {
+      return { success: false, message: 'Pengeluaran tanggal lampau tidak dapat dihapus.' };
+    }
 
     dbDeleteById_('Expenses', 'expense_id', expenseId, EXPENSE_OPTIONS);
 

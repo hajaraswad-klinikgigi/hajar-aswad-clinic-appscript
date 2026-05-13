@@ -114,6 +114,13 @@
     const toggle = document.getElementById('showInactivePatients');
     if (toggle) toggle.checked = showInactivePatients;
 
+    // Stale-while-revalidate: tampilkan data lama langsung jika ada
+    if (allPatients && allPatients.length > 0) {
+      filteredPatients = allPatients.slice();
+      patientCurrentPage = 1;
+      renderPatientsTable();
+    }
+
     loadPatients();
   }
 

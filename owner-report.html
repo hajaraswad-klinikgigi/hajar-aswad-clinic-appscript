@@ -364,14 +364,15 @@ function ownerRenderDaily(data) {
   const content = document.getElementById('ownerReportContent');
   if (!content || !data) return;
 
-  const rev   = data.revenue || {};
-  const exp   = data.expense || {};
-  const net   = data.net     || {};
-  const byDoc = Array.isArray(rev.by_doctor)  ? rev.by_doctor  : [];
-  const bySvc = Array.isArray(rev.by_service) ? rev.by_service : [];
-  const byPay = rev.by_payment_method || {};
-  const items = Array.isArray(exp.items) ? exp.items : [];
-  const byCat = exp.by_category || {};
+  const rev     = data.revenue || {};
+  const exp     = data.expense || {};
+  const net     = data.net     || {};
+  const byDoc   = Array.isArray(rev.by_doctor)  ? rev.by_doctor  : [];
+  const bySvc   = Array.isArray(rev.by_service) ? rev.by_service : [];
+  const byPay   = rev.by_payment_method || {};
+  const items   = Array.isArray(exp.items) ? exp.items : [];
+  const byCat   = exp.by_category || {};
+  const isToday = (data.date || ownerReportDate) === ownerTodayYmd();
 
   content.innerHTML = `
     <div class="owner-kpi-grid">
@@ -433,11 +434,13 @@ function ownerRenderDaily(data) {
         <div class="owner-section-title">Detail Pengeluaran</div>
         <div class="owner-section-subtitle">Item pengeluaran hari ini</div>
       </div></div>
+      ${!isToday ? '<div class="owner-empty" style="color:#6b7280;font-size:13px;">Laporan tanggal lampau — data tidak dapat diubah</div>' : ''}
       ${items.length === 0
         ? '<div class="owner-empty">Belum ada pengeluaran hari ini</div>'
         : `<div class="table-wrapper"><table class="table">
           <thead><tr>
-            <th>Kategori</th><th>Keterangan</th><th>Nominal</th><th>Dicatat Oleh</th><th></th>
+            <th>Kategori</th><th>Keterangan</th><th>Nominal</th><th>Dicatat Oleh</th>
+            ${isToday ? '<th></th>' : ''}
           </tr></thead>
           <tbody>
             ${items.map(function(e){
@@ -457,7 +460,7 @@ function ownerRenderDaily(data) {
                 <td>${esc(e.description||'-')}${e.doctor_name?' <span style="color:#6b7280">('+esc(e.doctor_name)+')</span>':''}</td>
                 <td>${ownerFmtRp(e.amount)}</td>
                 <td>${esc(e.recorded_by||'-')}</td>
-                <td>
+                ${isToday ? `<td>
                   <div class="inline-actions">
                     <button type="button" class="icon-btn edit"
                       title="Edit pengeluaran" aria-label="Edit pengeluaran"
@@ -478,7 +481,7 @@ function ownerRenderDaily(data) {
                       </svg>
                     </button>
                   </div>
-                </td>
+                </td>` : ''}
               </tr>`;
             }).join('')}
           </tbody>

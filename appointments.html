@@ -309,12 +309,17 @@
       </div>  
     `;  
   
-    const toggle = document.getElementById('showCancelledAppointments');  
-    if (toggle) toggle.checked = showCancelledAppointments;  
-  
+    const toggle = document.getElementById('showCancelledAppointments');
+    if (toggle) toggle.checked = showCancelledAppointments;
+
+    // Stale-while-revalidate: tampilkan data lama langsung jika ada
+    if (allAppointments && allAppointments.length > 0) {
+      applyAppointmentFilters();
+    }
+
     loadAppointments();
     syncAppointmentsFullscreenState();
-    syncAppointmentsRefreshMode();  
+    syncAppointmentsRefreshMode();
   }  
   
   function getAppointmentsFullscreenTarget() {  
