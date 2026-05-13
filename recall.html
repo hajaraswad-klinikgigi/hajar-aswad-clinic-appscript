@@ -146,7 +146,9 @@
                 <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"></polyline></svg>
               </button>
               <span class="pagination-label">Page</span>
-              <span class="pagination-current" id="recallCurrentPage">1</span>
+              <input type="number" class="pagination-input" id="recallCurrentPage" value="1" min="1"
+                onkeydown="if(event.key==='Enter'){goToRecallPage(this);this.blur();}"
+                onblur="goToRecallPage(this)" onwheel="this.blur()">
               <span class="pagination-sep">of</span>
               <span class="pagination-total" id="recallTotalPages">1</span>
               <button type="button" class="pagination-arrow" id="recallNextBtn" onclick="nextRecallPage()" aria-label="Halaman berikutnya">
@@ -854,11 +856,22 @@
 
   function renderRecallPaginationState(current, total, count) {
     var el = function(id) { return document.getElementById(id); };
-    if (el('recallCurrentPage'))  el('recallCurrentPage').textContent  = current || 0;
-    if (el('recallTotalPages'))   el('recallTotalPages').textContent   = total   || 0;
+    var inp = el('recallCurrentPage'); if (inp) inp.value = current || 0;
+    if (el('recallTotalPages'))   el('recallTotalPages').textContent   = total || 0;
     if (el('recallPaginationInfo')) el('recallPaginationInfo').textContent = (count || 0) + ' records';
     var prev = el('recallPrevBtn'); if (prev) prev.disabled = current <= 1;
     var next = el('recallNextBtn'); if (next) next.disabled = current >= total;
+  }
+
+  function goToRecallPage(input) {
+    var totalPages = Math.ceil(filteredRecallRows.length / recallPageSize) || 1;
+    var page = parseInt(input.value, 10);
+    if (isNaN(page) || page < 1) page = 1;
+    if (page > totalPages) page = totalPages;
+    input.value = page;
+    if (recallCurrentPage === page) return;
+    recallCurrentPage = page;
+    applyRecallFilters(false);
   }
 
   function nextRecallPage() {
