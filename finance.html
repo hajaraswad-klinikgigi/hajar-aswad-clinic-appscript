@@ -25,6 +25,7 @@ let financeInstallmentRowsState = [];
 let currentFinanceInvoiceDeliveryInfo = null;
 
 let financeBillingDetailLoadToken = 0;
+let financeBillingDetailCache = {};
 
 function financeFormatRupiah(value) {
   return formatAppRupiah(value);
@@ -1604,6 +1605,11 @@ function mergeFinanceMutationDetailFromResult_(res, options) {
   }
 
   currentFinanceBillingDetail = detail;
+  // Sync cache setelah mutasi lokal (payment/discount/cicilan)
+  const mutatedBillingId = String((detail.billing && detail.billing.billing_id) || '').trim();
+  if (mutatedBillingId) {
+    financeBillingDetailCache[mutatedBillingId] = detail;
+  }
   renderFinanceBillingDetail(currentFinanceBillingDetail);
 
   return true;
@@ -2938,7 +2944,15 @@ function openFinanceBillingDetail(billingId) {
 
   const token = ++financeBillingDetailLoadToken;
 
-  renderFinanceBillingDetailFastPreview_(normalizedBillingId);
+  // Cache hit: tampilkan penuh langsung, refresh di background
+  if (financeBillingDetailCache[normalizedBillingId]) {
+    currentFinanceBillingDetail = financeBillingDetailCache[normalizedBillingId];
+    currentFinanceInstallmentPlan = null;
+    currentFinanceInvoiceDeliveryInfo = null;
+    renderFinanceBillingDetail(currentFinanceBillingDetail);
+  } else {
+    renderFinanceBillingDetailFastPreview_(normalizedBillingId);
+  }
 
   loadFinanceBillingDetail(normalizedBillingId, {
     token: token,
@@ -2978,6 +2992,9 @@ function loadFinanceBillingDetail(billingId, options) {
       }
 
       currentFinanceBillingDetail = res.data || null;
+      if (currentFinanceBillingDetail) {
+        financeBillingDetailCache[normalizedBillingId] = currentFinanceBillingDetail;
+      }
       renderFinanceBillingDetail(currentFinanceBillingDetail);
     })
     .withFailureHandler(function(err) {
