@@ -1,4 +1,4 @@
-<style>
+﻿<style>
   /* ===== Shared modal base ===== */
   .modal {
     position: fixed;
@@ -22,8 +22,8 @@
     overflow-y: auto;
     scroll-behavior: smooth;
     padding: 24px;
-    background: #fff;
-    border: 1px solid #eef2f7;
+    background: #161b2e;
+    border: 1px solid rgba(255, 255, 255, 0.07);
     border-radius: 20px;
     box-shadow: 0 20px 50px rgba(15, 23, 42, 0.16);
   }
@@ -63,17 +63,17 @@
     margin-top: -8px;
     margin-bottom: 10px;
     font-size: 12px;
-    color: #b91c1c;
+    color: #fca5a5;
   }
 
   .input-error {
     border-color: #dc2626 !important;
-    background: #fef2f2;
+    background: rgba(239, 68, 68, 0.10);
   }
 
   .confirm-text {
     margin-bottom: 16px;
-    color: #374151;
+    color: #94a3b8;
     line-height: 1.5;
   }
 
@@ -90,11 +90,11 @@
 
   .detail-label {
     font-weight: 700;
-    color: #374151;
+    color: #94a3b8;
   }
 
   .detail-value {
-    color: #111827;
+    color: #f1f5f9;
     word-break: break-word;
   }
 
@@ -122,8 +122,8 @@
     justify-content: space-between;
     gap: 12px;
     padding: 20px 24px 16px;
-    background: #ffffff;
-    border-bottom: 1px solid #eef2f7;
+    background: #161b2e;
+    border-bottom: 1px solid rgba(255,255,255,0.06);
   }
 
   .detail-modal-title-sticky {
@@ -131,7 +131,7 @@
     font-size: 20px;
     font-weight: 800;
     letter-spacing: -0.02em;
-    color: #0f172a;
+    color: #f1f5f9;
   }
 
   .detail-modal-content-scroll {
@@ -148,18 +148,17 @@
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    color: #dc2626;
-    background: linear-gradient(135deg, #ffffff 0%, #fef2f2 100%);
-    border: 1px solid #fecaca;
+    color: #fca5a5;
+    background: rgba(239, 68, 68, 0.10);
+    border: 1px solid rgba(239, 68, 68, 0.25);
     border-radius: 12px;
-    box-shadow: 0 8px 18px rgba(220, 38, 38, 0.10);
-    transition: transform 0.18s ease, box-shadow 0.18s ease, background 0.18s ease;
+    box-shadow: none;
+    transition: transform 0.18s ease, background 0.18s ease;
   }
 
   .detail-close-btn:hover {
     transform: translateY(-1px);
-    background: linear-gradient(135deg, #fff5f5 0%, #fee2e2 100%);
-    box-shadow: 0 12px 22px rgba(220, 38, 38, 0.16);
+    background: rgba(239, 68, 68, 0.18);
   }
 
   .detail-close-btn:active {
@@ -190,7 +189,7 @@
     font-size: 24px;
     font-weight: 800;
     letter-spacing: -0.02em;
-    color: #0f172a;
+    color: #f1f5f9;
   }
 
   .appointment-modal-box .modal-actions {
@@ -221,19 +220,19 @@
     margin-top: -4px;
     margin-bottom: 12px;
     padding: 10px 12px;
-    color: #9a3412;
-    background: #fff7ed;
+    color: #fdba74;
+    background: rgba(251, 146, 60, 0.12);
     border: 1px solid #fed7aa;
     border-radius: 12px;
   }
 
   #appointmentDetailContent .detail-label {
     font-weight: 700;
-    color: #475569;
+    color: #94a3b8;
   }
 
   #appointmentDetailContent .detail-value {
-    color: #111827;
+    color: #f1f5f9;
   }
 
   /* ===== Patient modals ===== */
@@ -257,7 +256,7 @@
     font-size: 24px;
     font-weight: 800;
     letter-spacing: -0.02em;
-    color: #0f172a;
+    color: #f1f5f9;
   }
 
   .patient-modal-box .modal-actions {
@@ -283,14 +282,14 @@
     font-size: 24px;
     font-weight: 800;
     letter-spacing: -0.02em;
-    color: #0f172a;
+    color: #f1f5f9;
   }
 
   .treatment-modal-box h3 {
     font-size: 18px;
     font-weight: 800;
     letter-spacing: -0.02em;
-    color: #0f172a;
+    color: #f1f5f9;
   }
 
   .treatment-modal-box .modal-actions {
@@ -303,7 +302,7 @@
 
   .treatment-modal-box .table-wrapper {
     overflow: hidden;
-    border: 1px solid #eef2f7;
+    border: 1px solid rgba(255, 255, 255, 0.07);
     border-radius: 16px;
   }
 
@@ -313,7 +312,7 @@
   }
 
   .treatment-modal-box .table th {
-    background: #f8fafc;
+    background: #0d1117;
   }
 
   .treatment-modal-box .table td,
@@ -359,7 +358,7 @@
   }
 
   .treatment-btn-secondary {
-    color: #374151;
+    color: #94a3b8;
     background: #e5e7eb;
   }
 
@@ -401,7 +400,7 @@
   .patient-photo-preview-content {
     overflow-y: auto;
     padding: 20px 24px 24px;
-    background: #fff;
+    background: #161b2e;
   }
 
   .patient-photo-preview-content img {
@@ -409,8 +408,8 @@
     width: 100%;
     max-height: 72vh;
     object-fit: contain;
-    background: #f8fafc;
-    border: 1px solid #e5e7eb;
+    background: #0d1117;
+    border: 1px solid rgba(255, 255, 255, 0.07);
     border-radius: 16px;
   }
 
@@ -418,25 +417,25 @@
     margin-top: 14px;
     font-size: 14px;
     line-height: 1.6;
-    color: #475569;
+    color: #94a3b8;
   }
   
   #photo_treatment_warning {
     margin-top: -4px;
     margin-bottom: 12px;
     padding: 10px 12px;
-    color: #9a3412;
-    background: #fff7ed;
+    color: #fdba74;
+    background: rgba(251, 146, 60, 0.12);
     border: 1px solid #fed7aa;
     border-radius: 12px;
   }
 
   /* ===== Patient photo gallery ===== */
   .patient-photo-treatment-card {
-    border: 1px solid #e5e7eb;
+    border: 1px solid rgba(255, 255, 255, 0.07);
     border-radius: 16px;
     padding: 16px;
-    background: linear-gradient(180deg, #ffffff 0%, #fbfdff 100%);
+    background: #1e2235;
     box-shadow: 0 8px 24px rgba(15, 23, 42, 0.04);
   }
 
@@ -455,7 +454,7 @@
   .patient-photo-treatment-title {
     font-size: 14px;
     font-weight: 800;
-    color: #0f172a;
+    color: #f1f5f9;
     margin-bottom: 4px;
   }
 
@@ -480,10 +479,10 @@
 
   .patient-photo-card {
     position: relative;
-    border: 1px solid #e5e7eb;
+    border: 1px solid rgba(255, 255, 255, 0.07);
     border-radius: 14px;
     overflow: hidden;
-    background: #fff;
+    background: #161b2e;
     box-shadow: 0 8px 18px rgba(15, 23, 42, 0.04);
     transition: transform 0.18s ease, box-shadow 0.18s ease;
   }
@@ -511,7 +510,7 @@
 
   .patient-photo-thumb-wrap {
     aspect-ratio: 4 / 3;
-    background: #f8fafc;
+    background: #0d1117;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -532,7 +531,7 @@
   .patient-photo-file-name {
     font-size: 13px;
     font-weight: 700;
-    color: #0f172a;
+    color: #f1f5f9;
     margin-bottom: 4px;
     line-height: 1.4;
     word-break: break-word;
@@ -549,9 +548,9 @@
     font-size: 13px;
     color: #64748b;
     padding: 12px;
-    border: 1px dashed #dbe3ee;
+    border: 1px dashed rgba(255,255,255,0.08);
     border-radius: 12px;
-    background: #f8fafc;
+    background: #0d1117;
   }
 
   .patient-photo-type-badge {
@@ -576,13 +575,13 @@
 
   .patient-photo-type-badge.before {
     background: rgba(239, 246, 255, 0.94);
-    color: #1d4ed8;
-    border: 1px solid #dbeafe;
+    color: #93c5fd;
+    border: 1px solid rgba(79, 110, 247, 0.20);
   }
 
   .patient-photo-type-badge.after {
     background: rgba(240, 253, 244, 0.94);
-    color: #166534;
+    color: #86efac;
     border: 1px solid #dcfce7;
   }
 
@@ -599,7 +598,7 @@
     border-radius: 12px;
     border: 1px solid rgba(254, 202, 202, 0.95);
     background: rgba(255, 255, 255, 0.92);
-    color: #dc2626;
+    color: #fca5a5;
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -610,7 +609,7 @@
 
   .patient-photo-delete-btn:hover {
     background: #fee2e2;
-    color: #b91c1c;
+    color: #fca5a5;
     transform: translateY(-1px);
   }
 
@@ -632,7 +631,7 @@
   }
 
   .patient-photo-delete-btn.is-locked:hover {
-    background: #f8fafc;
+    background: #0d1117;
     color: #64748b;
     transform: translateY(-1px);
   }
@@ -647,7 +646,7 @@
   .modal-is-processing input:disabled,
   .modal-is-processing select:disabled,
   .modal-is-processing textarea:disabled {
-    background: #f8fafc;
+    background: #0d1117;
     color: #64748b;
     cursor: not-allowed;
   }
