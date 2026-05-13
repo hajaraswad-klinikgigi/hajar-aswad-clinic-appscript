@@ -4,11 +4,7 @@
   let currentPatientDetailTreatments = [];
   let currentPatientDetailPhotoGroups = [];
   let patientDetailRequestToken = 0;
-  let patientDetailFrontendCache = {
-    patient_id: '',
-    primary: null,
-    secondary: null
-  };
+  let patientDetailFrontendCache = {};
   let patientSearchDebounce = null;
   let pendingDeletePatientPhotoId = '';
   let pendingDeletePatientPhotoLabel = '';
@@ -652,6 +648,15 @@
   }
 
   function renderPatientOrthoRecallSection(orthoRecallSummary) {
+    if (orthoRecallSummary === null) {
+      return `
+        <div class="content-card patient-ortho-recall-card">
+          <h3 class="patient-ortho-recall-title">Orthodontic Recall</h3>
+          <div class="patient-ortho-recall-empty" style="color:#64748b;">Memuat data recall...</div>
+        </div>
+      `;
+    }
+
     const summary = orthoRecallSummary || getEmptyPatientOrthoRecallSummary();
     const current = summary.current || null;
 
@@ -1037,8 +1042,12 @@
 
   function renderPatientPrimarySection(patient, medicalRecords, orthoRecallSummary) {
     const p = patient || {};
+    const isLoadingMedical = medicalRecords === null;
     const records = Array.isArray(medicalRecords) ? medicalRecords : [];
-    const orthoRecall = orthoRecallSummary || getEmptyPatientOrthoRecallSummary();
+    // null = loading state, undefined/falsy = empty state
+    const orthoRecall = orthoRecallSummary === null
+      ? null
+      : (orthoRecallSummary || getEmptyPatientOrthoRecallSummary());
 
     const profileHtml = `
       <div class="content-card" style="height:100%;">
@@ -1120,7 +1129,9 @@
       <div class="content-card" style="height:100%;">
         <h3 style="margin-top:0; margin-bottom:16px;">Riwayat Rekam Medis</h3>
         ${
-          records.length
+          isLoadingMedical
+            ? '<div style="color:#64748b;">Memuat rekam medis...</div>'
+            : records.length
             ? records.map(function(r, idx) {
                 return `
                   <div style="border:1px solid rgba(255,255,255,0.08); border-radius:12px; padding:14px; margin-bottom:${idx === records.length - 1 ? '0' : '12px'}; background:#1e2235;">
@@ -1279,36 +1290,26 @@
   }
 
   function setPatientDetailFrontendCache(patientId, primaryData, secondaryData) {
-    patientDetailFrontendCache = {
-      patient_id: String(patientId || '').trim(),
+    const id = String(patientId || '').trim();
+    if (!id) return;
+    patientDetailFrontendCache[id] = {
       primary: primaryData || null,
       secondary: secondaryData || null
     };
   }
 
   function clearPatientDetailFrontendCache(patientId) {
-    const normalizedPatientId = String(patientId || '').trim();
-
-    if (!normalizedPatientId) {
-      patientDetailFrontendCache = {
-        patient_id: '',
-        primary: null,
-        secondary: null
-      };
-      return;
-    }
-
-    if (String(patientDetailFrontendCache.patient_id || '') === normalizedPatientId) {
-      patientDetailFrontendCache = {
-        patient_id: '',
-        primary: null,
-        secondary: null
-      };
+    const id = String(patientId || '').trim();
+    if (id) {
+      delete patientDetailFrontendCache[id];
+    } else {
+      patientDetailFrontendCache = {};
     }
   }
 
   function hasPatientDetailFrontendCache(patientId) {
-    return String(patientDetailFrontendCache.patient_id || '') === String(patientId || '').trim();
+    const id = String(patientId || '').trim();
+    return !!(id && patientDetailFrontendCache[id] && patientDetailFrontendCache[id].primary);
   }
 
   function handleLockedPhotoDelete(message) {
@@ -1473,10 +1474,11 @@
     modal.style.display = 'flex';
     modal.classList.remove('hidden');
 
-    const hasCache = hasPatientDetailFrontendCache(patientId);
+    const cachedEntry = patientDetailFrontendCache[patientId] || null;
+    const hasCache = !!(cachedEntry && cachedEntry.primary);
 
-    if (hasCache && patientDetailFrontendCache.primary) {
-      const primary = patientDetailFrontendCache.primary || {};
+    if (hasCache) {
+      const primary = cachedEntry.primary || {};
       const patient = primary.patient || {};
       const medicalRecords = Array.isArray(primary.medical_records)
         ? primary.medical_records
@@ -1485,8 +1487,8 @@
 
       content.innerHTML = renderPatientPrimarySection(patient, medicalRecords, orthoRecall);
 
-      if (patientDetailFrontendCache.secondary) {
-        const secondary = patientDetailFrontendCache.secondary || {};
+      if (cachedEntry.secondary) {
+        const secondary = cachedEntry.secondary || {};
         const treatments = Array.isArray(secondary.treatments)
           ? secondary.treatments
           : [];
@@ -1503,7 +1505,13 @@
         }
       }
     } else {
-      content.innerHTML = renderPatientDetailLoadingState();
+      // Fast preview: tampilkan profil dari allPatients sambil tunggu server
+      const localPatient = getLocalPatientById(patientId);
+      if (localPatient) {
+        content.innerHTML = renderPatientPrimarySection(localPatient, null, null);
+      } else {
+        content.innerHTML = renderPatientDetailLoadingState();
+      }
     }
 
     let primarySuccess = false;
@@ -1550,7 +1558,7 @@
               treatments: secondaryTreatments || [],
               photo_groups: secondaryPhotoGroups || []
             }
-          : (hasCache ? patientDetailFrontendCache.secondary : null)
+          : (hasCache ? cachedEntry.secondary : null)
       );
     }
 
