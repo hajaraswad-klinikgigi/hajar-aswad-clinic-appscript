@@ -7005,10 +7005,15 @@ function setEditExpenseAlert(msg, type) {
   alertEl.textContent = msg || '';
 }
 
+function expenseSetLoading_(submitId, cancelId, loading, submitIdleText) {
+  const btn    = document.getElementById(submitId);
+  const cancel = document.getElementById(cancelId);
+  if (btn)    { btn.disabled = loading;    if (loading) btn.textContent = 'Menyimpan...'; else if (submitIdleText) btn.textContent = submitIdleText; }
+  if (cancel) cancel.disabled = loading;
+}
+
 function submitEditExpense() {
   const el  = function(id) { return document.getElementById(id); };
-  const btn = el('editExpSubmitBtn');
-  if (btn) btn.disabled = true;
 
   const expenseId   = (el('editExpId')          || {}).value || '';
   const date        = (el('editExpDate')         || {}).value || '';
@@ -7018,26 +7023,32 @@ function submitEditExpense() {
   const amount      = Number((el('editExpAmount') || {}).value || 0);
   const notes       = (el('editExpNotes')        || {}).value || '';
 
-  if (!expenseId)   { setEditExpenseAlert('ID pengeluaran tidak ditemukan.'); if (btn) btn.disabled = false; return; }
-  if (!date)        { setEditExpenseAlert('Tanggal wajib diisi.'); if (btn) btn.disabled = false; return; }
-  if (!category)    { setEditExpenseAlert('Kategori wajib dipilih.'); if (btn) btn.disabled = false; return; }
-  if (!description) { setEditExpenseAlert('Keterangan wajib diisi.'); if (btn) btn.disabled = false; return; }
-  if (!amount || amount <= 0) { setEditExpenseAlert('Nominal harus lebih dari 0.'); if (btn) btn.disabled = false; return; }
+  function validErr(msg) {
+    setEditExpenseAlert(msg);
+    showToast(msg, 'error');
+  }
+
+  if (!expenseId)   { validErr('ID pengeluaran tidak ditemukan.'); return; }
+  if (!date)        { validErr('Tanggal wajib diisi.'); return; }
+  if (!category)    { validErr('Kategori wajib dipilih.'); return; }
+  if (!description) { validErr('Keterangan wajib diisi.'); return; }
+  if (!amount || amount <= 0) { validErr('Nominal harus lebih dari 0.'); return; }
 
   const doctorCats = ['doctor_salary','doctor_meal','doctor_standby'];
   if (doctorCats.indexOf(category) !== -1 && !doctorName) {
-    setEditExpenseAlert('Nama dokter wajib dipilih untuk kategori ini.');
-    if (btn) btn.disabled = false;
+    validErr('Nama dokter wajib dipilih untuk kategori ini.');
     return;
   }
 
+  expenseSetLoading_('editExpSubmitBtn', 'editExpCancelBtn', true);
+
   google.script.run
     .withSuccessHandler(function(res) {
+      expenseSetLoading_('editExpSubmitBtn', 'editExpCancelBtn', false, 'Simpan Perubahan');
       if (!res || !res.success) {
         const msg = res && res.message ? res.message : 'Gagal menyimpan.';
         setEditExpenseAlert(msg);
         showToast('Gagal: ' + msg, 'error');
-        if (btn) btn.disabled = false;
         return;
       }
       closeEditExpenseModal();
@@ -7046,10 +7057,10 @@ function submitEditExpense() {
       else if (typeof ownerLoadReport === 'function') ownerLoadReport();
     })
     .withFailureHandler(function(err) {
+      expenseSetLoading_('editExpSubmitBtn', 'editExpCancelBtn', false, 'Simpan Perubahan');
       const msg = err && err.message ? err.message : String(err);
       setEditExpenseAlert('Error: ' + msg);
       showToast('Error: ' + msg, 'error');
-      if (btn) btn.disabled = false;
     })
     .updateExpense(attachAuthContext({
       expense_id:   expenseId,
@@ -7141,9 +7152,7 @@ function setExpenseModalAlert(msg, type) {
 }
 
 function submitExpense() {
-  const el  = function(id) { return document.getElementById(id); };
-  const btn = el('expSubmitBtn');
-  if (btn) btn.disabled = true;
+  const el = function(id) { return document.getElementById(id); };
 
   const date        = (el('expDate')        || {}).value || '';
   const category    = (el('expCategory')    || {}).value || '';
@@ -7152,25 +7161,31 @@ function submitExpense() {
   const amount      = Number((el('expAmount') || {}).value || 0);
   const notes       = (el('expNotes')       || {}).value || '';
 
-  if (!date)        { setExpenseModalAlert('Tanggal wajib diisi.'); if (btn) btn.disabled = false; return; }
-  if (!category)    { setExpenseModalAlert('Kategori wajib dipilih.'); if (btn) btn.disabled = false; return; }
-  if (!description) { setExpenseModalAlert('Keterangan wajib diisi.'); if (btn) btn.disabled = false; return; }
-  if (!amount || amount <= 0) { setExpenseModalAlert('Nominal harus lebih dari 0.'); if (btn) btn.disabled = false; return; }
+  function validErr(msg) {
+    setExpenseModalAlert(msg);
+    showToast(msg, 'error');
+  }
+
+  if (!date)        { validErr('Tanggal wajib diisi.'); return; }
+  if (!category)    { validErr('Kategori wajib dipilih.'); return; }
+  if (!description) { validErr('Keterangan wajib diisi.'); return; }
+  if (!amount || amount <= 0) { validErr('Nominal harus lebih dari 0.'); return; }
 
   const doctorCats = ['doctor_salary','doctor_meal','doctor_standby'];
   if (doctorCats.indexOf(category) !== -1 && !doctorName) {
-    setExpenseModalAlert('Nama dokter wajib dipilih untuk kategori ini.');
-    if (btn) btn.disabled = false;
+    validErr('Nama dokter wajib dipilih untuk kategori ini.');
     return;
   }
 
+  expenseSetLoading_('expSubmitBtn', 'expCancelBtn', true);
+
   google.script.run
     .withSuccessHandler(function(res) {
+      expenseSetLoading_('expSubmitBtn', 'expCancelBtn', false, 'Simpan');
       if (!res || !res.success) {
         const msg = res && res.message ? res.message : 'Gagal menyimpan.';
         setExpenseModalAlert(msg);
         showToast('Gagal: ' + msg, 'error');
-        if (btn) btn.disabled = false;
         return;
       }
       closeExpenseModal();
@@ -7179,10 +7194,10 @@ function submitExpense() {
       else if (typeof ownerLoadReport === 'function') ownerLoadReport();
     })
     .withFailureHandler(function(err) {
+      expenseSetLoading_('expSubmitBtn', 'expCancelBtn', false, 'Simpan');
       const msg = err && err.message ? err.message : String(err);
       setExpenseModalAlert('Error: ' + msg);
       showToast('Error: ' + msg, 'error');
-      if (btn) btn.disabled = false;
     })
     .addExpense(attachAuthContext({
       expense_date: date,
@@ -7237,7 +7252,7 @@ function submitExpense() {
 
       <div class="owner-form-group">
         <label class="owner-form-label">Nominal (Rp) *</label>
-        <input type="number" id="expAmount" class="owner-form-input" placeholder="0" min="1">
+        <input type="number" id="expAmount" class="owner-form-input" placeholder="0" min="1" onwheel="this.blur()">
       </div>
 
       <div class="owner-form-group">
@@ -7246,7 +7261,7 @@ function submitExpense() {
       </div>
 
       <div class="owner-modal-actions">
-        <button type="button" class="btn btn-secondary" onclick="closeExpenseModal()">Batal</button>
+        <button type="button" class="btn btn-secondary" id="expCancelBtn" onclick="closeExpenseModal()">Batal</button>
         <button type="submit" class="btn btn-primary" id="expSubmitBtn">Simpan</button>
       </div>
     </form>
@@ -7294,7 +7309,7 @@ function submitExpense() {
 
       <div class="owner-form-group">
         <label class="owner-form-label">Nominal (Rp) *</label>
-        <input type="number" id="editExpAmount" class="owner-form-input" min="1">
+        <input type="number" id="editExpAmount" class="owner-form-input" min="1" onwheel="this.blur()">
       </div>
 
       <div class="owner-form-group">
@@ -7303,7 +7318,7 @@ function submitExpense() {
       </div>
 
       <div class="owner-modal-actions">
-        <button type="button" class="btn btn-secondary" onclick="closeEditExpenseModal()">Batal</button>
+        <button type="button" class="btn btn-secondary" id="editExpCancelBtn" onclick="closeEditExpenseModal()">Batal</button>
         <button type="submit" class="btn btn-primary" id="editExpSubmitBtn">Simpan Perubahan</button>
       </div>
     </form>

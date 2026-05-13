@@ -1,5 +1,6 @@
 <script>
   let dashboardPeriod = 'today';
+  let dashboardCache = {};
 
   function formatDashboardRupiah(value) {
     const num = Number(value || 0);
@@ -302,16 +303,28 @@
   }
 
   function loadDashboard() {
-    renderDashboardSkeleton();
+    const period = dashboardPeriod;
+
+    // Stale-while-revalidate: tampilkan cache dulu kalau ada
+    if (dashboardCache[period]) {
+      renderDashboard(dashboardCache[period]);
+    } else {
+      renderDashboardSkeleton();
+    }
 
     google.script.run
-      .withSuccessHandler(renderDashboard)
+      .withSuccessHandler(function(res) {
+        if (res && res.success) {
+          dashboardCache[period] = res;
+        }
+        renderDashboard(res);
+      })
       .withFailureHandler(function(err) {
         const msg = 'Error: ' + (err && err.message ? err.message : err);
-        renderDashboardError(msg);
+        if (!dashboardCache[period]) renderDashboardError(msg);
         showToast(msg, 'error');
       })
-      .getDashboardOwnerSummary(dashboardPeriod);
+      .getDashboardOwnerSummary(period);
   }
 
   function renderDashboard(res) {

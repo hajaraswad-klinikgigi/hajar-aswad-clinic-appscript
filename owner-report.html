@@ -8,6 +8,7 @@ let ownerReportMonth = 0;
 let ownerReportYear = 0;
 let ownerLoadToken = 0;
 let ownerCurrentDailyData = null;
+let ownerPendingDeleteExpenseId = null;
 
 const OWNER_CATEGORY_LABELS = {
   doctor_salary:    'Gaji Dokter',
@@ -138,6 +139,77 @@ function ownerPatchExpenseLocally(expense, isUpdate) {
   data.net.net_cash = cashIn - exp.total_expense;
 
   ownerRenderDaily(data);
+}
+
+/* =========================================================
+   DELETE EXPENSE
+   ========================================================= */
+function confirmDeleteExpense(expenseId) {
+  ownerPendingDeleteExpenseId = expenseId || '';
+  const modal = document.getElementById('confirmDeleteExpenseModal');
+  if (modal) modal.classList.remove('hidden');
+}
+
+function closeDeleteExpenseModal() {
+  ownerPendingDeleteExpenseId = null;
+  const modal = document.getElementById('confirmDeleteExpenseModal');
+  if (modal) modal.classList.add('hidden');
+}
+
+function executeDeleteExpense() {
+  const expenseId = ownerPendingDeleteExpenseId;
+  if (!expenseId) return;
+
+  const confirmBtn = document.getElementById('confirmDeleteExpenseSubmitBtn');
+  if (confirmBtn) { confirmBtn.disabled = true; confirmBtn.textContent = 'Menghapus...'; }
+
+  const sessionToken = currentUser && currentUser.session_token;
+
+  google.script.run
+    .withSuccessHandler(function(res) {
+      if (confirmBtn) { confirmBtn.disabled = false; confirmBtn.textContent = 'Hapus'; }
+      if (!res || !res.success) {
+        showToast('Gagal menghapus: ' + (res && res.message || 'Terjadi kesalahan'), 'error');
+        closeDeleteExpenseModal();
+        return;
+      }
+      closeDeleteExpenseModal();
+      showToast('Pengeluaran berhasil dihapus.', 'success');
+
+      // Local patch — hapus dari ownerCurrentDailyData tanpa server call
+      if (ownerReportTab === 'daily' && ownerCurrentDailyData) {
+        var data = ownerCurrentDailyData;
+        var exp  = data.expense || {};
+        var items = Array.isArray(exp.items) ? exp.items : [];
+        var idx = items.findIndex(function(e) { return e.expense_id === expenseId; });
+        if (idx !== -1) {
+          var removed = items[idx];
+          var amt = Number(removed.amount || 0);
+          var cat = String(removed.category || 'other').trim();
+          items.splice(idx, 1);
+          exp.total_expense = Math.max(0, (exp.total_expense || 0) - amt);
+          if (exp.by_category && exp.by_category[cat] !== undefined) {
+            exp.by_category[cat] = Math.max(0, (exp.by_category[cat] || 0) - amt);
+          }
+          if (!data.net) data.net = {};
+          data.net.total_expense = exp.total_expense;
+          var cashIn = data.net.cash_in || (data.revenue && data.revenue.total_cash_in) || 0;
+          data.net.net_cash = cashIn - exp.total_expense;
+          ownerRenderDaily(data);
+        } else {
+          ownerLoadReport();
+        }
+      } else {
+        if (typeof ownerLoadReport === 'function') ownerLoadReport();
+      }
+    })
+    .withFailureHandler(function(err) {
+      if (confirmBtn) { confirmBtn.disabled = false; confirmBtn.textContent = 'Hapus'; }
+      const msg = err && err.message ? err.message : String(err);
+      showToast('Error: ' + msg, 'error');
+      closeDeleteExpenseModal();
+    })
+    .deleteExpense({ session_token: sessionToken, expense_id: expenseId });
 }
 
 /* =========================================================
@@ -381,8 +453,12 @@ function ownerRenderDaily(data) {
                 <td>${esc(e.description||'-')}${e.doctor_name?' <span style="color:#6b7280">('+esc(e.doctor_name)+')</span>':''}</td>
                 <td>${ownerFmtRp(e.amount)}</td>
                 <td>${esc(e.recorded_by||'-')}</td>
-                <td><button class="btn btn-secondary" style="padding:4px 10px;font-size:12px;"
-                  onclick="openEditExpenseModal('${editArgs}')">Edit</button></td>
+                <td style="display:flex;gap:4px;">
+                  <button class="btn btn-secondary" style="padding:4px 10px;font-size:12px;"
+                    onclick="openEditExpenseModal('${editArgs}')">Edit</button>
+                  <button class="btn btn-danger" style="padding:4px 10px;font-size:12px;"
+                    onclick="confirmDeleteExpense('${escPrm(e.expense_id||'')}')">Hapus</button>
+                </td>
               </tr>`;
             }).join('')}
           </tbody>

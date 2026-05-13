@@ -560,6 +560,18 @@
 
     <div id="toastContainer" class="toast-container"></div>
 
+    <!-- CONFIRM DELETE EXPENSE MODAL -->
+    <div id="confirmDeleteExpenseModal" class="modal hidden">
+      <div class="modal-box" style="width:420px;">
+        <h2>Konfirmasi Hapus</h2>
+        <p class="confirm-text">Yakin ingin menghapus pengeluaran ini? Data tidak dapat dikembalikan.</p>
+        <div class="confirm-modal-actions">
+          <button type="button" class="btn btn-secondary" onclick="closeDeleteExpenseModal()">Batal</button>
+          <button type="button" class="btn btn-danger" id="confirmDeleteExpenseSubmitBtn" onclick="executeDeleteExpense()">Hapus</button>
+        </div>
+      </div>
+    </div>
+
     <?!= include('dashboard'); ?>
     <?!= include('patients'); ?>
     <?!= include('appointments'); ?>
