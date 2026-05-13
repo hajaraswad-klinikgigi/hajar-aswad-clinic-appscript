@@ -826,7 +826,221 @@ function ownerRenderYearly(data) {
 }
 
 function ownerPrintDailyReport() {
-  window.print();
+  var data = ownerCurrentDailyData;
+  if (!data) {
+    showToast('Buka laporan harian terlebih dahulu', 'error');
+    return;
+  }
+  if (typeof window.jspdf === 'undefined') {
+    showToast('Library PDF belum siap, coba lagi sebentar', 'error');
+    return;
+  }
+
+  var jsPDF = window.jspdf.jsPDF;
+  var doc   = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+
+  var rev   = data.revenue || {};
+  var exp   = data.expense || {};
+  var net   = data.net     || {};
+  var byDoc = Array.isArray(rev.by_doctor)  ? rev.by_doctor  : [];
+  var bySvc = Array.isArray(rev.by_service) ? rev.by_service : [];
+  var items = Array.isArray(exp.items)       ? exp.items      : [];
+  var byPay = rev.by_payment_method          || {};
+  var byCat = exp.by_category                || {};
+  var date  = String(data.date || ownerReportDate || ownerTodayYmd());
+
+  var PAGE_W = 210;
+  var MARGIN = 14;
+  var COL_W  = PAGE_W - MARGIN * 2;
+  var BLUE   = [30, 58, 138];
+  var BLUE_L = [219, 234, 254];
+  var GRAY   = [100, 116, 139];
+  var DARK   = [15, 23, 42];
+  var STRIPE = [248, 250, 252];
+
+  /* ── HEADER ─────────────────────────────────────────── */
+  doc.setFillColor(BLUE[0], BLUE[1], BLUE[2]);
+  doc.rect(0, 0, PAGE_W, 36, 'F');
+
+  doc.setTextColor(255, 255, 255);
+  doc.setFontSize(16);
+  doc.setFont('helvetica', 'bold');
+  doc.text('HAJAR ASWAD DENTAL CLINIC', MARGIN, 13);
+
+  doc.setFontSize(10);
+  doc.setFont('helvetica', 'normal');
+  doc.setTextColor(186, 206, 246);
+  doc.text('Laporan Keuangan Harian  •  ' + ownerFmtDate(date), MARGIN, 22);
+
+  doc.setFontSize(8);
+  doc.setTextColor(160, 182, 224);
+  doc.text('Dicetak: ' + new Date().toLocaleString('id-ID'), MARGIN, 29);
+
+  var y = 44;
+
+  /* ── HELPER: judul seksi ─────────────────────────────── */
+  function sectionTitle(label) {
+    doc.setFillColor(BLUE_L[0], BLUE_L[1], BLUE_L[2]);
+    doc.rect(MARGIN, y, COL_W, 7, 'F');
+    doc.setFontSize(8);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(BLUE[0], BLUE[1], BLUE[2]);
+    doc.text(label.toUpperCase(), MARGIN + 2, y + 5);
+    y += 9;
+  }
+
+  var headStyle = { fillColor: BLUE, textColor: [255,255,255], fontSize: 8, fontStyle: 'bold', cellPadding: 3 };
+  var bodyStyle = { fontSize: 9, cellPadding: 3, textColor: DARK };
+  var footStyle = { fillColor: [240,244,255], textColor: DARK, fontSize: 9, fontStyle: 'bold', cellPadding: 3 };
+
+  /* ── RINGKASAN KEUANGAN ──────────────────────────────── */
+  sectionTitle('Ringkasan Keuangan');
+  doc.autoTable({
+    startY: y,
+    head: [['Keterangan', 'Jumlah', 'Keterangan', 'Jumlah']],
+    body: [
+      ['Kas Masuk',          ownerFmtRp(rev.total_cash_in),   'Total Omset',   ownerFmtRp(rev.total_billing)],
+      ['  – Transfer',  ownerFmtRp(byPay.transfer || 0), 'Jml Pasien',    (rev.patient_count || 0) + ' orang'],
+      ['  – Cash',      ownerFmtRp(byPay.cash     || 0), 'Piutang Baru',  ownerFmtRp(rev.piutang_baru || 0)],
+      ['Total Pengeluaran',  ownerFmtRp(exp.total_expense),   'Laba Bersih',   ownerFmtRp(net.net_cash)],
+    ],
+    theme: 'grid',
+    headStyles: headStyle,
+    bodyStyles: bodyStyle,
+    columnStyles: {
+      0: { cellWidth: 42, textColor: GRAY },
+      1: { cellWidth: 50, fontStyle: 'bold' },
+      2: { cellWidth: 42, textColor: GRAY },
+      3: { cellWidth: 48, fontStyle: 'bold' },
+    },
+    alternateRowStyles: { fillColor: STRIPE },
+    margin: { left: MARGIN, right: MARGIN },
+  });
+  y = doc.lastAutoTable.finalY + 8;
+
+  /* ── PER DOKTER ──────────────────────────────────────── */
+  if (byDoc.length) {
+    sectionTitle('Laporan Per Dokter');
+    doc.autoTable({
+      startY: y,
+      head: [['Dokter', 'Jml Pasien', 'Total Billing', 'Kas Masuk']],
+      body: byDoc.map(function(d) {
+        return [d.doctor_name || '-', String(d.patient_count || 0), ownerFmtRp(d.total_billing), ownerFmtRp(d.total_cash_in)];
+      }),
+      theme: 'striped',
+      headStyles: headStyle,
+      bodyStyles: bodyStyle,
+      columnStyles: {
+        0: { cellWidth: 60 },
+        1: { cellWidth: 30, halign: 'center' },
+        2: { cellWidth: 46, halign: 'right' },
+        3: { cellWidth: 46, halign: 'right' },
+      },
+      alternateRowStyles: { fillColor: STRIPE },
+      margin: { left: MARGIN, right: MARGIN },
+    });
+    y = doc.lastAutoTable.finalY + 8;
+  }
+
+  /* ── PER LAYANAN ─────────────────────────────────────── */
+  if (bySvc.length) {
+    sectionTitle('Per Jenis Layanan');
+    doc.autoTable({
+      startY: y,
+      head: [['Layanan', 'Jumlah', 'Total']],
+      body: bySvc.map(function(s) {
+        return [s.service_name || '-', String(s.count || 0), ownerFmtRp(s.total)];
+      }),
+      theme: 'striped',
+      headStyles: headStyle,
+      bodyStyles: bodyStyle,
+      columnStyles: {
+        0: { cellWidth: 112 },
+        1: { cellWidth: 26, halign: 'center' },
+        2: { cellWidth: 44, halign: 'right' },
+      },
+      alternateRowStyles: { fillColor: STRIPE },
+      margin: { left: MARGIN, right: MARGIN },
+    });
+    y = doc.lastAutoTable.finalY + 8;
+  }
+
+  /* ── PENGELUARAN PER KATEGORI ────────────────────────── */
+  var catRows = Object.keys(OWNER_CATEGORY_LABELS).filter(function(k) {
+    return byCat[k];
+  }).map(function(k) {
+    return [OWNER_CATEGORY_LABELS[k], ownerFmtRp(byCat[k])];
+  });
+  if (catRows.length) {
+    sectionTitle('Pengeluaran per Kategori');
+    doc.autoTable({
+      startY: y,
+      head: [['Kategori', 'Total']],
+      body: catRows,
+      foot: [['Total Pengeluaran', ownerFmtRp(exp.total_expense)]],
+      theme: 'striped',
+      headStyles: headStyle,
+      bodyStyles: bodyStyle,
+      footStyles: footStyle,
+      columnStyles: {
+        0: { cellWidth: 120 },
+        1: { cellWidth: 62, halign: 'right' },
+      },
+      alternateRowStyles: { fillColor: STRIPE },
+      margin: { left: MARGIN, right: MARGIN },
+    });
+    y = doc.lastAutoTable.finalY + 8;
+  }
+
+  /* ── DETAIL PENGELUARAN ──────────────────────────────── */
+  if (items.length) {
+    sectionTitle('Detail Pengeluaran');
+    doc.autoTable({
+      startY: y,
+      head: [['Kategori', 'Keterangan', 'Nominal', 'Oleh']],
+      body: items.map(function(e) {
+        var desc = e.description || '-';
+        if (e.doctor_name) desc += ' (' + e.doctor_name + ')';
+        return [
+          OWNER_CATEGORY_LABELS[e.category] || e.category || '-',
+          desc,
+          ownerFmtRp(e.amount),
+          e.recorded_by || '-',
+        ];
+      }),
+      foot: [['', 'Total', ownerFmtRp(exp.total_expense), '']],
+      theme: 'striped',
+      headStyles: headStyle,
+      bodyStyles: bodyStyle,
+      footStyles: footStyle,
+      columnStyles: {
+        0: { cellWidth: 34 },
+        1: { cellWidth: 78 },
+        2: { cellWidth: 40, halign: 'right' },
+        3: { cellWidth: 30 },
+      },
+      alternateRowStyles: { fillColor: STRIPE },
+      margin: { left: MARGIN, right: MARGIN },
+    });
+  }
+
+  /* ── FOOTER tiap halaman ─────────────────────────────── */
+  var totalPages = doc.internal.getNumberOfPages();
+  for (var i = 1; i <= totalPages; i++) {
+    doc.setPage(i);
+    doc.setFontSize(8);
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(180, 180, 180);
+    doc.setDrawColor(210, 210, 210);
+    doc.line(MARGIN, 290, PAGE_W - MARGIN, 290);
+    doc.text(
+      'Hajar Aswad Dental Clinic  —  Halaman ' + i + ' dari ' + totalPages,
+      PAGE_W / 2, 295,
+      { align: 'center' }
+    );
+  }
+
+  doc.save('laporan-harian-' + date + '.pdf');
 }
 
 </script>
