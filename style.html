@@ -379,26 +379,27 @@
 
   .pagination-nav {
     display: flex;
-    align-items: center;
+    align-items: baseline;
     gap: 6px;
     background: #f8fafc;
     border: 1px solid #dde4ee;
     border-radius: 10px;
-    padding: 4px 8px;
+    padding: 5px 8px;
   }
 
   .pagination-arrow {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: 26px;
-    height: 26px;
+    width: 24px;
+    height: 24px;
     border-radius: 6px;
     border: none;
     background: transparent;
     color: #374151;
     cursor: pointer;
     padding: 0;
+    align-self: center;
     transition: background 0.15s, color 0.15s;
   }
 
@@ -418,15 +419,12 @@
     background: #fff;
     border: 1px solid #dde4ee;
     border-radius: 6px;
-    padding: 0 6px;
+    padding: 1px 6px 2px;
     width: 44px;
-    height: 22px;
-    box-sizing: border-box;
-    line-height: 20px;
     text-align: center;
     outline: none;
+    vertical-align: baseline;
     -moz-appearance: textfield;
-    align-self: center;
   }
   .pagination-input::-webkit-outer-spin-button,
   .pagination-input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
