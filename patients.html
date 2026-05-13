@@ -1123,7 +1123,7 @@
           records.length
             ? records.map(function(r, idx) {
                 return `
-                  <div style="border:1px solid #e5e7eb; border-radius:12px; padding:14px; margin-bottom:${idx === records.length - 1 ? '0' : '12px'}; background:#fff;">
+                  <div style="border:1px solid rgba(255,255,255,0.08); border-radius:12px; padding:14px; margin-bottom:${idx === records.length - 1 ? '0' : '12px'}; background:#1e2235;">
                     <div style="margin-bottom:8px;">
                       <strong>Tanggal Kunjungan</strong><br>
                       <div>${formatDateDmy(r.visit_date || '-')}</div>
@@ -1199,24 +1199,24 @@
                   ? `
                     <div style="margin-top:12px;">
                       <strong>Daftar Tindakan</strong>
-                      <div style="margin-top:8px; border:1px solid #e5e7eb; border-radius:10px; overflow:hidden;">
+                      <div style="margin-top:8px; border:1px solid rgba(255,255,255,0.08); border-radius:10px; overflow:hidden;">
                         <table style="width:100%; border-collapse:collapse; font-size:14px;">
                           <thead>
-                            <tr style="background:#f9fafb;">
-                              <th style="text-align:left; padding:10px; border-bottom:1px solid #e5e7eb;">Tindakan</th>
-                              <th style="text-align:center; padding:10px; border-bottom:1px solid #e5e7eb;">Qty</th>
-                              <th style="text-align:right; padding:10px; border-bottom:1px solid #e5e7eb;">Harga</th>
-                              <th style="text-align:right; padding:10px; border-bottom:1px solid #e5e7eb;">Subtotal</th>
+                            <tr style="background:#161b2e;">
+                              <th style="text-align:left; padding:10px; border-bottom:1px solid rgba(255,255,255,0.08); color:#94a3b8;">Tindakan</th>
+                              <th style="text-align:center; padding:10px; border-bottom:1px solid rgba(255,255,255,0.08); color:#94a3b8;">Qty</th>
+                              <th style="text-align:right; padding:10px; border-bottom:1px solid rgba(255,255,255,0.08); color:#94a3b8;">Harga</th>
+                              <th style="text-align:right; padding:10px; border-bottom:1px solid rgba(255,255,255,0.08); color:#94a3b8;">Subtotal</th>
                             </tr>
                           </thead>
                           <tbody>
                             ${items.map(function(item) {
                               return `
                                 <tr>
-                                  <td style="padding:10px; border-bottom:1px solid #f3f4f6;">${escapeHtml(item.service_name || '-')}</td>
-                                  <td style="padding:10px; text-align:center; border-bottom:1px solid #f3f4f6;">${escapeHtml(item.qty || 0)}</td>
-                                  <td style="padding:10px; text-align:right; border-bottom:1px solid #f3f4f6;">${formatRupiah(item.unit_price || 0)}</td>
-                                  <td style="padding:10px; text-align:right; border-bottom:1px solid #f3f4f6;">${formatRupiah(item.subtotal || 0)}</td>
+                                  <td style="padding:10px; border-bottom:1px solid rgba(255,255,255,0.05); color:#e2e8f0;">${escapeHtml(item.service_name || '-')}</td>
+                                  <td style="padding:10px; text-align:center; border-bottom:1px solid rgba(255,255,255,0.05); color:#e2e8f0;">${escapeHtml(item.qty || 0)}</td>
+                                  <td style="padding:10px; text-align:right; border-bottom:1px solid rgba(255,255,255,0.05); color:#e2e8f0;">${formatRupiah(item.unit_price || 0)}</td>
+                                  <td style="padding:10px; text-align:right; border-bottom:1px solid rgba(255,255,255,0.05); color:#e2e8f0;">${formatRupiah(item.subtotal || 0)}</td>
                                 </tr>
                               `;
                             }).join('')}
@@ -1228,7 +1228,7 @@
                   : '<div style="margin-top:12px;">Tidak ada item tindakan</div>';
 
                 return `
-                  <div style="border:1px solid #e5e7eb; border-radius:12px; padding:14px; margin-bottom:${idx === treatments.length - 1 ? '0' : '12px'}; background:#fff;">
+                  <div style="border:1px solid rgba(255,255,255,0.08); border-radius:12px; padding:14px; margin-bottom:${idx === treatments.length - 1 ? '0' : '12px'}; background:#1e2235;">
                     <div style="margin-bottom:8px;">
                       <strong>Tanggal Treatment</strong><br>
                       <div>${formatDateDmy(t.treatment_date || '-')}</div>
