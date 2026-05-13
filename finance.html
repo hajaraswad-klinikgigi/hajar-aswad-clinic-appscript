@@ -7302,133 +7302,151 @@ function submitExpense() {
 <!-- EXPENSE MODAL -->
 <div class="owner-modal-overlay" id="expenseModal">
   <div class="owner-modal-box">
-    <h3 class="owner-modal-title">Tambah Pengeluaran</h3>
-    <form onsubmit="event.preventDefault(); submitExpense();">
-      <div class="owner-modal-alert" id="expenseModalAlert"></div>
+    <div class="detail-modal-header-sticky">
+      <h2 class="detail-modal-title-sticky">Tambah Pengeluaran</h2>
+      <button type="button" class="detail-close-btn" onclick="closeExpenseModal()" aria-label="Tutup" title="Tutup">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M6 6l12 12"></path><path d="M18 6l-12 12"></path>
+        </svg>
+      </button>
+    </div>
+    <div class="modal-form-scroll">
+      <form onsubmit="event.preventDefault(); submitExpense();">
+        <div class="owner-modal-alert" id="expenseModalAlert"></div>
 
-      <div class="owner-form-group">
-        <label class="owner-form-label">Tanggal *</label>
-        <input type="date" id="expDate" class="owner-form-input"
-          onchange="expClearFieldErr('expDate','expDateErr')">
-        <div class="owner-field-error" id="expDateErr"></div>
-      </div>
+        <div class="owner-form-group">
+          <label class="owner-form-label">Tanggal *</label>
+          <input type="date" id="expDate" class="owner-form-input"
+            onchange="expClearFieldErr('expDate','expDateErr')">
+          <div class="owner-field-error" id="expDateErr"></div>
+        </div>
 
-      <div class="owner-form-group">
-        <label class="owner-form-label">Kategori *</label>
-        <select id="expCategory" class="owner-form-select"
-          onchange="toggleExpenseDoctorField(); expClearFieldErr('expCategory','expCategoryErr')">
-          <option value="">-- Pilih Kategori --</option>
-          <option value="doctor_salary">Gaji Dokter</option>
-          <option value="doctor_meal">Uang Makan Dokter</option>
-          <option value="doctor_standby">Uang Duduk (Standby) Dokter</option>
-          <option value="operational">Operasional Klinik</option>
-          <option value="utility">Utilitas (Listrik, Air, dll)</option>
-          <option value="owner_withdrawal">Penarikan Owner</option>
-          <option value="other">Lain-lain</option>
-        </select>
-        <div class="owner-field-error" id="expCategoryErr"></div>
-      </div>
+        <div class="owner-form-group">
+          <label class="owner-form-label">Kategori *</label>
+          <select id="expCategory" class="owner-form-select"
+            onchange="toggleExpenseDoctorField(); expClearFieldErr('expCategory','expCategoryErr')">
+            <option value="">-- Pilih Kategori --</option>
+            <option value="doctor_salary">Gaji Dokter</option>
+            <option value="doctor_meal">Uang Makan Dokter</option>
+            <option value="doctor_standby">Uang Duduk (Standby) Dokter</option>
+            <option value="operational">Operasional Klinik</option>
+            <option value="utility">Utilitas (Listrik, Air, dll)</option>
+            <option value="owner_withdrawal">Penarikan Owner</option>
+            <option value="other">Lain-lain</option>
+          </select>
+          <div class="owner-field-error" id="expCategoryErr"></div>
+        </div>
 
-      <div class="owner-form-group" id="expDoctorFieldGroup" style="display:none;">
-        <label class="owner-form-label">Nama Dokter *</label>
-        <select id="expDoctorName" class="owner-form-select"
-          onchange="expClearFieldErr('expDoctorName','expDoctorNameErr')">
-          <option value="">-- Pilih Dokter --</option>
-        </select>
-        <div class="owner-field-error" id="expDoctorNameErr"></div>
-      </div>
+        <div class="owner-form-group" id="expDoctorFieldGroup" style="display:none;">
+          <label class="owner-form-label">Nama Dokter *</label>
+          <select id="expDoctorName" class="owner-form-select"
+            onchange="expClearFieldErr('expDoctorName','expDoctorNameErr')">
+            <option value="">-- Pilih Dokter --</option>
+          </select>
+          <div class="owner-field-error" id="expDoctorNameErr"></div>
+        </div>
 
-      <div class="owner-form-group">
-        <label class="owner-form-label">Keterangan *</label>
-        <input type="text" id="expDescription" class="owner-form-input"
-          placeholder="Contoh: Beli kapas, gaji dr. Selly Mei 2026..."
-          oninput="expClearFieldErr('expDescription','expDescriptionErr')">
-        <div class="owner-field-error" id="expDescriptionErr"></div>
-      </div>
+        <div class="owner-form-group">
+          <label class="owner-form-label">Keterangan *</label>
+          <input type="text" id="expDescription" class="owner-form-input"
+            placeholder="Contoh: Beli kapas, gaji dr. Selly Mei 2026..."
+            oninput="expClearFieldErr('expDescription','expDescriptionErr')">
+          <div class="owner-field-error" id="expDescriptionErr"></div>
+        </div>
 
-      <div class="owner-form-group">
-        <label class="owner-form-label">Nominal (Rp) *</label>
-        <input type="number" id="expAmount" class="owner-form-input" placeholder="0" min="1"
-          onwheel="this.blur()" oninput="expClearFieldErr('expAmount','expAmountErr')">
-        <div class="owner-field-error" id="expAmountErr"></div>
-      </div>
+        <div class="owner-form-group">
+          <label class="owner-form-label">Nominal (Rp) *</label>
+          <input type="number" id="expAmount" class="owner-form-input" placeholder="0" min="1"
+            onwheel="this.blur()" oninput="expClearFieldErr('expAmount','expAmountErr')">
+          <div class="owner-field-error" id="expAmountErr"></div>
+        </div>
 
-      <div class="owner-form-group">
-        <label class="owner-form-label">Catatan (opsional)</label>
-        <textarea id="expNotes" class="owner-form-textarea" placeholder="Catatan tambahan..."></textarea>
-      </div>
+        <div class="owner-form-group">
+          <label class="owner-form-label">Catatan (opsional)</label>
+          <textarea id="expNotes" class="owner-form-textarea" placeholder="Catatan tambahan..."></textarea>
+        </div>
 
-      <div class="owner-modal-actions">
-        <button type="button" class="btn btn-secondary" id="expCancelBtn" onclick="closeExpenseModal()">Batal</button>
-        <button type="submit" class="btn btn-primary" id="expSubmitBtn">Simpan</button>
-      </div>
-    </form>
+        <div class="owner-modal-actions">
+          <button type="button" class="btn btn-secondary" id="expCancelBtn" onclick="closeExpenseModal()">Batal</button>
+          <button type="submit" class="btn btn-primary" id="expSubmitBtn">Simpan</button>
+        </div>
+      </form>
+    </div>
   </div>
 </div>
 
 <!-- EDIT EXPENSE MODAL -->
 <div class="owner-modal-overlay" id="editExpenseModal">
   <div class="owner-modal-box">
-    <h3 class="owner-modal-title">Edit Pengeluaran</h3>
-    <form onsubmit="event.preventDefault(); submitEditExpense();">
-      <div class="owner-modal-alert" id="editExpenseAlert"></div>
-      <input type="hidden" id="editExpId">
+    <div class="detail-modal-header-sticky">
+      <h2 class="detail-modal-title-sticky">Edit Pengeluaran</h2>
+      <button type="button" class="detail-close-btn" onclick="closeEditExpenseModal()" aria-label="Tutup" title="Tutup">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M6 6l12 12"></path><path d="M18 6l-12 12"></path>
+        </svg>
+      </button>
+    </div>
+    <div class="modal-form-scroll">
+      <form onsubmit="event.preventDefault(); submitEditExpense();">
+        <div class="owner-modal-alert" id="editExpenseAlert"></div>
+        <input type="hidden" id="editExpId">
 
-      <div class="owner-form-group">
-        <label class="owner-form-label">Tanggal *</label>
-        <input type="date" id="editExpDate" class="owner-form-input"
-          onchange="expClearFieldErr('editExpDate','editExpDateErr')">
-        <div class="owner-field-error" id="editExpDateErr"></div>
-      </div>
+        <div class="owner-form-group">
+          <label class="owner-form-label">Tanggal *</label>
+          <input type="date" id="editExpDate" class="owner-form-input"
+            onchange="expClearFieldErr('editExpDate','editExpDateErr')">
+          <div class="owner-field-error" id="editExpDateErr"></div>
+        </div>
 
-      <div class="owner-form-group">
-        <label class="owner-form-label">Kategori *</label>
-        <select id="editExpCategory" class="owner-form-select"
-          onchange="toggleEditExpenseDoctorField(); expClearFieldErr('editExpCategory','editExpCategoryErr')">
-          <option value="">-- Pilih Kategori --</option>
-          <option value="doctor_salary">Gaji Dokter</option>
-          <option value="doctor_meal">Uang Makan Dokter</option>
-          <option value="doctor_standby">Uang Duduk (Standby) Dokter</option>
-          <option value="operational">Operasional Klinik</option>
-          <option value="utility">Utilitas (Listrik, Air, dll)</option>
-          <option value="owner_withdrawal">Penarikan Owner</option>
-          <option value="other">Lain-lain</option>
-        </select>
-        <div class="owner-field-error" id="editExpCategoryErr"></div>
-      </div>
+        <div class="owner-form-group">
+          <label class="owner-form-label">Kategori *</label>
+          <select id="editExpCategory" class="owner-form-select"
+            onchange="toggleEditExpenseDoctorField(); expClearFieldErr('editExpCategory','editExpCategoryErr')">
+            <option value="">-- Pilih Kategori --</option>
+            <option value="doctor_salary">Gaji Dokter</option>
+            <option value="doctor_meal">Uang Makan Dokter</option>
+            <option value="doctor_standby">Uang Duduk (Standby) Dokter</option>
+            <option value="operational">Operasional Klinik</option>
+            <option value="utility">Utilitas (Listrik, Air, dll)</option>
+            <option value="owner_withdrawal">Penarikan Owner</option>
+            <option value="other">Lain-lain</option>
+          </select>
+          <div class="owner-field-error" id="editExpCategoryErr"></div>
+        </div>
 
-      <div class="owner-form-group" id="editExpDoctorFieldGroup" style="display:none;">
-        <label class="owner-form-label">Nama Dokter *</label>
-        <select id="editExpDoctorName" class="owner-form-select"
-          onchange="expClearFieldErr('editExpDoctorName','editExpDoctorNameErr')">
-          <option value="">-- Pilih Dokter --</option>
-        </select>
-        <div class="owner-field-error" id="editExpDoctorNameErr"></div>
-      </div>
+        <div class="owner-form-group" id="editExpDoctorFieldGroup" style="display:none;">
+          <label class="owner-form-label">Nama Dokter *</label>
+          <select id="editExpDoctorName" class="owner-form-select"
+            onchange="expClearFieldErr('editExpDoctorName','editExpDoctorNameErr')">
+            <option value="">-- Pilih Dokter --</option>
+          </select>
+          <div class="owner-field-error" id="editExpDoctorNameErr"></div>
+        </div>
 
-      <div class="owner-form-group">
-        <label class="owner-form-label">Keterangan *</label>
-        <input type="text" id="editExpDescription" class="owner-form-input"
-          oninput="expClearFieldErr('editExpDescription','editExpDescriptionErr')">
-        <div class="owner-field-error" id="editExpDescriptionErr"></div>
-      </div>
+        <div class="owner-form-group">
+          <label class="owner-form-label">Keterangan *</label>
+          <input type="text" id="editExpDescription" class="owner-form-input"
+            oninput="expClearFieldErr('editExpDescription','editExpDescriptionErr')">
+          <div class="owner-field-error" id="editExpDescriptionErr"></div>
+        </div>
 
-      <div class="owner-form-group">
-        <label class="owner-form-label">Nominal (Rp) *</label>
-        <input type="number" id="editExpAmount" class="owner-form-input" min="1"
-          onwheel="this.blur()" oninput="expClearFieldErr('editExpAmount','editExpAmountErr')">
-        <div class="owner-field-error" id="editExpAmountErr"></div>
-      </div>
+        <div class="owner-form-group">
+          <label class="owner-form-label">Nominal (Rp) *</label>
+          <input type="number" id="editExpAmount" class="owner-form-input" min="1"
+            onwheel="this.blur()" oninput="expClearFieldErr('editExpAmount','editExpAmountErr')">
+          <div class="owner-field-error" id="editExpAmountErr"></div>
+        </div>
 
-      <div class="owner-form-group">
-        <label class="owner-form-label">Catatan (opsional)</label>
-        <textarea id="editExpNotes" class="owner-form-textarea"></textarea>
-      </div>
+        <div class="owner-form-group">
+          <label class="owner-form-label">Catatan (opsional)</label>
+          <textarea id="editExpNotes" class="owner-form-textarea"></textarea>
+        </div>
 
-      <div class="owner-modal-actions">
-        <button type="button" class="btn btn-secondary" id="editExpCancelBtn" onclick="closeEditExpenseModal()">Batal</button>
-        <button type="submit" class="btn btn-primary" id="editExpSubmitBtn">Simpan Perubahan</button>
-      </div>
-    </form>
+        <div class="owner-modal-actions">
+          <button type="button" class="btn btn-secondary" id="editExpCancelBtn" onclick="closeEditExpenseModal()">Batal</button>
+          <button type="submit" class="btn btn-primary" id="editExpSubmitBtn">Simpan Perubahan</button>
+        </div>
+      </form>
+    </div>
   </div>
 </div>
