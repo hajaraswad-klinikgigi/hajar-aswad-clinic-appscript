@@ -454,7 +454,7 @@
             renderAppointmentsTable(false);
             startAppointmentsAutoPaging();
           } else {
-            applyAppointmentFilters();
+            applyAppointmentFilters(true);
           }
         })
         .withFailureHandler(function() {
@@ -671,7 +671,7 @@
             renderAppointmentsTable(false);
             startAppointmentsAutoPaging();
           } else {
-            applyAppointmentFilters();
+            applyAppointmentFilters(true);
           }
 
           preloadTreatmentMasters();
@@ -693,7 +693,7 @@
           renderAppointmentsTable(false);
           startAppointmentsAutoPaging();
         } else {
-          applyAppointmentFilters();
+          applyAppointmentFilters(true);
         }
 
         preloadTreatmentMasters();
@@ -737,7 +737,7 @@
 
     filteredAppointments = rows;
     appointmentQueueMap = buildAppointmentQueueMap(filteredAppointments);
-    appointmentCurrentPage = 1;
+    if (!keepPage) appointmentCurrentPage = 1;
     closeAllAppointmentExpandRows();
     renderAppointmentsTable(false);
   }

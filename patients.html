@@ -160,7 +160,6 @@
         });
 
         filteredPatients = [...allPatients];
-        patientCurrentPage = 1;
         renderPatientsTable();
       })
       .withFailureHandler(function(err) {
@@ -175,6 +174,7 @@
   function handleToggleInactivePatients() {
     const toggle = document.getElementById('showInactivePatients');
     showInactivePatients = !!(toggle && toggle.checked);
+    patientCurrentPage = 1;
     loadPatients();
   }
 
