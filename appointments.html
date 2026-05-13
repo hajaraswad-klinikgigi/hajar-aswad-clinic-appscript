@@ -709,7 +709,7 @@
       .getAppointments();
   } 
   
-  function applyAppointmentFilters() {
+  function applyAppointmentFilters(keepPage) {
     if (treatmentInitInFlight || isTreatmentModalOpen()) {
       return;
     }
