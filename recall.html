@@ -30,8 +30,12 @@
             <div class="patients-subtitle">Track brace patients who need follow-up visits</div>
           </div>
 
-          <button type="button" id="recallRefreshBtn" class="action-btn" onclick="loadRecallList()">
-            Refresh
+          <button type="button" id="recallRefreshBtn" class="icon-btn" onclick="loadRecallList()"
+            title="Refresh data recall" aria-label="Refresh data recall">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polyline points="23 4 23 10 17 10"></polyline>
+              <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path>
+            </svg>
           </button>
         </div>
 
@@ -566,21 +570,9 @@
   function setRecallRefreshButtonState(isLoading) {
     const btn = document.getElementById('recallRefreshBtn');
     if (!btn) return;
-
-    if (isLoading) {
-      btn.disabled = true;
-
-      if (!btn.dataset.idleText) {
-        btn.dataset.idleText = btn.innerText;
-      }
-
-      btn.innerText = 'Loading...';
-      return;
-    }
-
-    btn.disabled = false;
-    btn.innerText = btn.dataset.idleText || 'Refresh';
-    delete btn.dataset.idleText;
+    btn.disabled = isLoading;
+    const svg = btn.querySelector('svg');
+    if (svg) svg.style.opacity = isLoading ? '0.35' : '1';
   }
 
   function isRecallWorkflowBusy() {
