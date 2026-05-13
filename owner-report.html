@@ -9,6 +9,7 @@ let ownerReportYear = 0;
 let ownerLoadToken = 0;
 let ownerCurrentDailyData = null;
 let ownerPendingDeleteExpenseId = null;
+let ownerReportCache = {};
 
 const OWNER_CATEGORY_LABELS = {
   doctor_salary:    'Gaji Dokter',
@@ -316,27 +317,49 @@ function ownerOnYearChange() {
 }
 
 /* =========================================================
-   LOAD DATA — token pattern mencegah stale response
+   LOAD DATA — token pattern + stale-while-revalidate
    ========================================================= */
+function ownerCacheKey() {
+  if (ownerReportTab === 'daily')   return 'daily:'   + (ownerReportDate || ownerTodayYmd());
+  if (ownerReportTab === 'monthly') return 'monthly:' + ownerReportYear + '-' + ownerReportMonth;
+  return 'yearly:' + ownerReportYear;
+}
+
 function ownerLoadReport() {
   const token = ++ownerLoadToken;   // invalidasi semua request sebelumnya
   const tab   = ownerReportTab;     // capture tab saat request dibuat
+  const key   = ownerCacheKey();
   const sessionToken = currentUser && currentUser.session_token;
 
   const content = document.getElementById('ownerReportContent');
-  if (content) content.innerHTML = '<div class="owner-loading">Memuat laporan...</div>';
+
+  // Stale-while-revalidate: tampilkan cache langsung kalau ada
+  if (ownerReportCache[key]) {
+    if (tab === 'daily')        ownerRenderDaily(ownerReportCache[key]);
+    else if (tab === 'monthly') ownerRenderMonthly(ownerReportCache[key]);
+    else                        ownerRenderYearly(ownerReportCache[key]);
+  } else {
+    if (content) content.innerHTML = '<div class="owner-loading">Memuat laporan...</div>';
+  }
 
   function onSuccess(res) {
-    if (token !== ownerLoadToken) return;   // response stale, abaikan
-    if (!res || !res.success) { ownerRenderError(res && res.message); return; }
-    if (tab === 'daily')   ownerRenderDaily(res.data);
+    if (token !== ownerLoadToken) return;
+    if (!res || !res.success) {
+      if (!ownerReportCache[key]) ownerRenderError(res && res.message);
+      else showToast((res && res.message) || 'Gagal memuat laporan', 'error');
+      return;
+    }
+    ownerReportCache[key] = res.data;
+    if (tab === 'daily')        ownerRenderDaily(res.data);
     else if (tab === 'monthly') ownerRenderMonthly(res.data);
     else                        ownerRenderYearly(res.data);
   }
 
   function onError(err) {
     if (token !== ownerLoadToken) return;
-    ownerRenderError(err && err.message ? err.message : String(err));
+    const msg = err && err.message ? err.message : String(err);
+    if (!ownerReportCache[key]) ownerRenderError(msg);
+    else showToast('Error memuat laporan: ' + msg, 'error');
   }
 
   if (tab === 'daily') {

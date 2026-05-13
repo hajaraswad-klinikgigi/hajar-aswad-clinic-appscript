@@ -6982,6 +6982,8 @@ function openEditExpenseModal(expenseId, category, description, amount, doctorNa
   const alertEl = el('editExpenseAlert');
   if (alertEl) { alertEl.className = 'owner-modal-alert'; alertEl.textContent = ''; }
 
+  expClearAllFieldErrors('editExp');
+
   const btn = el('editExpSubmitBtn');
   if (btn) btn.disabled = false;
 
@@ -7027,6 +7029,8 @@ function expenseSetLoading_(submitId, cancelId, loading, submitIdleText) {
 function submitEditExpense() {
   const el  = function(id) { return document.getElementById(id); };
 
+  expClearAllFieldErrors('editExp');
+
   const expenseId   = (el('editExpId')          || {}).value || '';
   const date        = (el('editExpDate')         || {}).value || '';
   const category    = (el('editExpCategory')     || {}).value || '';
@@ -7035,22 +7039,21 @@ function submitEditExpense() {
   const amount      = Number((el('editExpAmount') || {}).value || 0);
   const notes       = (el('editExpNotes')        || {}).value || '';
 
-  function validErr(msg) {
-    setEditExpenseAlert(msg);
-    showToast(msg, 'error');
-  }
+  let hasErr = false;
+  function fieldErr(inputId, errId, msg) { expSetFieldErr(inputId, errId, msg); hasErr = true; }
 
-  if (!expenseId)   { validErr('ID pengeluaran tidak ditemukan.'); return; }
-  if (!date)        { validErr('Tanggal wajib diisi.'); return; }
-  if (!category)    { validErr('Kategori wajib dipilih.'); return; }
-  if (!description) { validErr('Keterangan wajib diisi.'); return; }
-  if (!amount || amount <= 0) { validErr('Nominal harus lebih dari 0.'); return; }
+  if (!expenseId)   { setEditExpenseAlert('ID pengeluaran tidak ditemukan.'); return; }
+  if (!date)        fieldErr('editExpDate',        'editExpDateErr',        'Tanggal wajib diisi.');
+  if (!category)    fieldErr('editExpCategory',    'editExpCategoryErr',    'Kategori wajib dipilih.');
+  if (!description) fieldErr('editExpDescription', 'editExpDescriptionErr', 'Keterangan wajib diisi.');
+  if (!amount || amount <= 0) fieldErr('editExpAmount', 'editExpAmountErr', 'Nominal harus lebih dari 0.');
 
   const doctorCats = ['doctor_salary','doctor_meal','doctor_standby'];
   if (doctorCats.indexOf(category) !== -1 && !doctorName) {
-    validErr('Nama dokter wajib dipilih untuk kategori ini.');
-    return;
+    fieldErr('editExpDoctorName', 'editExpDoctorNameErr', 'Nama dokter wajib dipilih untuk kategori ini.');
   }
+
+  if (hasErr) return;
 
   expenseSetLoading_('editExpSubmitBtn', 'editExpCancelBtn', true);
 
@@ -7115,6 +7118,29 @@ function switchFinanceTab(tab) {
 }
 
 /* =========================================================
+   EXPENSE FIELD ERROR HELPERS
+   ========================================================= */
+function expSetFieldErr(inputId, errId, msg) {
+  var inp = document.getElementById(inputId);
+  var err = document.getElementById(errId);
+  if (inp) inp.classList.add('error');
+  if (err) { err.textContent = msg || ''; err.style.display = msg ? '' : 'none'; }
+}
+
+function expClearFieldErr(inputId, errId) {
+  var inp = document.getElementById(inputId);
+  var err = document.getElementById(errId);
+  if (inp) inp.classList.remove('error');
+  if (err) { err.textContent = ''; err.style.display = 'none'; }
+}
+
+function expClearAllFieldErrors(prefix) {
+  ['Date','Category','DoctorName','Description','Amount'].forEach(function(f) {
+    expClearFieldErr(prefix + f, prefix + f + 'Err');
+  });
+}
+
+/* =========================================================
    EXPENSE FORM — tambah pengeluaran (accessible admin & owner)
    ========================================================= */
 
@@ -7131,6 +7157,8 @@ function openExpenseModal() {
 
   const alertEl = el('expenseModalAlert');
   if (alertEl) { alertEl.className = 'owner-modal-alert'; alertEl.textContent = ''; }
+
+  expClearAllFieldErrors('exp');
 
   const btn = el('expSubmitBtn');
   if (btn) btn.disabled = false;
@@ -7166,6 +7194,8 @@ function setExpenseModalAlert(msg, type) {
 function submitExpense() {
   const el = function(id) { return document.getElementById(id); };
 
+  expClearAllFieldErrors('exp');
+
   const date        = (el('expDate')        || {}).value || '';
   const category    = (el('expCategory')    || {}).value || '';
   const doctorName  = (el('expDoctorName')  || {}).value || '';
@@ -7173,21 +7203,20 @@ function submitExpense() {
   const amount      = Number((el('expAmount') || {}).value || 0);
   const notes       = (el('expNotes')       || {}).value || '';
 
-  function validErr(msg) {
-    setExpenseModalAlert(msg);
-    showToast(msg, 'error');
-  }
+  let hasErr = false;
+  function fieldErr(inputId, errId, msg) { expSetFieldErr(inputId, errId, msg); hasErr = true; }
 
-  if (!date)        { validErr('Tanggal wajib diisi.'); return; }
-  if (!category)    { validErr('Kategori wajib dipilih.'); return; }
-  if (!description) { validErr('Keterangan wajib diisi.'); return; }
-  if (!amount || amount <= 0) { validErr('Nominal harus lebih dari 0.'); return; }
+  if (!date)        fieldErr('expDate',        'expDateErr',        'Tanggal wajib diisi.');
+  if (!category)    fieldErr('expCategory',    'expCategoryErr',    'Kategori wajib dipilih.');
+  if (!description) fieldErr('expDescription', 'expDescriptionErr', 'Keterangan wajib diisi.');
+  if (!amount || amount <= 0) fieldErr('expAmount', 'expAmountErr', 'Nominal harus lebih dari 0.');
 
   const doctorCats = ['doctor_salary','doctor_meal','doctor_standby'];
   if (doctorCats.indexOf(category) !== -1 && !doctorName) {
-    validErr('Nama dokter wajib dipilih untuk kategori ini.');
-    return;
+    fieldErr('expDoctorName', 'expDoctorNameErr', 'Nama dokter wajib dipilih untuk kategori ini.');
   }
+
+  if (hasErr) return;
 
   expenseSetLoading_('expSubmitBtn', 'expCancelBtn', true);
 
@@ -7232,12 +7261,15 @@ function submitExpense() {
 
       <div class="owner-form-group">
         <label class="owner-form-label">Tanggal *</label>
-        <input type="date" id="expDate" class="owner-form-input">
+        <input type="date" id="expDate" class="owner-form-input"
+          onchange="expClearFieldErr('expDate','expDateErr')">
+        <div class="owner-field-error" id="expDateErr"></div>
       </div>
 
       <div class="owner-form-group">
         <label class="owner-form-label">Kategori *</label>
-        <select id="expCategory" class="owner-form-select" onchange="toggleExpenseDoctorField()">
+        <select id="expCategory" class="owner-form-select"
+          onchange="toggleExpenseDoctorField(); expClearFieldErr('expCategory','expCategoryErr')">
           <option value="">-- Pilih Kategori --</option>
           <option value="doctor_salary">Gaji Dokter</option>
           <option value="doctor_meal">Uang Makan Dokter</option>
@@ -7247,24 +7279,31 @@ function submitExpense() {
           <option value="owner_withdrawal">Penarikan Owner</option>
           <option value="other">Lain-lain</option>
         </select>
+        <div class="owner-field-error" id="expCategoryErr"></div>
       </div>
 
       <div class="owner-form-group" id="expDoctorFieldGroup" style="display:none;">
         <label class="owner-form-label">Nama Dokter *</label>
-        <select id="expDoctorName" class="owner-form-select">
+        <select id="expDoctorName" class="owner-form-select"
+          onchange="expClearFieldErr('expDoctorName','expDoctorNameErr')">
           <option value="">-- Pilih Dokter --</option>
         </select>
+        <div class="owner-field-error" id="expDoctorNameErr"></div>
       </div>
 
       <div class="owner-form-group">
         <label class="owner-form-label">Keterangan *</label>
         <input type="text" id="expDescription" class="owner-form-input"
-          placeholder="Contoh: Beli kapas, gaji dr. Selly Mei 2026...">
+          placeholder="Contoh: Beli kapas, gaji dr. Selly Mei 2026..."
+          oninput="expClearFieldErr('expDescription','expDescriptionErr')">
+        <div class="owner-field-error" id="expDescriptionErr"></div>
       </div>
 
       <div class="owner-form-group">
         <label class="owner-form-label">Nominal (Rp) *</label>
-        <input type="number" id="expAmount" class="owner-form-input" placeholder="0" min="1" onwheel="this.blur()">
+        <input type="number" id="expAmount" class="owner-form-input" placeholder="0" min="1"
+          onwheel="this.blur()" oninput="expClearFieldErr('expAmount','expAmountErr')">
+        <div class="owner-field-error" id="expAmountErr"></div>
       </div>
 
       <div class="owner-form-group">
@@ -7290,12 +7329,15 @@ function submitExpense() {
 
       <div class="owner-form-group">
         <label class="owner-form-label">Tanggal *</label>
-        <input type="date" id="editExpDate" class="owner-form-input">
+        <input type="date" id="editExpDate" class="owner-form-input"
+          onchange="expClearFieldErr('editExpDate','editExpDateErr')">
+        <div class="owner-field-error" id="editExpDateErr"></div>
       </div>
 
       <div class="owner-form-group">
         <label class="owner-form-label">Kategori *</label>
-        <select id="editExpCategory" class="owner-form-select" onchange="toggleEditExpenseDoctorField()">
+        <select id="editExpCategory" class="owner-form-select"
+          onchange="toggleEditExpenseDoctorField(); expClearFieldErr('editExpCategory','editExpCategoryErr')">
           <option value="">-- Pilih Kategori --</option>
           <option value="doctor_salary">Gaji Dokter</option>
           <option value="doctor_meal">Uang Makan Dokter</option>
@@ -7305,23 +7347,30 @@ function submitExpense() {
           <option value="owner_withdrawal">Penarikan Owner</option>
           <option value="other">Lain-lain</option>
         </select>
+        <div class="owner-field-error" id="editExpCategoryErr"></div>
       </div>
 
       <div class="owner-form-group" id="editExpDoctorFieldGroup" style="display:none;">
         <label class="owner-form-label">Nama Dokter *</label>
-        <select id="editExpDoctorName" class="owner-form-select">
+        <select id="editExpDoctorName" class="owner-form-select"
+          onchange="expClearFieldErr('editExpDoctorName','editExpDoctorNameErr')">
           <option value="">-- Pilih Dokter --</option>
         </select>
+        <div class="owner-field-error" id="editExpDoctorNameErr"></div>
       </div>
 
       <div class="owner-form-group">
         <label class="owner-form-label">Keterangan *</label>
-        <input type="text" id="editExpDescription" class="owner-form-input">
+        <input type="text" id="editExpDescription" class="owner-form-input"
+          oninput="expClearFieldErr('editExpDescription','editExpDescriptionErr')">
+        <div class="owner-field-error" id="editExpDescriptionErr"></div>
       </div>
 
       <div class="owner-form-group">
         <label class="owner-form-label">Nominal (Rp) *</label>
-        <input type="number" id="editExpAmount" class="owner-form-input" min="1" onwheel="this.blur()">
+        <input type="number" id="editExpAmount" class="owner-form-input" min="1"
+          onwheel="this.blur()" oninput="expClearFieldErr('editExpAmount','editExpAmountErr')">
+        <div class="owner-field-error" id="editExpAmountErr"></div>
       </div>
 
       <div class="owner-form-group">
