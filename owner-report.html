@@ -921,25 +921,60 @@ function ownerPrintDailyReport() {
   /* ── PER DOKTER ──────────────────────────────────────── */
   if (byDoc.length) {
     sectionTitle('Laporan Per Dokter');
-    doc.autoTable({
-      startY: y,
-      head: [['Dokter', 'Jml Pasien', 'Total Billing', 'Kas Masuk']],
-      body: byDoc.map(function(d) {
-        return [d.doctor_name || '-', String(d.patient_count || 0), ownerFmtRp(d.total_billing), ownerFmtRp(d.total_cash_in)];
-      }),
-      theme: 'striped',
-      headStyles: headStyle,
-      bodyStyles: bodyStyle,
-      columnStyles: {
-        0: { cellWidth: 60 },
-        1: { cellWidth: 30, halign: 'center' },
-        2: { cellWidth: 46, halign: 'right' },
-        3: { cellWidth: 46, halign: 'right' },
-      },
-      alternateRowStyles: { fillColor: STRIPE },
-      margin: { left: MARGIN, right: MARGIN },
+
+    var pageH = doc.internal.pageSize.height;
+
+    byDoc.forEach(function(d, idx) {
+      var patients = Array.isArray(d.patients) ? d.patients : [];
+
+      // Estimasi tinggi: 2 baris header (~8mm) + tiap pasien (~7mm) + margin
+      var estH    = 16 + patients.length * 7;
+      var remaining = pageH - y - 15;
+
+      // Jika section muat di satu halaman tapi ruang tersisa tidak cukup → halaman baru
+      if (estH < pageH * 0.80 && estH > remaining && y > 60) {
+        doc.addPage();
+        y = MARGIN;
+      }
+
+      doc.autoTable({
+        startY: y,
+        head: [
+          [{
+            content: (d.doctor_name || '-') +
+                     '   •   ' + (d.patient_count || 0) + ' pasien' +
+                     '   •   Billing: ' + ownerFmtRp(d.total_billing) +
+                     '   •   Kas Masuk: ' + ownerFmtRp(d.total_cash_in),
+            colSpan: 4,
+            styles: { fillColor: BLUE, textColor: [255,255,255], fontStyle: 'bold', fontSize: 9, cellPadding: 3.5 },
+          }],
+          ['Pasien', 'Layanan / Treatment', 'Biaya', 'Bayar'],
+        ],
+        body: patients.length
+          ? patients.map(function(p) {
+              var biaya = !p.has_billing ? '-'
+                : Number(p.biaya || 0) === 0 ? 'Gratis'
+                : ownerFmtRp(p.biaya);
+              return [p.patient_name || '-', p.services || '-', biaya,
+                      p.has_billing ? ownerFmtRp(p.bayar) : '-'];
+            })
+          : [['Tidak ada data pasien', '', '', '']],
+        theme: 'striped',
+        headStyles: { fillColor: [51,82,168], textColor: [255,255,255], fontSize: 8, fontStyle: 'bold', cellPadding: 2.5 },
+        bodyStyles: { fontSize: 8.5, cellPadding: 2.5, textColor: DARK },
+        columnStyles: {
+          0: { cellWidth: 52 },
+          1: { cellWidth: 70 },
+          2: { cellWidth: 30, halign: 'right' },
+          3: { cellWidth: 30, halign: 'right' },
+        },
+        alternateRowStyles: { fillColor: STRIPE },
+        showHead: 'everyPage',
+        margin: { left: MARGIN, right: MARGIN },
+      });
+
+      y = doc.lastAutoTable.finalY + (idx < byDoc.length - 1 ? 5 : 8);
     });
-    y = doc.lastAutoTable.finalY + 8;
   }
 
   /* ── PER LAYANAN ─────────────────────────────────────── */
