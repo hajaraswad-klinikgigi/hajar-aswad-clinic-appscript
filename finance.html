@@ -1,6 +1,7 @@
 <script>
 let financePeriod = 'today';
 let financeActiveLaporan = false;
+let financeBootstrapCache = {};
 let allFinanceBillings = [];
 let filteredFinanceBillings = [];
 let financeCurrentPage = 1;
@@ -1180,11 +1181,20 @@ function loadFinancePageBootstrap() {
     return;
   }
 
-  renderFinancePageBootstrapLoadingState();
+  const cached = financeBootstrapCache[financePeriod];
+  if (cached) {
+    // Stale-while-revalidate: tampilkan cache dulu, skip skeleton
+    renderFinanceBootstrap(cached);
+  } else {
+    renderFinancePageBootstrapLoadingState();
+  }
 
   google.script.run
     .withSuccessHandler(function(res) {
       financeEndProcess(processKey, processOptions);
+      if (res && res.success) {
+        financeBootstrapCache[financePeriod] = res;
+      }
       renderFinanceBootstrap(res);
     })
     .withFailureHandler(function(err) {
@@ -1195,7 +1205,9 @@ function loadFinancePageBootstrap() {
         'Gagal memuat halaman Finance'
       );
 
-      renderFinancePageBootstrapErrorState(message);
+      if (!financeBootstrapCache[financePeriod]) {
+        renderFinancePageBootstrapErrorState(message);
+      }
       showToast('Error finance bootstrap: ' + message, 'error');
     })
     .getFinancePageBootstrap(attachAuthContext({

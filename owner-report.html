@@ -160,14 +160,17 @@ function executeDeleteExpense() {
   const expenseId = ownerPendingDeleteExpenseId;
   if (!expenseId) return;
 
-  const confirmBtn = document.getElementById('confirmDeleteExpenseSubmitBtn');
+  const confirmBtn  = document.getElementById('confirmDeleteExpenseSubmitBtn');
+  const cancelBtn   = document.querySelector('#confirmDeleteExpenseModal .btn-secondary');
   if (confirmBtn) { confirmBtn.disabled = true; confirmBtn.textContent = 'Menghapus...'; }
+  if (cancelBtn)  cancelBtn.disabled = true;
 
   const sessionToken = currentUser && currentUser.session_token;
 
   google.script.run
     .withSuccessHandler(function(res) {
       if (confirmBtn) { confirmBtn.disabled = false; confirmBtn.textContent = 'Hapus'; }
+      if (cancelBtn)  cancelBtn.disabled = false;
       if (!res || !res.success) {
         showToast('Gagal menghapus: ' + (res && res.message || 'Terjadi kesalahan'), 'error');
         closeDeleteExpenseModal();
@@ -205,6 +208,7 @@ function executeDeleteExpense() {
     })
     .withFailureHandler(function(err) {
       if (confirmBtn) { confirmBtn.disabled = false; confirmBtn.textContent = 'Hapus'; }
+      if (cancelBtn)  cancelBtn.disabled = false;
       const msg = err && err.message ? err.message : String(err);
       showToast('Error: ' + msg, 'error');
       closeDeleteExpenseModal();
@@ -453,11 +457,27 @@ function ownerRenderDaily(data) {
                 <td>${esc(e.description||'-')}${e.doctor_name?' <span style="color:#6b7280">('+esc(e.doctor_name)+')</span>':''}</td>
                 <td>${ownerFmtRp(e.amount)}</td>
                 <td>${esc(e.recorded_by||'-')}</td>
-                <td style="display:flex;gap:4px;">
-                  <button class="btn btn-secondary" style="padding:4px 10px;font-size:12px;"
-                    onclick="openEditExpenseModal('${editArgs}')">Edit</button>
-                  <button class="btn btn-danger" style="padding:4px 10px;font-size:12px;"
-                    onclick="confirmDeleteExpense('${escPrm(e.expense_id||'')}')">Hapus</button>
+                <td>
+                  <div class="inline-actions">
+                    <button type="button" class="icon-btn edit"
+                      title="Edit pengeluaran" aria-label="Edit pengeluaran"
+                      onclick="openEditExpenseModal('${editArgs}')">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M12 20h9"></path>
+                        <path d="M16.5 3.5a2.12 2.12 0 1 1 3 3L7 19l-4 1 1-4 12.5-12.5z"></path>
+                      </svg>
+                    </button>
+                    <button type="button" class="icon-btn danger"
+                      title="Hapus pengeluaran" aria-label="Hapus pengeluaran"
+                      onclick="confirmDeleteExpense('${escPrm(e.expense_id||'')}')">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <polyline points="3 6 5 6 21 6"></polyline>
+                        <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"></path>
+                        <path d="M10 11v6"></path><path d="M14 11v6"></path>
+                        <path d="M9 6V4h6v2"></path>
+                      </svg>
+                    </button>
+                  </div>
                 </td>
               </tr>`;
             }).join('')}
