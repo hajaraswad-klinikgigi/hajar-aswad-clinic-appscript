@@ -155,8 +155,9 @@
     padding: 20px 16px;
     transition: transform 0.25s ease;
     z-index: 1002;
-    position: sticky;
+    position: fixed;
     top: 0;
+    left: 0;
     height: 100vh;
     overflow-y: auto;
     border-right: 1px solid rgba(255, 255, 255, 0.05);
@@ -328,10 +329,11 @@
   }
 
   .main-content {
-    flex: 1;
+    margin-left: 248px;
     min-width: 0;
     padding: 28px 28px 24px;
     background: #0d1117;
+    min-height: 100vh;
   }
 
   .topbar {
