@@ -924,6 +924,7 @@ function ownerBuildRevenueFromRawData_(rawData, startDate, endDate) {
   const totalCashIn  = payments.reduce(function(s, p) { return s + Number(p.amount || 0); }, 0);
   const patientCount = treatments.length;
 
+  // Untuk KPI agregat — gunakan billing/payment yang terfilter dalam periode
   const billingByTreatmentId = {};
   billings.forEach(function(b) {
     billingByTreatmentId[String(b.treatment_id || '')] = b;
@@ -933,6 +934,21 @@ function ownerBuildRevenueFromRawData_(rawData, startDate, endDate) {
   payments.forEach(function(p) {
     const bid = String(p.billing_id || '');
     paymentsByBillingId[bid] = (paymentsByBillingId[bid] || 0) + Number(p.amount || 0);
+  });
+
+  // Untuk daftar pasien — gunakan SEMUA billing/payment tanpa filter tanggal
+  // agar treatment yang billingnya beda bulan tetap tampil biaya & bayarnya
+  const allBillingByTreatmentId = {};
+  rawData.billings.forEach(function(b) {
+    if (String(b.billing_status || '').trim().toLowerCase() !== 'cancelled') {
+      allBillingByTreatmentId[String(b.treatment_id || '')] = b;
+    }
+  });
+
+  const allPaymentsByBillingId = {};
+  rawData.payments.forEach(function(p) {
+    const bid = String(p.billing_id || '');
+    allPaymentsByBillingId[bid] = (allPaymentsByBillingId[bid] || 0) + Number(p.amount || 0);
   });
 
   const servicesByTreatmentId = {};
@@ -947,12 +963,18 @@ function ownerBuildRevenueFromRawData_(rawData, startDate, endDate) {
   treatments.forEach(function(t) {
     const doc = String(t.doctor_name || 'Tidak diketahui').trim();
     const tid = String(t.treatment_id || '');
+    // KPI: pakai filtered billing
     const billing = billingByTreatmentId[tid];
     const billingId = billing ? String(billing.billing_id || '') : '';
     const cashIn = billingId ? (paymentsByBillingId[billingId] || 0) : 0;
     const biaya = billing ? Number(billing.grand_total || 0) : 0;
+    // Pasien: pakai all billing untuk dapat nama & jumlah pasti
+    const allBilling = allBillingByTreatmentId[tid] || billing;
+    const allBillingId = allBilling ? String(allBilling.billing_id || '') : '';
+    const patientBiaya = allBilling ? Number(allBilling.grand_total || 0) : 0;
+    const patientBayar = allBillingId ? (allPaymentsByBillingId[allBillingId] || 0) : 0;
     const patientName = String(
-      (billing && billing.patient_name) || t.patient_name || '-'
+      (allBilling && allBilling.patient_name) || t.patient_name || '-'
     ).trim();
     const services = (servicesByTreatmentId[tid] || []).join(', ') || '-';
 
@@ -962,7 +984,7 @@ function ownerBuildRevenueFromRawData_(rawData, startDate, endDate) {
     byDoctorMap[doc].patient_count++;
     byDoctorMap[doc].total_billing += biaya;
     byDoctorMap[doc].total_cash_in += cashIn;
-    byDoctorMap[doc].patients.push({ patient_name: patientName, services: services, biaya: biaya, bayar: cashIn });
+    byDoctorMap[doc].patients.push({ patient_name: patientName, services: services, biaya: patientBiaya, bayar: patientBayar });
   });
 
   const byServiceMap = {};
