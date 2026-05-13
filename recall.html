@@ -871,7 +871,7 @@
     input.value = page;
     if (recallCurrentPage === page) return;
     recallCurrentPage = page;
-    applyRecallFilters(false);
+    renderRecallTable();
   }
 
   function nextRecallPage() {

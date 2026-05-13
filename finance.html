@@ -2410,7 +2410,7 @@ function loadFinanceBillings() {
         return row;
       });
 
-      applyFinanceBillingFilters(false);
+      applyFinanceBillingFilters(true);
     })
     .withFailureHandler(function(err) {
       financeEndProcess(processKey, processOptions);
@@ -4549,7 +4549,7 @@ function loadFinanceReceivables() {
         buildFinanceReceivableSummary(allFinanceReceivables);
 
       renderFinanceReceivableSummary(summaryData);
-      applyFinanceReceivableFilters(false);
+      applyFinanceReceivableFilters(true);
     })
     .withFailureHandler(function(err) {
       financeEndProcess(processKey, processOptions);
