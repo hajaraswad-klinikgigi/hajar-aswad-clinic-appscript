@@ -3,6 +3,9 @@
   <head>
     <base target="_top">
     <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,400;0,14..32,500;0,14..32,600;0,14..32,700;0,14..32,800&display=swap" rel="stylesheet">
     <?!= include('style'); ?>
     <?!= include('style-dashboard'); ?>
     <?!= include('style-patients'); ?>
@@ -44,14 +47,64 @@
         <div class="sidebar-overlay" onclick="closeSidebar()"></div>
 
         <aside class="sidebar" id="appSidebar">
-          <div class="sidebar-brand">Hajar Aswad</div>
+          <div class="sidebar-brand">
+            <div class="sidebar-brand-icon">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M12 2a7 7 0 0 1 7 7c0 5-7 13-7 13S5 14 5 9a7 7 0 0 1 7-7z"/>
+                <circle cx="12" cy="9" r="2.5"/>
+              </svg>
+            </div>
+            <div>
+              <div class="sidebar-brand-name">Hajar Aswad</div>
+              <div class="sidebar-brand-sub">Dental Clinic</div>
+            </div>
+          </div>
 
-           <button type="button" id="menuDashboard" class="sidebar-menu active" onclick="showDashboardPage(); closeSidebar();">Dashboard</button>
-          <button type="button" id="menuPatients" class="sidebar-menu" onclick="showPatientsPage(); closeSidebar();">Patients</button>
-          <button type="button" id="menuAppointments" class="sidebar-menu" onclick="showAppointmentsPage(); closeSidebar();">Appointments</button>
-          <button type="button" id="menuRecall" class="sidebar-menu" onclick="showRecallPage(); closeSidebar();">Recall</button>
-          <button type="button" id="menuFinance" class="sidebar-menu" onclick="showFinancePage(); closeSidebar();">Finance</button>
-          <button type="button" onclick="logoutLocal()">Logout</button>
+          <nav class="sidebar-nav">
+            <button type="button" id="menuDashboard" class="sidebar-menu active" onclick="showDashboardPage(); closeSidebar();">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/>
+                <rect x="14" y="14" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/>
+              </svg>
+              Dashboard
+            </button>
+            <button type="button" id="menuPatients" class="sidebar-menu" onclick="showPatientsPage(); closeSidebar();">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/>
+                <path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+              </svg>
+              Patients
+            </button>
+            <button type="button" id="menuAppointments" class="sidebar-menu" onclick="showAppointmentsPage(); closeSidebar();">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/>
+                <line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
+              </svg>
+              Appointments
+            </button>
+            <button type="button" id="menuRecall" class="sidebar-menu" onclick="showRecallPage(); closeSidebar();">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
+              </svg>
+              Recall
+            </button>
+            <button type="button" id="menuFinance" class="sidebar-menu" onclick="showFinancePage(); closeSidebar();">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/>
+              </svg>
+              Finance
+            </button>
+          </nav>
+
+          <div class="sidebar-footer">
+            <button type="button" class="sidebar-logout" onclick="logoutLocal()">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
+                <polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/>
+              </svg>
+              Logout
+            </button>
+          </div>
         </aside>
 
         <main class="main-content">
