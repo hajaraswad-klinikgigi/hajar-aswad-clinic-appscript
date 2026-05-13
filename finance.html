@@ -6898,6 +6898,62 @@ function submitFinanceInstallmentPlan(e) {
 }
 
 /* =========================================================
+   EXPENSE — DOCTOR DROPDOWN (dynamic, cached)
+   ========================================================= */
+
+let expenseDoctorCache = null;
+
+function loadExpenseDoctors(selectId, selectedName) {
+  const select = document.getElementById(selectId);
+  if (!select) return;
+
+  function populateSelect(doctors) {
+    expenseDoctorCache = doctors;
+    select.innerHTML = '<option value="">-- Pilih Dokter --</option>' +
+      doctors.map(function(d) {
+        const name = d.full_name || d.username || '';
+        return '<option value="' + escapeAppHtml(name) + '"' +
+          (name === selectedName ? ' selected' : '') + '>' +
+          escapeAppHtml(name) + '</option>';
+      }).join('');
+    select.disabled = false;
+  }
+
+  // Coba cache dari treatment modal terlebih dahulu
+  if (window.treatmentMasterCache &&
+      Array.isArray(window.treatmentMasterCache.doctors) &&
+      window.treatmentMasterCache.doctors.length > 0) {
+    populateSelect(window.treatmentMasterCache.doctors);
+    return;
+  }
+
+  // Coba cache lokal expense
+  if (expenseDoctorCache && expenseDoctorCache.length > 0) {
+    populateSelect(expenseDoctorCache);
+    return;
+  }
+
+  // Fetch dari server
+  select.innerHTML = '<option value="">Memuat dokter...</option>';
+  select.disabled = true;
+
+  google.script.run
+    .withSuccessHandler(function(res) {
+      if (res && res.success && Array.isArray(res.data)) {
+        populateSelect(res.data);
+      } else {
+        select.innerHTML = '<option value="">Gagal memuat dokter</option>';
+        select.disabled = false;
+      }
+    })
+    .withFailureHandler(function() {
+      select.innerHTML = '<option value="">Gagal memuat dokter</option>';
+      select.disabled = false;
+    })
+    .getActiveDoctors({});
+}
+
+/* =========================================================
    EDIT EXPENSE
    ========================================================= */
 
@@ -6909,7 +6965,6 @@ function openEditExpenseModal(expenseId, category, description, amount, doctorNa
   el('editExpCategory').value    = category || '';
   el('editExpDescription').value = description || '';
   el('editExpAmount').value      = amount || '';
-  el('editExpDoctorName').value  = doctorName || '';
   el('editExpNotes').value       = notes || '';
 
   const alertEl = el('editExpenseAlert');
@@ -6918,7 +6973,7 @@ function openEditExpenseModal(expenseId, category, description, amount, doctorNa
   const btn = el('editExpSubmitBtn');
   if (btn) btn.disabled = false;
 
-  toggleEditExpenseDoctorField();
+  toggleEditExpenseDoctorField(doctorName || '');
 
   const modal = el('editExpenseModal');
   if (modal) modal.classList.add('open');
@@ -6929,12 +6984,18 @@ function closeEditExpenseModal() {
   if (modal) modal.classList.remove('open');
 }
 
-function toggleEditExpenseDoctorField() {
+function toggleEditExpenseDoctorField(pendingName) {
   const cat = document.getElementById('editExpCategory');
   const grp = document.getElementById('editExpDoctorFieldGroup');
   if (!cat || !grp) return;
   const doctorCats = ['doctor_salary','doctor_meal','doctor_standby'];
-  grp.style.display = doctorCats.indexOf(cat.value) !== -1 ? 'block' : 'none';
+  const isDoctor = doctorCats.indexOf(cat.value) !== -1;
+  grp.style.display = isDoctor ? 'block' : 'none';
+  if (isDoctor) {
+    const selected = typeof pendingName === 'string' ? pendingName
+      : ((document.getElementById('editExpDoctorName') || {}).value || '');
+    loadExpenseDoctors('editExpDoctorName', selected);
+  }
 }
 
 function setEditExpenseAlert(msg, type) {
@@ -6981,7 +7042,8 @@ function submitEditExpense() {
       }
       closeEditExpenseModal();
       showToast('Pengeluaran berhasil diperbarui.', 'success');
-      if (typeof ownerLoadReport === 'function') ownerLoadReport();
+      if (typeof ownerPatchExpenseLocally === 'function') ownerPatchExpenseLocally(res.data, true);
+      else if (typeof ownerLoadReport === 'function') ownerLoadReport();
     })
     .withFailureHandler(function(err) {
       const msg = err && err.message ? err.message : String(err);
@@ -7066,7 +7128,9 @@ function toggleExpenseDoctorField() {
   const grp = document.getElementById('expDoctorFieldGroup');
   if (!cat || !grp) return;
   const doctorCats = ['doctor_salary','doctor_meal','doctor_standby'];
-  grp.style.display = doctorCats.indexOf(cat.value) !== -1 ? 'block' : 'none';
+  const isDoctor = doctorCats.indexOf(cat.value) !== -1;
+  grp.style.display = isDoctor ? 'block' : 'none';
+  if (isDoctor) loadExpenseDoctors('expDoctorName', (document.getElementById('expDoctorName') || {}).value || '');
 }
 
 function setExpenseModalAlert(msg, type) {
@@ -7111,7 +7175,8 @@ function submitExpense() {
       }
       closeExpenseModal();
       showToast('Pengeluaran berhasil disimpan.', 'success');
-      if (typeof ownerLoadReport === 'function') ownerLoadReport();
+      if (typeof ownerPatchExpenseLocally === 'function') ownerPatchExpenseLocally(res.data, false);
+      else if (typeof ownerLoadReport === 'function') ownerLoadReport();
     })
     .withFailureHandler(function(err) {
       const msg = err && err.message ? err.message : String(err);
@@ -7135,60 +7200,56 @@ function submitExpense() {
 <div class="owner-modal-overlay" id="expenseModal">
   <div class="owner-modal-box">
     <h3 class="owner-modal-title">Tambah Pengeluaran</h3>
-    <div class="owner-modal-alert" id="expenseModalAlert"></div>
+    <form onsubmit="event.preventDefault(); submitExpense();">
+      <div class="owner-modal-alert" id="expenseModalAlert"></div>
 
-    <div class="owner-form-group">
-      <label class="owner-form-label">Tanggal *</label>
-      <input type="date" id="expDate" class="owner-form-input">
-    </div>
+      <div class="owner-form-group">
+        <label class="owner-form-label">Tanggal *</label>
+        <input type="date" id="expDate" class="owner-form-input">
+      </div>
 
-    <div class="owner-form-group">
-      <label class="owner-form-label">Kategori *</label>
-      <select id="expCategory" class="owner-form-select" onchange="toggleExpenseDoctorField()">
-        <option value="">-- Pilih Kategori --</option>
-        <option value="doctor_salary">Gaji Dokter</option>
-        <option value="doctor_meal">Uang Makan Dokter</option>
-        <option value="doctor_standby">Uang Duduk (Standby) Dokter</option>
-        <option value="operational">Operasional Klinik</option>
-        <option value="utility">Utilitas (Listrik, Air, dll)</option>
-        <option value="owner_withdrawal">Penarikan Owner</option>
-        <option value="other">Lain-lain</option>
-      </select>
-    </div>
+      <div class="owner-form-group">
+        <label class="owner-form-label">Kategori *</label>
+        <select id="expCategory" class="owner-form-select" onchange="toggleExpenseDoctorField()">
+          <option value="">-- Pilih Kategori --</option>
+          <option value="doctor_salary">Gaji Dokter</option>
+          <option value="doctor_meal">Uang Makan Dokter</option>
+          <option value="doctor_standby">Uang Duduk (Standby) Dokter</option>
+          <option value="operational">Operasional Klinik</option>
+          <option value="utility">Utilitas (Listrik, Air, dll)</option>
+          <option value="owner_withdrawal">Penarikan Owner</option>
+          <option value="other">Lain-lain</option>
+        </select>
+      </div>
 
-    <div class="owner-form-group" id="expDoctorFieldGroup" style="display:none;">
-      <label class="owner-form-label">Nama Dokter *</label>
-      <select id="expDoctorName" class="owner-form-select">
-        <option value="">-- Pilih Dokter --</option>
-        <option value="drg. Selly">drg. Selly</option>
-        <option value="drg. Novira">drg. Novira</option>
-        <option value="drg. Nurdiana">drg. Nurdiana</option>
-        <option value="drg. Aisyah">drg. Aisyah</option>
-        <option value="drg. Mitha">drg. Mitha</option>
-        <option value="drg. Yuni">drg. Yuni</option>
-      </select>
-    </div>
+      <div class="owner-form-group" id="expDoctorFieldGroup" style="display:none;">
+        <label class="owner-form-label">Nama Dokter *</label>
+        <select id="expDoctorName" class="owner-form-select">
+          <option value="">-- Pilih Dokter --</option>
+        </select>
+      </div>
 
-    <div class="owner-form-group">
-      <label class="owner-form-label">Keterangan *</label>
-      <input type="text" id="expDescription" class="owner-form-input"
-        placeholder="Contoh: Beli kapas, gaji dr. Selly Mei 2026...">
-    </div>
+      <div class="owner-form-group">
+        <label class="owner-form-label">Keterangan *</label>
+        <input type="text" id="expDescription" class="owner-form-input"
+          placeholder="Contoh: Beli kapas, gaji dr. Selly Mei 2026...">
+      </div>
 
-    <div class="owner-form-group">
-      <label class="owner-form-label">Nominal (Rp) *</label>
-      <input type="number" id="expAmount" class="owner-form-input" placeholder="0" min="1">
-    </div>
+      <div class="owner-form-group">
+        <label class="owner-form-label">Nominal (Rp) *</label>
+        <input type="number" id="expAmount" class="owner-form-input" placeholder="0" min="1">
+      </div>
 
-    <div class="owner-form-group">
-      <label class="owner-form-label">Catatan (opsional)</label>
-      <textarea id="expNotes" class="owner-form-textarea" placeholder="Catatan tambahan..."></textarea>
-    </div>
+      <div class="owner-form-group">
+        <label class="owner-form-label">Catatan (opsional)</label>
+        <textarea id="expNotes" class="owner-form-textarea" placeholder="Catatan tambahan..."></textarea>
+      </div>
 
-    <div class="owner-modal-actions">
-      <button class="btn btn-secondary" onclick="closeExpenseModal()">Batal</button>
-      <button class="btn btn-primary" id="expSubmitBtn" onclick="submitExpense()">Simpan</button>
-    </div>
+      <div class="owner-modal-actions">
+        <button type="button" class="btn btn-secondary" onclick="closeExpenseModal()">Batal</button>
+        <button type="submit" class="btn btn-primary" id="expSubmitBtn">Simpan</button>
+      </div>
+    </form>
   </div>
 </div>
 
@@ -7196,59 +7257,55 @@ function submitExpense() {
 <div class="owner-modal-overlay" id="editExpenseModal">
   <div class="owner-modal-box">
     <h3 class="owner-modal-title">Edit Pengeluaran</h3>
-    <div class="owner-modal-alert" id="editExpenseAlert"></div>
-    <input type="hidden" id="editExpId">
+    <form onsubmit="event.preventDefault(); submitEditExpense();">
+      <div class="owner-modal-alert" id="editExpenseAlert"></div>
+      <input type="hidden" id="editExpId">
 
-    <div class="owner-form-group">
-      <label class="owner-form-label">Tanggal *</label>
-      <input type="date" id="editExpDate" class="owner-form-input">
-    </div>
+      <div class="owner-form-group">
+        <label class="owner-form-label">Tanggal *</label>
+        <input type="date" id="editExpDate" class="owner-form-input">
+      </div>
 
-    <div class="owner-form-group">
-      <label class="owner-form-label">Kategori *</label>
-      <select id="editExpCategory" class="owner-form-select" onchange="toggleEditExpenseDoctorField()">
-        <option value="">-- Pilih Kategori --</option>
-        <option value="doctor_salary">Gaji Dokter</option>
-        <option value="doctor_meal">Uang Makan Dokter</option>
-        <option value="doctor_standby">Uang Duduk (Standby) Dokter</option>
-        <option value="operational">Operasional Klinik</option>
-        <option value="utility">Utilitas (Listrik, Air, dll)</option>
-        <option value="owner_withdrawal">Penarikan Owner</option>
-        <option value="other">Lain-lain</option>
-      </select>
-    </div>
+      <div class="owner-form-group">
+        <label class="owner-form-label">Kategori *</label>
+        <select id="editExpCategory" class="owner-form-select" onchange="toggleEditExpenseDoctorField()">
+          <option value="">-- Pilih Kategori --</option>
+          <option value="doctor_salary">Gaji Dokter</option>
+          <option value="doctor_meal">Uang Makan Dokter</option>
+          <option value="doctor_standby">Uang Duduk (Standby) Dokter</option>
+          <option value="operational">Operasional Klinik</option>
+          <option value="utility">Utilitas (Listrik, Air, dll)</option>
+          <option value="owner_withdrawal">Penarikan Owner</option>
+          <option value="other">Lain-lain</option>
+        </select>
+      </div>
 
-    <div class="owner-form-group" id="editExpDoctorFieldGroup" style="display:none;">
-      <label class="owner-form-label">Nama Dokter *</label>
-      <select id="editExpDoctorName" class="owner-form-select">
-        <option value="">-- Pilih Dokter --</option>
-        <option value="drg. Selly">drg. Selly</option>
-        <option value="drg. Novira">drg. Novira</option>
-        <option value="drg. Nurdiana">drg. Nurdiana</option>
-        <option value="drg. Aisyah">drg. Aisyah</option>
-        <option value="drg. Mitha">drg. Mitha</option>
-        <option value="drg. Yuni">drg. Yuni</option>
-      </select>
-    </div>
+      <div class="owner-form-group" id="editExpDoctorFieldGroup" style="display:none;">
+        <label class="owner-form-label">Nama Dokter *</label>
+        <select id="editExpDoctorName" class="owner-form-select">
+          <option value="">-- Pilih Dokter --</option>
+        </select>
+      </div>
 
-    <div class="owner-form-group">
-      <label class="owner-form-label">Keterangan *</label>
-      <input type="text" id="editExpDescription" class="owner-form-input">
-    </div>
+      <div class="owner-form-group">
+        <label class="owner-form-label">Keterangan *</label>
+        <input type="text" id="editExpDescription" class="owner-form-input">
+      </div>
 
-    <div class="owner-form-group">
-      <label class="owner-form-label">Nominal (Rp) *</label>
-      <input type="number" id="editExpAmount" class="owner-form-input" min="1">
-    </div>
+      <div class="owner-form-group">
+        <label class="owner-form-label">Nominal (Rp) *</label>
+        <input type="number" id="editExpAmount" class="owner-form-input" min="1">
+      </div>
 
-    <div class="owner-form-group">
-      <label class="owner-form-label">Catatan (opsional)</label>
-      <textarea id="editExpNotes" class="owner-form-textarea"></textarea>
-    </div>
+      <div class="owner-form-group">
+        <label class="owner-form-label">Catatan (opsional)</label>
+        <textarea id="editExpNotes" class="owner-form-textarea"></textarea>
+      </div>
 
-    <div class="owner-modal-actions">
-      <button class="btn btn-secondary" onclick="closeEditExpenseModal()">Batal</button>
-      <button class="btn btn-primary" id="editExpSubmitBtn" onclick="submitEditExpense()">Simpan Perubahan</button>
-    </div>
+      <div class="owner-modal-actions">
+        <button type="button" class="btn btn-secondary" onclick="closeEditExpenseModal()">Batal</button>
+        <button type="submit" class="btn btn-primary" id="editExpSubmitBtn">Simpan Perubahan</button>
+      </div>
+    </form>
   </div>
 </div>

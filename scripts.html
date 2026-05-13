@@ -337,8 +337,9 @@
       medical_notes: document.getElementById('patient_medical_notes').value.trim()
     };
 
-    const action = patientFormMode === 'edit' ? 'updatePatient' : 'createPatient';
-    const successMessage = patientFormMode === 'edit'
+    const capturedMode = patientFormMode;
+    const action = capturedMode === 'edit' ? 'updatePatient' : 'createPatient';
+    const successMessage = capturedMode === 'edit'
       ? 'Data pasien berhasil diperbarui'
       : 'Pasien berhasil ditambahkan';
 
@@ -346,7 +347,7 @@
 
     setModalProcessingState('patientModal', true, {
       primaryButtonId: 'patientSubmitBtn',
-      loadingText: patientFormMode === 'edit' ? 'Updating...' : 'Menyimpan...'
+      loadingText: capturedMode === 'edit' ? 'Updating...' : 'Menyimpan...'
     });
 
     google.script.run
@@ -356,7 +357,7 @@
         if (!res || !res.success) {
           setModalProcessingState('patientModal', false, {
             primaryButtonId: 'patientSubmitBtn',
-            idleText: patientFormMode === 'edit' ? 'Update' : 'Simpan'
+            idleText: capturedMode === 'edit' ? 'Update' : 'Simpan'
           });
 
           applyPatientErrors(res && res.errors ? res.errors : null);
@@ -372,7 +373,34 @@
         clearPatientForm();
         clearPatientErrors();
 
-        if (typeof loadPatients === 'function') {
+        // Partial refresh — patch allPatients tanpa reload server
+        var saved = res.data;
+        if (saved && typeof renderPatientsTable === 'function') {
+          var keyword = ((document.getElementById('patientSearchInput') || {}).value || '').trim().toLowerCase();
+          saved._search_text = [
+            saved.patient_code || '', saved.full_name || '', saved.phone || '',
+            saved.email || '', saved.guardian_name || '', saved.guardian_relationship || '',
+            saved.guardian_phone || '', saved.guardian_email || '', saved.address || ''
+          ].join(' ').toLowerCase();
+
+          if (capturedMode === 'edit') {
+            var idx = (allPatients || []).findIndex(function(p) { return p.patient_id === saved.patient_id; });
+            if (idx !== -1) {
+              allPatients[idx] = saved;
+            } else {
+              allPatients = [saved].concat(allPatients || []);
+            }
+          } else {
+            allPatients = [saved].concat(allPatients || []);
+            patientCurrentPage = 1;
+          }
+
+          filteredPatients = keyword
+            ? (allPatients || []).filter(function(p) { return String(p._search_text||'').includes(keyword); })
+            : (allPatients || []).slice();
+
+          renderPatientsTable();
+        } else if (typeof loadPatients === 'function') {
           loadPatients();
         }
 

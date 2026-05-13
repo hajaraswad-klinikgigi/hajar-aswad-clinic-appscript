@@ -2180,7 +2180,15 @@
         }
 
         closeCancelAppointmentModal();
-        loadAppointments();
+        // Patch status lokal — tidak perlu reload seluruh daftar
+        var idx = (allAppointments || []).findIndex(function(a) { return a.appointment_id === targetAppointmentId; });
+        if (idx !== -1) {
+          allAppointments[idx].status = 'cancelled';
+          allAppointments[idx]._search_text = (allAppointments[idx]._search_text || '').replace(/scheduled|restored/, 'cancelled');
+          if (typeof applyAppointmentFilters === 'function') applyAppointmentFilters();
+        } else {
+          loadAppointments();
+        }
         showToast('Appointment dibatalkan', 'success');
       })
       .withFailureHandler(function(err) {
@@ -2246,7 +2254,15 @@
         }
 
         closeRestoreAppointmentModal();
-        loadAppointments();
+        // Patch status lokal — tidak perlu reload seluruh daftar
+        var idx = (allAppointments || []).findIndex(function(a) { return a.appointment_id === targetAppointmentId; });
+        if (idx !== -1) {
+          allAppointments[idx].status = 'scheduled';
+          allAppointments[idx]._search_text = (allAppointments[idx]._search_text || '').replace(/cancelled/, 'scheduled');
+          if (typeof applyAppointmentFilters === 'function') applyAppointmentFilters();
+        } else {
+          loadAppointments();
+        }
         showToast('Appointment direstore', 'success');
       })
       .withFailureHandler(function(err) {

@@ -1177,6 +1177,8 @@ function getOwnerYearlyReport(payload) {
           total_expense: expSummary.total_expense,
           net_cash:      revenue.total_cash_in - expSummary.total_expense
         },
+        by_doctor:         revenue.by_doctor,
+        by_service:        revenue.by_service,
         monthly_breakdown: monthlyBreakdown
       }
     };
