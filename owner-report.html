@@ -10,6 +10,7 @@ let ownerLoadToken = 0;
 let ownerCurrentDailyData = null;
 let ownerPendingDeleteExpenseId = null;
 let ownerReportCache = {};
+let ownerExpandedDoctors = new Set();
 
 const OWNER_CATEGORY_LABELS = {
   doctor_salary:    'Gaji Dokter',
@@ -90,7 +91,8 @@ function ownerRenderDoctorSection(byDoc, autoExpand) {
     const arrowStyle = expanded ? 'transform:rotate(90deg)' : '';
     const patientRowDisplay = expanded ? '' : 'display:none';
 
-    rows += `<tr class="owner-doc-row" onclick="ownerToggleDoctor(${idx})">
+    var docNameJs = (d.doctor_name || '-').replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+    rows += `<tr class="owner-doc-row" data-doc-name="${escapeAppHtml(d.doctor_name||'-')}" data-doc-expand-idx="${idx}" onclick="ownerToggleDoctor(${idx}, '${docNameJs}')">
       <td>
         <span class="owner-doc-arrow" id="ownerDocArrow${idx}" style="${arrowStyle}">›</span>
         <strong>${escapeAppHtml(d.doctor_name||'-')}</strong>
@@ -124,12 +126,29 @@ function ownerRenderDoctorSection(byDoc, autoExpand) {
   </table></div>`;
 }
 
-function ownerToggleDoctor(idx) {
+function ownerToggleDoctor(idx, docName) {
   var rows = document.querySelectorAll('[data-doc-idx="' + idx + '"]');
   var arrow = document.getElementById('ownerDocArrow' + idx);
   var collapsed = rows.length > 0 && rows[0].style.display === 'none';
   rows.forEach(function(r) { r.style.display = collapsed ? '' : 'none'; });
   if (arrow) arrow.style.transform = collapsed ? 'rotate(90deg)' : 'rotate(0deg)';
+  if (docName) {
+    if (collapsed) ownerExpandedDoctors.add(docName);
+    else ownerExpandedDoctors.delete(docName);
+  }
+}
+
+function ownerRestoreExpandedState() {
+  if (!ownerExpandedDoctors.size) return;
+  document.querySelectorAll('.owner-doc-row[data-doc-name]').forEach(function(row) {
+    var docName = row.getAttribute('data-doc-name');
+    var idx = row.getAttribute('data-doc-expand-idx');
+    if (ownerExpandedDoctors.has(docName)) {
+      document.querySelectorAll('[data-doc-idx="' + idx + '"]').forEach(function(r) { r.style.display = ''; });
+      var arrow = document.getElementById('ownerDocArrow' + idx);
+      if (arrow) arrow.style.transform = 'rotate(90deg)';
+    }
+  });
 }
 
 function ownerRenderServiceSection(bySvc) {
@@ -307,12 +326,6 @@ function ownerRenderInContainer(containerId) {
           <input type="date" id="ownerDateInput" class="finance-period-select"
             value="${ownerReportDate}" onchange="ownerOnDateChange(this.value)">
         </div>
-        <button class="icon-btn refresh" onclick="ownerLoadReport()" title="Refresh laporan" aria-label="Refresh laporan">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <polyline points="23 4 23 10 17 10"></polyline>
-            <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path>
-          </svg>
-        </button>
       </div>
     </div>
     <div id="ownerReportContent">
@@ -350,6 +363,7 @@ function ownerPreloadTabs() {
 
 function ownerSwitchTab(tab) {
   ownerReportTab = tab;
+  ownerExpandedDoctors.clear();
 
   ['daily','monthly','yearly'].forEach(function(t) {
     const btn = document.getElementById('ownerTab' + t.charAt(0).toUpperCase() + t.slice(1));
@@ -389,6 +403,8 @@ function ownerSwitchTab(tab) {
 
 function ownerOnDateChange(val) {
   ownerReportDate = val;
+  ownerExpandedDoctors.clear();
+  ownerLoadReport();
 }
 
 function ownerOnMonthChange() {
@@ -396,11 +412,15 @@ function ownerOnMonthChange() {
   const y = document.getElementById('ownerYearInput');
   if (m) ownerReportMonth = Number(m.value);
   if (y) ownerReportYear  = Number(y.value);
+  ownerExpandedDoctors.clear();
+  ownerLoadReport();
 }
 
 function ownerOnYearChange() {
   const y = document.getElementById('ownerYearInput');
   if (y) ownerReportYear = Number(y.value);
+  ownerExpandedDoctors.clear();
+  ownerLoadReport();
 }
 
 /* =========================================================
@@ -701,6 +721,7 @@ function ownerRenderMonthly(data) {
       </table></div>
     </div>
   `;
+  ownerRestoreExpandedState();
 }
 
 /* =========================================================
@@ -787,6 +808,7 @@ function ownerRenderYearly(data) {
       </table></div>
     </div>
   `;
+  ownerRestoreExpandedState();
 }
 
 </script>
