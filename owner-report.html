@@ -231,22 +231,24 @@ function ownerRenderInContainer(containerId) {
 
   container.innerHTML = `
     <div class="owner-report-controls">
-      <div class="finance-tab-nav finance-tab-nav-sub">
-        <button class="finance-tab-btn active" id="ownerTabDaily"   onclick="ownerSwitchTab('daily')">Harian</button>
-        <button class="finance-tab-btn"        id="ownerTabMonthly" onclick="ownerSwitchTab('monthly')">Bulanan</button>
-        <button class="finance-tab-btn"        id="ownerTabYearly"  onclick="ownerSwitchTab('yearly')">Tahunan</button>
+      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+        <div class="finance-tab-nav finance-tab-nav-sub">
+          <button class="finance-tab-btn active" id="ownerTabDaily"   onclick="ownerSwitchTab('daily')">Harian</button>
+          <button class="finance-tab-btn"        id="ownerTabMonthly" onclick="ownerSwitchTab('monthly')">Bulanan</button>
+          <button class="finance-tab-btn"        id="ownerTabYearly"  onclick="ownerSwitchTab('yearly')">Tahunan</button>
+        </div>
+        <button class="icon-btn refresh" onclick="ownerLoadReport()" title="Refresh laporan" aria-label="Refresh laporan">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polyline points="23 4 23 10 17 10"></polyline>
+            <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path>
+          </svg>
+        </button>
       </div>
       <div class="owner-report-ctrl-right">
         <div id="ownerDateControl" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
           <input type="date" id="ownerDateInput" class="finance-period-select"
             value="${ownerReportDate}" onchange="ownerOnDateChange(this.value)">
         </div>
-        <button class="icon-btn" onclick="ownerLoadReport()" title="Refresh laporan" aria-label="Refresh laporan">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <polyline points="23 4 23 10 17 10"></polyline>
-            <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path>
-          </svg>
-        </button>
         <button class="btn btn-primary" onclick="openExpenseModal()">+ Tambah Pengeluaran</button>
       </div>
     </div>
