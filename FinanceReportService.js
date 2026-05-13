@@ -935,19 +935,34 @@ function ownerBuildRevenueFromRawData_(rawData, startDate, endDate) {
     paymentsByBillingId[bid] = (paymentsByBillingId[bid] || 0) + Number(p.amount || 0);
   });
 
+  const servicesByTreatmentId = {};
+  treatmentItems.forEach(function(ti) {
+    const tid = String(ti.treatment_id || '');
+    if (!servicesByTreatmentId[tid]) servicesByTreatmentId[tid] = [];
+    const svc = String(ti.service_name || ti.item_name || '').trim();
+    if (svc) servicesByTreatmentId[tid].push(svc);
+  });
+
   const byDoctorMap = {};
   treatments.forEach(function(t) {
     const doc = String(t.doctor_name || 'Tidak diketahui').trim();
-    const billing = billingByTreatmentId[String(t.treatment_id || '')];
+    const tid = String(t.treatment_id || '');
+    const billing = billingByTreatmentId[tid];
     const billingId = billing ? String(billing.billing_id || '') : '';
     const cashIn = billingId ? (paymentsByBillingId[billingId] || 0) : 0;
+    const biaya = billing ? Number(billing.grand_total || 0) : 0;
+    const patientName = String(
+      (billing && billing.patient_name) || t.patient_name || '-'
+    ).trim();
+    const services = (servicesByTreatmentId[tid] || []).join(', ') || '-';
 
     if (!byDoctorMap[doc]) {
-      byDoctorMap[doc] = { doctor_name: doc, patient_count: 0, total_billing: 0, total_cash_in: 0 };
+      byDoctorMap[doc] = { doctor_name: doc, patient_count: 0, total_billing: 0, total_cash_in: 0, patients: [] };
     }
     byDoctorMap[doc].patient_count++;
-    byDoctorMap[doc].total_billing += billing ? Number(billing.grand_total || 0) : 0;
+    byDoctorMap[doc].total_billing += biaya;
     byDoctorMap[doc].total_cash_in += cashIn;
+    byDoctorMap[doc].patients.push({ patient_name: patientName, services: services, biaya: biaya, bayar: cashIn });
   });
 
   const byServiceMap = {};

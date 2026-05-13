@@ -53,20 +53,57 @@ function ownerNetClass(val) {
 /* =========================================================
    SHARED SECTION RENDERERS
    ========================================================= */
-function ownerRenderDoctorSection(byDoc) {
+function ownerRenderDoctorSection(byDoc, autoExpand) {
   const doctors = Array.isArray(byDoc) ? byDoc : [];
   if (!doctors.length) return '<div class="owner-empty">Tidak ada data treatment periode ini</div>';
+
+  var rows = '';
+  doctors.forEach(function(d, idx) {
+    const patients = Array.isArray(d.patients) ? d.patients : [];
+    const expanded = autoExpand || false;
+    const arrowStyle = expanded ? 'transform:rotate(90deg)' : '';
+    const patientRowDisplay = expanded ? '' : 'display:none';
+
+    rows += `<tr class="owner-doc-row" onclick="ownerToggleDoctor(${idx})">
+      <td>
+        <span class="owner-doc-arrow" id="ownerDocArrow${idx}" style="${arrowStyle}">›</span>
+        <strong>${escapeAppHtml(d.doctor_name||'-')}</strong>
+      </td>
+      <td>${d.patient_count||0} pasien</td>
+      <td></td>
+      <td>${ownerFmtRp(d.total_billing)}</td>
+      <td>${ownerFmtRp(d.total_cash_in)}</td>
+    </tr>`;
+
+    patients.forEach(function(p) {
+      rows += `<tr class="owner-patient-row" data-doc-idx="${idx}" style="${patientRowDisplay}">
+        <td class="owner-patient-name">${escapeAppHtml(p.patient_name||'-')}</td>
+        <td></td>
+        <td class="owner-patient-services">${escapeAppHtml(p.services||'-')}</td>
+        <td>${ownerFmtRp(p.biaya)}</td>
+        <td>${ownerFmtRp(p.bayar)}</td>
+      </tr>`;
+    });
+  });
+
   return `<div class="table-wrapper"><table class="table">
-    <thead><tr><th>Dokter</th><th>Pasien</th><th>Omset</th><th>Kas Masuk</th></tr></thead>
-    <tbody>
-      ${doctors.map(function(d){return`<tr>
-        <td><strong>${escapeAppHtml(d.doctor_name||'-')}</strong></td>
-        <td>${d.patient_count||0}</td>
-        <td>${ownerFmtRp(d.total_billing)}</td>
-        <td>${ownerFmtRp(d.total_cash_in)}</td>
-      </tr>`;}).join('')}
-    </tbody>
+    <thead><tr>
+      <th>Dokter / Pasien</th>
+      <th>Jumlah</th>
+      <th>Treatment</th>
+      <th>Biaya</th>
+      <th>Bayar</th>
+    </tr></thead>
+    <tbody>${rows}</tbody>
   </table></div>`;
+}
+
+function ownerToggleDoctor(idx) {
+  var rows = document.querySelectorAll('[data-doc-idx="' + idx + '"]');
+  var arrow = document.getElementById('ownerDocArrow' + idx);
+  var collapsed = rows.length > 0 && rows[0].style.display === 'none';
+  rows.forEach(function(r) { r.style.display = collapsed ? '' : 'none'; });
+  if (arrow) arrow.style.transform = collapsed ? 'rotate(90deg)' : 'rotate(0deg)';
 }
 
 function ownerRenderServiceSection(bySvc) {
@@ -464,7 +501,7 @@ function ownerRenderDaily(data) {
         <div class="owner-section-title">Per Dokter</div>
         <div class="owner-section-subtitle">Pasien dan billing per dokter</div>
       </div></div>
-      ${ownerRenderDoctorSection(byDoc)}
+      ${ownerRenderDoctorSection(byDoc, true)}
     </div>
 
     <div class="content-card">
@@ -597,7 +634,7 @@ function ownerRenderMonthly(data) {
         <div class="owner-section-title">Per Dokter</div>
         <div class="owner-section-subtitle">Pasien dan billing per dokter</div>
       </div></div>
-      ${ownerRenderDoctorSection(byDoc)}
+      ${ownerRenderDoctorSection(byDoc, false)}
     </div>
 
     <div class="content-card">
@@ -683,7 +720,7 @@ function ownerRenderYearly(data) {
         <div class="owner-section-title">Per Dokter</div>
         <div class="owner-section-subtitle">Pasien dan billing per dokter tahun ini</div>
       </div></div>
-      ${ownerRenderDoctorSection(byDoc)}
+      ${ownerRenderDoctorSection(byDoc, false)}
     </div>
 
     <div class="content-card">
