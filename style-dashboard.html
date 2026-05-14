@@ -206,12 +206,13 @@
   .dashboard-stat-warning .dashboard-stat-value { color: #fbbf24; }
 
   /* =========================================================
-     DASHBOARD PANELS — full-width stacked vertical
+     DASHBOARD PANELS — 2-column: Top Tindakan (3/5) | Appointment (2/5)
      ========================================================= */
   .dashboard-panels {
-    display: flex;
-    flex-direction: column;
-    gap: 12px;
+    display: grid;
+    grid-template-columns: 3fr 2fr;
+    gap: 14px;
+    align-items: start;
   }
 
   .dashboard-panel {
@@ -220,6 +221,46 @@
     padding: 16px;
     box-shadow: 0 10px 26px rgba(15, 23, 42, 0.05);
     border: 1px solid rgba(255, 255, 255, 0.07);
+  }
+
+  /* =========================================================
+     APPOINTMENT SCHEDULED LIST — nama only, compact
+     ========================================================= */
+  .dashboard-appt-list {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .dashboard-appt-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 9px 0;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    font-size: 13px;
+  }
+
+  .dashboard-appt-item:last-child {
+    border-bottom: none;
+    padding-bottom: 0;
+  }
+
+  .dashboard-appt-num {
+    width: 18px;
+    flex-shrink: 0;
+    font-size: 11px;
+    font-weight: 700;
+    color: #475569;
+  }
+
+  .dashboard-appt-name {
+    flex: 1;
+    min-width: 0;
+    color: #e2e8f0;
+    font-weight: 600;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   .dashboard-panel-header {
