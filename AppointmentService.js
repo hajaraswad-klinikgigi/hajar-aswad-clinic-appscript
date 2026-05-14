@@ -835,7 +835,22 @@ function restoreAppointment(id, options) {
  * Spreadsheet mode: fetch snapshot → loop → update satu per satu.
  */
 function autoUpdateOverdueScheduledAppointments(options) {
+  const freezeCheck = repoCheckProductionMutationAllowed_({
+    operation: 'AUTO_CANCEL_OVERDUE_APPOINTMENTS',
+    module: 'AppointmentService',
+    action: 'autoUpdateOverdueScheduledAppointments',
+    __test_freeze_enabled: options && options.__test_freeze_enabled === true
+  });
+
+  if (!freezeCheck.allowed) {
+    return { success: false, message: freezeCheck.message };
+  }
+
+  const lock = LockService.getScriptLock();
+
   try {
+    lock.waitLock(5000);
+
     var today = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd');
 
     if (dbIsSupabaseMode_(options)) {
@@ -876,6 +891,8 @@ function autoUpdateOverdueScheduledAppointments(options) {
       success: false,
       message: String(err && err.message ? err.message : err || '')
     };
+  } finally {
+    lock.releaseLock();
   }
 }
 
