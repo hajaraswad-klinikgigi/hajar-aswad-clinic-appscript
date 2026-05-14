@@ -491,7 +491,7 @@ function ownerLoadReport() {
 
 function ownerRenderError(msg) {
   const content = document.getElementById('ownerReportContent');
-  if (content) content.innerHTML = `<div class="content-card owner-loading" style="color:#b91c1c;">
+  if (content) content.innerHTML = `<div class="content-card owner-loading pt-error">
     Gagal memuat laporan: ${escapeAppHtml(msg || 'Terjadi kesalahan')}
   </div>`;
 }

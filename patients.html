@@ -1521,7 +1521,7 @@
             content.innerHTML = `
               <div class="content-card">
                 <div class="pt-section-title">Detail Pasien</div>
-                <div style="color:#b91c1c;">${escapeHtml((fullRes && fullRes.message) || 'Gagal mengambil detail pasien')}</div>
+                <div class="pt-error">${escapeHtml((fullRes && fullRes.message) || 'Gagal mengambil detail pasien')}</div>
               </div>
             `;
             showToast((fullRes && fullRes.message) || 'Gagal mengambil detail pasien', 'error');
@@ -1536,7 +1536,7 @@
           content.innerHTML = `
             <div class="content-card">
               <div class="pt-section-title">Detail Pasien</div>
-              <div style="color:#b91c1c;">Error: ${escapeHtml(err && err.message ? err.message : err)}</div>
+              <div class="pt-error">Error: ${escapeHtml(err && err.message ? err.message : err)}</div>
             </div>
           `;
           showToast('Error: ' + (err && err.message ? err.message : err), 'error');

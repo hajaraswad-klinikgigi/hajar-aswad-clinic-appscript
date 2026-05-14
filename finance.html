@@ -2665,11 +2665,7 @@ function renderFinanceDetailSectionLoadingHtml(title, subtitle, loadingTitle, lo
         </div>
       </div>
 
-      ${financeRenderInlineStateHtml(
-        'loading',
-        loadingTitle || 'Memuat data...',
-        loadingMessage || 'Mohon tunggu sebentar.'
-      )}
+      <div class="pt-loading">${escapeFinanceHtml(loadingTitle || 'Memuat data...')}</div>
     </div>
   `;
 }
@@ -2795,14 +2791,9 @@ function renderFinanceBillingDetailErrorState(message) {
 
   content.innerHTML = `
     <div class="finance-detail-header-card">
-      <div style="width:100%;">
+      <div class="finance-detail-header-full">
         <div class="finance-detail-label">Detail Billing</div>
-
-        ${financeRenderInlineStateHtml(
-          'error',
-          'Gagal memuat detail billing',
-          message || 'Terjadi kesalahan saat memuat detail billing.'
-        )}
+        <div class="pt-error">${escapeFinanceHtml(message || 'Terjadi kesalahan saat memuat detail billing.')}</div>
       </div>
     </div>
   `;
