@@ -1011,7 +1011,7 @@
           </div>
 
           <div class="content-card" style="min-height:220px;">
-            <h3 style="margin-top:0; margin-bottom:16px;">Orthodontic Recall</h3>
+            <div class="pt-section-title">Orthodontic Recall</div>
             <div style="color:#64748b;">Memuat data recall...</div>
           </div>
         </div>
@@ -1024,7 +1024,7 @@
 
       <div id="patientDetailSecondaryWrap" style="margin-top:16px;">
         <div class="content-card">
-          <h3 style="margin-top:0; margin-bottom:16px;">Riwayat Treatment</h3>
+          <div class="pt-section-title">Riwayat Treatment</div>
           <div style="color:#64748b;">Memuat riwayat treatment...</div>
         </div>
 
@@ -1156,7 +1156,7 @@
   function renderPatientSecondarySection(treatments, photoGroups) {
     const treatmentHtml = `
       <div class="content-card">
-        <h3 style="margin-top:0; margin-bottom:16px;">Riwayat Treatment</h3>
+        <div class="pt-section-title">Riwayat Treatment</div>
         ${
           treatments.length
             ? treatments.map(function(t, idx) {
