@@ -765,25 +765,24 @@ function showFinancePage() {
           <div class="finance-subtitle">Kelola billing, pembayaran, diskon, kas masuk, dan piutang sederhana</div>
         </div>
 
-        <div class="finance-header-right" id="financeHeaderRight">
-          <div class="finance-period-filter-wrap" id="financePeriodWrap">
-            <label class="finance-period-filter-label" for="financePeriodSelect">Periode</label>
-            <select
-              id="financePeriodSelect"
-              class="finance-period-select"
-              onchange="changeFinancePeriod(this)"
-            >
-              <option value="today">Hari Ini</option>
-              <option value="7days">7 Hari</option>
-              <option value="30days">30 Hari</option>
-            </select>
-          </div>
-          <button type="button" id="ownerDailyPdfBtn" class="action-btn" onclick="ownerPrintDailyReport()" style="display:none;" title="Download PDF Laporan Harian">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:15px;height:15px;vertical-align:middle;margin-right:6px;margin-top:-2px;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
-            Download
-          </button>
-          <button type="button" id="financeAddExpBtn" class="action-btn" onclick="openExpenseModal()" style="display:none;">+ Pengeluaran</button>
+        <div class="finance-period-filter-wrap" id="financePeriodWrap">
+          <label class="finance-period-filter-label" for="financePeriodSelect">Periode</label>
+          <select
+            id="financePeriodSelect"
+            class="finance-period-select"
+            onchange="changeFinancePeriod(this)"
+          >
+            <option value="today">Hari Ini</option>
+            <option value="7days">7 Hari</option>
+            <option value="30days">30 Hari</option>
+          </select>
         </div>
+
+        <button type="button" id="ownerDailyPdfBtn" class="action-btn" onclick="ownerPrintDailyReport()" style="display:none;" title="Download PDF Laporan Harian">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:15px;height:15px;vertical-align:middle;margin-right:6px;margin-top:-2px;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+          Download
+        </button>
+        <button type="button" id="financeAddExpBtn" class="action-btn" onclick="openExpenseModal()" style="display:none;">+ Pengeluaran</button>
       </div>
 
       <div id="financePeriodInfo" class="finance-period-info"></div>
@@ -3510,7 +3509,7 @@ function renderFinanceBillingDetail(data, options) {
       <div class="finance-detail-box">
         <div class="finance-detail-label">Pasien</div>
         <div class="finance-detail-value">${escapeFinanceHtml(billing.patient_name || '-')}</div>
-        <div class="finance-detail-sub">${escapeFinanceHtml(billing.patient_id || '-')}</div>
+        <div class="finance-detail-subvalue">${escapeFinanceHtml(billing.patient_id || '-')}</div>
       </div>
 
       <div class="finance-detail-box">
