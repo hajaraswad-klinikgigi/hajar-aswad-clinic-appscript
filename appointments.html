@@ -837,10 +837,11 @@
       const admin = isAdmin();  
       const owner = isOwner();  
   
-      const canStartTreatment = !isAppointmentsFullscreenMode && status === 'scheduled' && (admin || owner);  
-      const canEdit = !isAppointmentsFullscreenMode && (admin || owner) && status !== 'completed';  
-      const canCancel = !isAppointmentsFullscreenMode && (admin || owner) && status !== 'completed' && status !== 'cancelled';  
-      const canRestore = !isAppointmentsFullscreenMode && (admin || owner) && status === 'cancelled' && !isCancelRestoreLocked(row);
+      const cancelLocked = status === 'cancelled' && isCancelRestoreLocked(row);
+      const canStartTreatment = !isAppointmentsFullscreenMode && status === 'scheduled' && (admin || owner);
+      const canEdit = !isAppointmentsFullscreenMode && (admin || owner) && status !== 'completed' && !cancelLocked;
+      const canCancel = !isAppointmentsFullscreenMode && (admin || owner) && status !== 'completed' && status !== 'cancelled';
+      const canRestore = !isAppointmentsFullscreenMode && (admin || owner) && status === 'cancelled' && !cancelLocked;
   
       const safePatientName = String(row.patient_name || '').replace(/'/g, "\\'");  
       const topActionCount = 1 + (canEdit ? 1 : 0) + ((canStartTreatment || canCancel || canRestore) ? 1 : 0);  
