@@ -382,14 +382,7 @@
       <div class="modal-box modal-box-sticky appointment-modal-box">
         <div class="detail-modal-header-sticky">
           <h2 id="appointmentModalTitle" class="detail-modal-title-sticky">Tambah Appointment</h2>
-
-          <button
-            type="button"
-            class="detail-close-btn"
-            onclick="closeAppointmentModal()"
-            aria-label="Tutup modal appointment"
-            title="Tutup"
-          >
+          <button type="button" class="detail-close-btn" onclick="closeAppointmentModal()" aria-label="Tutup modal appointment" title="Tutup">
             <svg viewBox="0 0 24 24" fill="none" stroke-width="2">
               <path d="M6 6l12 12"></path>
               <path d="M18 6l-12 12"></path>
@@ -402,30 +395,29 @@
             <input type="hidden" id="appointment_id_hidden">
             <input type="hidden" id="appointment_patient_id">
 
+            <div class="patient-form-section">Pasien</div>
             <label>Cari Pasien</label>
-            <input
-              type="text"
-              id="appointment_patient_search"
-              placeholder="Ketik minimal 2 huruf nama, kode pasien, atau no HP..."
-              autocomplete="off"
-              oninput="handleAppointmentPatientSearch()"
-            >
+            <input type="text" id="appointment_patient_search" placeholder="Ketik minimal 2 huruf nama, kode pasien, atau no HP..." autocomplete="off" oninput="handleAppointmentPatientSearch()">
             <div id="error_appointment_patient_id" class="field-error"></div>
-
             <div id="appointment_patient_selected" class="patient-selected-card"></div>
-
             <div id="appointment_patient_warning" class="field-error" style="display:none;"></div>
-
             <div id="appointment_patient_results" class="patient-search-results"></div>
 
-            <label>Tanggal Appointment</label>
-            <input type="date" id="appointment_date" required>
-            <div id="error_appointment_date" class="field-error"></div>
+            <div class="patient-form-section">Jadwal</div>
+            <div class="patient-form-grid">
+              <div>
+                <label>Tanggal</label>
+                <input type="date" id="appointment_date" required>
+                <div id="error_appointment_date" class="field-error"></div>
+              </div>
+              <div>
+                <label>Jam</label>
+                <input type="time" id="appointment_time" required>
+                <div id="error_appointment_time" class="field-error"></div>
+              </div>
+            </div>
 
-            <label>Jam Appointment</label>
-            <input type="time" id="appointment_time" required>
-            <div id="error_appointment_time" class="field-error"></div>
-
+            <div class="patient-form-section">Detail</div>
             <label>Keluhan</label>
             <textarea id="appointment_complaint" required></textarea>
             <div id="error_appointment_complaint" class="field-error"></div>
@@ -467,7 +459,7 @@
         </div>
 
         <div class="detail-modal-content-scroll">
-          <div id="appointmentDetailContent" class="detail-grid"></div>
+          <div id="appointmentDetailContent"></div>
         </div>
       </div>
     </div>

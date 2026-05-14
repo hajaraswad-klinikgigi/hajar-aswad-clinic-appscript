@@ -1198,23 +1198,21 @@
     if (!content) return;
 
     content.innerHTML = `
-      <div class="detail-label">Appointment ID</div>
-      <div class="detail-value">${escapeHtml(a.appointment_id || '')}</div>
-
-      <div class="detail-label">Pasien</div>
-      <div class="detail-value">${escapeHtml(a.patient_name || '')}</div>
-
-      <div class="detail-label">Tanggal</div>
-      <div class="detail-value">${formatAppointmentDateDisplay(a.appointment_date)}</div>
-
-      <div class="detail-label">Jam</div>
-      <div class="detail-value">${formatAppointmentTimeDisplay(a.appointment_time)}</div>
-
-      <div class="detail-label">Keluhan</div>
-      <div class="detail-value">${escapeHtml(a.complaint || '-')}</div>
-
-      <div class="detail-label">Status</div>
-      <div class="detail-value">${getAppointmentStatusBadge(String(a.status || '').toLowerCase())}</div>
+      <div class="pt-section-title">Informasi Appointment</div>
+      <div class="pt-detail-grid">
+        <div class="pt-detail-label">Appointment ID</div>
+        <div class="pt-detail-value">${escapeHtml(a.appointment_id || '')}</div>
+        <div class="pt-detail-label">Pasien</div>
+        <div class="pt-detail-value">${escapeHtml(a.patient_name || '')}</div>
+        <div class="pt-detail-label">Tanggal</div>
+        <div class="pt-detail-value">${formatAppointmentDateDisplay(a.appointment_date)}</div>
+        <div class="pt-detail-label">Jam</div>
+        <div class="pt-detail-value">${formatAppointmentTimeDisplay(a.appointment_time)}</div>
+        <div class="pt-detail-label">Keluhan</div>
+        <div class="pt-detail-value">${escapeHtml(a.complaint || '-')}</div>
+        <div class="pt-detail-label">Status</div>
+        <div class="pt-detail-value">${getAppointmentStatusBadge(String(a.status || '').toLowerCase())}</div>
+      </div>
     `;
   }
 
