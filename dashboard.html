@@ -89,6 +89,8 @@
 
     if (topServices) topServices.innerHTML = `<div class="dashboard-empty">Memuat top tindakan...</div>`;
     if (latestAppt) latestAppt.innerHTML = `<div class="dashboard-empty">Memuat appointment...</div>`;
+    const feedbackSection = document.getElementById('dashboardFeedbackSection');
+    if (feedbackSection) feedbackSection.innerHTML = `<div class="dashboard-empty">Memuat kepuasan layanan...</div>`;
   }
 
   function renderDashboardError(message) {
@@ -105,6 +107,8 @@
     if (statStrip) statStrip.innerHTML = '';
     if (topServices) topServices.innerHTML = `<div class="dashboard-empty">${msg}</div>`;
     if (latestAppt) latestAppt.innerHTML = `<div class="dashboard-empty">${msg}</div>`;
+    const feedbackSection = document.getElementById('dashboardFeedbackSection');
+    if (feedbackSection) feedbackSection.innerHTML = `<div class="dashboard-empty">${msg}</div>`;
   }
 
   function renderDashboardEmpty(message) {
@@ -174,6 +178,8 @@
             <div id="latestAppt"></div>
           </div>
         </div>
+
+        <div id="dashboardFeedbackSection"></div>
       </div>
     `;
 
@@ -229,6 +235,7 @@
     renderStatStrip(k, d.feedback_summary || null);
     renderTopServices(d.top_services || []);
     renderLatestAppointments(d.latest_appointments || []);
+    renderDashboardFeedbackSection(d.feedback_summary || null);
   }
 
   function renderDashboardPeriod(period) {
@@ -397,6 +404,76 @@
             </div>
           `;
         }).join('')}
+      </div>
+    `;
+  }
+
+  function renderDashboardFeedbackSection(summary) {
+    const el = document.getElementById('dashboardFeedbackSection');
+    if (!el) return;
+
+    const s = summary || {};
+    const latest = Array.isArray(s.latest_feedbacks) ? s.latest_feedbacks : [];
+
+    el.innerHTML = `
+      <div class="dashboard-panel">
+        <div class="dashboard-panel-header">
+          <h3>Kepuasan Layanan</h3>
+          <span class="dashboard-panel-badge">Feedback</span>
+        </div>
+
+        <div class="dashboard-feedback-stats">
+          <div class="dashboard-feedback-stat dashboard-feedback-stat-primary">
+            <div class="dashboard-feedback-stat-label">Feedback Masuk</div>
+            <div class="dashboard-feedback-stat-value">${Number(s.submitted_count || 0)}</div>
+          </div>
+          <div class="dashboard-feedback-stat dashboard-feedback-stat-success">
+            <div class="dashboard-feedback-stat-label">Rata-rata Rating</div>
+            <div class="dashboard-feedback-stat-value">${formatDashboardRating(s.average_rating || 0)}</div>
+          </div>
+          <div class="dashboard-feedback-stat dashboard-feedback-stat-success">
+            <div class="dashboard-feedback-stat-label">Puas</div>
+            <div class="dashboard-feedback-stat-value">${Number(s.satisfied_count || 0)}</div>
+          </div>
+          <div class="dashboard-feedback-stat">
+            <div class="dashboard-feedback-stat-label">Netral</div>
+            <div class="dashboard-feedback-stat-value">${Number(s.neutral_count || 0)}</div>
+          </div>
+          <div class="dashboard-feedback-stat dashboard-feedback-stat-danger">
+            <div class="dashboard-feedback-stat-label">Kurang Puas</div>
+            <div class="dashboard-feedback-stat-value">${Number(s.unsatisfied_count || 0)}</div>
+          </div>
+          <div class="dashboard-feedback-stat">
+            <div class="dashboard-feedback-stat-label">Belum Diisi</div>
+            <div class="dashboard-feedback-stat-value">${Number(s.pending_count || 0)}</div>
+          </div>
+        </div>
+
+        <div class="dashboard-panel-divider"></div>
+        <div class="dashboard-panel-subtitle">Feedback Terbaru</div>
+
+        ${latest.length
+          ? `<div class="dashboard-feedback-list">
+              ${latest.map(function(row) {
+                return `
+                  <div class="dashboard-feedback-item">
+                    <div class="dashboard-feedback-item-head">
+                      <span class="dashboard-feedback-item-name">${row.patient_name || '-'}</span>
+                      <span class="dashboard-feedback-item-meta">
+                        ${formatDashboardDateDmy(row.submitted_ymd || row.submitted_at || '')}
+                        &bull; Rating ${formatDashboardRating(row.rating || 0)}
+                        &bull; ${row.billing_id || '-'}
+                      </span>
+                    </div>
+                    ${row.comment
+                      ? `<div class="dashboard-feedback-item-comment">${row.comment}</div>`
+                      : ''}
+                  </div>
+                `;
+              }).join('')}
+            </div>`
+          : `<div class="dashboard-empty">Belum ada feedback pada periode ini.</div>`
+        }
       </div>
     `;
   }
