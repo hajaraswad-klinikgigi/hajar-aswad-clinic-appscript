@@ -3127,12 +3127,8 @@ function renderFinanceFeedbackDetailPendingHtml(feedback) {
 
 function renderFinanceFeedbackDetailSubmittedItemHtml(label, value, isFull) {
   return `
-    <div class="finance-feedback-detail-item${isFull ? ' full' : ''}">
-      <div class="finance-feedback-detail-label">${escapeFinanceHtml(label || '-')}</div>
-      <div class="finance-feedback-detail-value">
-        ${escapeFinanceHtml(value || '-')}
-      </div>
-    </div>
+    <div class="pt-detail-label">${escapeFinanceHtml(label || '-')}</div>
+    <div class="pt-detail-value">${escapeFinanceHtml(value || '-')}</div>
   `;
 }
 
@@ -3155,7 +3151,7 @@ function renderFinanceFeedbackDetailSubmittedHtml(feedback) {
           ${getFinanceFeedbackStatusBadge(feedback.feedback_status)}
         </div>
 
-        <div class="finance-feedback-detail-grid">
+        <div class="pt-detail-grid">
           ${renderFinanceFeedbackDetailSubmittedItemHtml(
             'Kualitas Layanan',
             getFinanceFeedbackChoiceLabel(feedback.service_quality),
