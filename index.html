@@ -127,14 +127,7 @@
       <div class="modal-box modal-box-sticky patient-modal-box">
         <div class="detail-modal-header-sticky">
           <h2 id="patientModalTitle" class="detail-modal-title-sticky">Tambah Pasien</h2>
-
-          <button
-            type="button"
-            class="detail-close-btn"
-            onclick="closePatientModal()"
-            aria-label="Tutup modal pasien"
-            title="Tutup"
-          >
+          <button type="button" class="detail-close-btn" onclick="closePatientModal()" aria-label="Tutup modal pasien" title="Tutup">
             <svg viewBox="0 0 24 24" fill="none" stroke-width="2">
               <path d="M6 6l12 12"></path>
               <path d="M18 6l-12 12"></path>
@@ -146,96 +139,92 @@
           <form onsubmit="submitPatient(event)">
             <input type="hidden" id="patient_id_hidden">
 
-            <label>Nama Lengkap</label>
-            <input
-              type="text"
-              id="patient_full_name"
-              required
-              oninput="formatPatientNameInput(this)"
-            >
-            <div id="error_patient_full_name" class="field-error"></div>
+            <div class="patient-form-section">Identitas</div>
+            <div class="patient-form-grid">
+              <div class="patient-form-col2">
+                <label>Nama Lengkap</label>
+                <input type="text" id="patient_full_name" required oninput="formatPatientNameInput(this)">
+                <div id="error_patient_full_name" class="field-error"></div>
+              </div>
+              <div>
+                <label>Gender</label>
+                <select id="patient_gender" required>
+                  <option value="">Pilih gender</option>
+                  <option value="Laki-laki">Laki-laki</option>
+                  <option value="Perempuan">Perempuan</option>
+                </select>
+                <div id="error_patient_gender" class="field-error"></div>
+              </div>
+              <div>
+                <label>Tanggal Lahir</label>
+                <input type="text" id="patient_birth_date" placeholder="dd-mm-yyyy" inputmode="numeric" maxlength="10" oninput="formatBirthDateInput(this)" required>
+                <div id="error_patient_birth_date" class="field-error"></div>
+              </div>
+            </div>
 
-            <label>Gender</label>
-            <select id="patient_gender" required>
-              <option value="">Pilih gender</option>
-              <option value="Laki-laki">Laki-laki</option>
-              <option value="Perempuan">Perempuan</option>
-            </select>
-            <div id="error_patient_gender" class="field-error"></div>
+            <div class="patient-form-section">Kontak</div>
+            <div class="patient-form-grid">
+              <div>
+                <label>No HP</label>
+                <input type="text" id="patient_phone">
+                <div id="error_patient_phone" class="field-error"></div>
+              </div>
+              <div>
+                <label>Email</label>
+                <input type="email" id="patient_email">
+                <div id="error_patient_email" class="field-error"></div>
+              </div>
+            </div>
 
-            <label>Tanggal Lahir</label>
-            <input
-              type="text"
-              id="patient_birth_date"
-              placeholder="dd-mm-yyyy"
-              inputmode="numeric"
-              maxlength="10"
-              oninput="formatBirthDateInput(this)"
-              required
-            >
-            <div id="error_patient_birth_date" class="field-error"></div>
-
-            <label>No HP</label>
-            <input type="text" id="patient_phone">
-            <div id="error_patient_phone" class="field-error"></div>
-
-            <label>Email</label>
-            <input type="email" id="patient_email">
-            <div id="error_patient_email" class="field-error"></div>
-
-            <button
-              type="button"
-              id="patientGuardianToggleBtn"
-              class="btn btn-secondary"
-              onclick="togglePatientGuardianSection()"
-              style="width:100%; justify-content:space-between; margin-bottom:12px;"
-            >
+            <button type="button" id="patientGuardianToggleBtn" class="patient-guardian-toggle" onclick="togglePatientGuardianSection()">
               <span>Data Wali</span>
               <span id="patientGuardianToggleIcon">▼</span>
             </button>
 
-            <div
-              id="patientGuardianRuleText"
-              style="display:none; margin-top:-2px; margin-bottom:14px; font-size:12px; line-height:1.5; color:#64748b;"
-            ></div>
+            <div id="patientGuardianRuleText" style="display:none; margin-top:8px; margin-bottom:4px; font-size:12px; line-height:1.5; color:#64748b;"></div>
 
-            <div id="patientGuardianSectionWrap" style="display:none;">
-              <label>Nama Wali</label>
-              <input
-                type="text"
-                id="patient_guardian_name"
-                oninput="formatPatientNameInput(this)"
-              >
-              <div id="error_patient_guardian_name" class="field-error"></div>
-
-              <label>Hubungan Wali</label>
-              <input
-                type="text"
-                id="patient_guardian_relationship"
-                placeholder="Contoh: Ayah, Ibu, Wali"
-              >
-              <div id="error_patient_guardian_relationship" class="field-error"></div>
-
-              <label>No HP Wali</label>
-              <input type="text" id="patient_guardian_phone">
-              <div id="error_patient_guardian_phone" class="field-error"></div>
-
-              <label>Email Wali</label>
-              <input type="email" id="patient_guardian_email">
-              <div id="error_patient_guardian_email" class="field-error"></div>
+            <div id="patientGuardianSectionWrap" style="display:none; margin-top:10px;">
+              <div class="patient-form-grid">
+                <div>
+                  <label>Nama Wali</label>
+                  <input type="text" id="patient_guardian_name" oninput="formatPatientNameInput(this)">
+                  <div id="error_patient_guardian_name" class="field-error"></div>
+                </div>
+                <div>
+                  <label>Hubungan Wali</label>
+                  <input type="text" id="patient_guardian_relationship" placeholder="Contoh: Ayah, Ibu, Wali">
+                  <div id="error_patient_guardian_relationship" class="field-error"></div>
+                </div>
+                <div>
+                  <label>No HP Wali</label>
+                  <input type="text" id="patient_guardian_phone">
+                  <div id="error_patient_guardian_phone" class="field-error"></div>
+                </div>
+                <div>
+                  <label>Email Wali</label>
+                  <input type="email" id="patient_guardian_email">
+                  <div id="error_patient_guardian_email" class="field-error"></div>
+                </div>
+              </div>
             </div>
 
+            <div class="patient-form-section">Catatan</div>
             <label>Alamat</label>
             <textarea id="patient_address" required></textarea>
             <div id="error_patient_address" class="field-error"></div>
 
-            <label>Catatan Alergi</label>
-            <textarea id="patient_allergy_notes"></textarea>
-            <div id="error_patient_allergy_notes" class="field-error"></div>
-
-            <label>Catatan Medis</label>
-            <textarea id="patient_medical_notes"></textarea>
-            <div id="error_patient_medical_notes" class="field-error"></div>
+            <div class="patient-form-grid">
+              <div>
+                <label>Catatan Alergi</label>
+                <textarea id="patient_allergy_notes"></textarea>
+                <div id="error_patient_allergy_notes" class="field-error"></div>
+              </div>
+              <div>
+                <label>Catatan Medis</label>
+                <textarea id="patient_medical_notes"></textarea>
+                <div id="error_patient_medical_notes" class="field-error"></div>
+              </div>
+            </div>
 
             <div class="modal-actions modal-actions-right">
               <button type="button" class="btn btn-secondary" onclick="closePatientModal()">Batal</button>

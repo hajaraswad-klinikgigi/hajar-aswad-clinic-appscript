@@ -1044,125 +1044,87 @@
     const p = patient || {};
     const isLoadingMedical = medicalRecords === null;
     const records = Array.isArray(medicalRecords) ? medicalRecords : [];
-    // null = loading state, undefined/falsy = empty state
     const orthoRecall = orthoRecallSummary === null
       ? null
       : (orthoRecallSummary || getEmptyPatientOrthoRecallSummary());
 
+    const hasGuardian = !!(p.guardian_name || p.guardian_phone || p.guardian_email);
+
     const profileHtml = `
-      <div class="content-card" style="height:100%;">
-        <h3 style="margin-top:0; margin-bottom:16px;">Profil Pasien</h3>
-
-        <div style="margin-bottom:10px;">
-          <strong>Patient ID</strong><br>
-          <div>${escapeHtml(p.patient_id || '-')}</div>
+      <div class="content-card">
+        <div class="pt-section-title">Identitas</div>
+        <div class="pt-detail-grid">
+          <div class="pt-detail-label">Patient ID</div>
+          <div class="pt-detail-value">${escapeHtml(p.patient_id || '-')}</div>
+          <div class="pt-detail-label">Patient Code</div>
+          <div class="pt-detail-value">${escapeHtml(p.patient_code || '-')}</div>
+          <div class="pt-detail-label">Nama</div>
+          <div class="pt-detail-value">${escapeHtml(p.full_name || '-')}</div>
+          <div class="pt-detail-label">Gender</div>
+          <div class="pt-detail-value">${escapeHtml(p.gender || '-')}</div>
+          <div class="pt-detail-label">Tanggal Lahir</div>
+          <div class="pt-detail-value">${formatDateDmy(p.birth_date || '-')}</div>
         </div>
 
-        <div style="margin-bottom:10px;">
-          <strong>Patient Code</strong><br>
-          <div>${escapeHtml(p.patient_code || '-')}</div>
+        <div class="pt-section-title">Kontak</div>
+        <div class="pt-detail-grid">
+          <div class="pt-detail-label">No HP</div>
+          <div class="pt-detail-value">${escapeHtml(p.phone || '-')}</div>
+          <div class="pt-detail-label">Email</div>
+          <div class="pt-detail-value">${escapeHtml(p.email || '-')}</div>
         </div>
 
-        <div style="margin-bottom:10px;">
-          <strong>Nama Lengkap</strong><br>
-          <div>${escapeHtml(p.full_name || '-')}</div>
-        </div>
+        ${hasGuardian ? `
+          <div class="pt-section-title">Data Wali</div>
+          <div class="pt-detail-grid">
+            <div class="pt-detail-label">Nama Wali</div>
+            <div class="pt-detail-value">${escapeHtml(p.guardian_name || '-')}</div>
+            <div class="pt-detail-label">Hubungan</div>
+            <div class="pt-detail-value">${escapeHtml(p.guardian_relationship || '-')}</div>
+            <div class="pt-detail-label">No HP Wali</div>
+            <div class="pt-detail-value">${escapeHtml(p.guardian_phone || '-')}</div>
+            <div class="pt-detail-label">Email Wali</div>
+            <div class="pt-detail-value">${escapeHtml(p.guardian_email || '-')}</div>
+          </div>
+        ` : ''}
 
-        <div style="margin-bottom:10px;">
-          <strong>Gender</strong><br>
-          <div>${escapeHtml(p.gender || '-')}</div>
-        </div>
-
-        <div style="margin-bottom:10px;">
-          <strong>Tanggal Lahir</strong><br>
-          <div>${formatDateDmy(p.birth_date || '-')}</div>
-        </div>
-
-        <div style="margin-bottom:10px;">
-          <strong>No HP</strong><br>
-          <div>${escapeHtml(p.phone || '-')}</div>
-        </div>
-
-        <div style="margin-bottom:10px;">
-          <strong>Email</strong><br>
-          <div>${escapeHtml(p.email || '-')}</div>
-        </div>
-
-        <div style="margin-bottom:10px;">
-          <strong>Nama Wali</strong><br>
-          <div>${escapeHtml(p.guardian_name || '-')}</div>
-        </div>
-
-        <div style="margin-bottom:10px;">
-          <strong>Hubungan Wali</strong><br>
-          <div>${escapeHtml(p.guardian_relationship || '-')}</div>
-        </div>
-
-        <div style="margin-bottom:10px;">
-          <strong>No HP Wali</strong><br>
-          <div>${escapeHtml(p.guardian_phone || '-')}</div>
-        </div>
-
-        <div style="margin-bottom:10px;">
-          <strong>Email Wali</strong><br>
-          <div>${escapeHtml(p.guardian_email || '-')}</div>
-        </div>
-
-        <div style="margin-bottom:10px;">
-          <strong>Alamat</strong><br>
-          <div>${escapeHtml(p.address || '-')}</div>
-        </div>
-
-        <div style="margin-bottom:10px;">
-          <strong>Catatan Alergi</strong><br>
-          <div>${escapeHtml(p.allergy_notes || '-')}</div>
-        </div>
-
-        <div>
-          <strong>Catatan Medis</strong><br>
-          <div>${escapeHtml(p.medical_notes || '-')}</div>
+        <div class="pt-section-title">Catatan</div>
+        <div class="pt-detail-grid">
+          <div class="pt-detail-label">Alamat</div>
+          <div class="pt-detail-value">${escapeHtml(p.address || '-')}</div>
+          <div class="pt-detail-label">Alergi</div>
+          <div class="pt-detail-value">${escapeHtml(p.allergy_notes || '-')}</div>
+          <div class="pt-detail-label">Catatan Medis</div>
+          <div class="pt-detail-value">${escapeHtml(p.medical_notes || '-')}</div>
         </div>
       </div>
     `;
 
     const medicalHtml = `
-      <div class="content-card" style="height:100%;">
-        <h3 style="margin-top:0; margin-bottom:16px;">Riwayat Rekam Medis</h3>
-        ${
-          isLoadingMedical
-            ? '<div style="color:#64748b;">Memuat rekam medis...</div>'
-            : records.length
+      <div class="content-card">
+        <div class="pt-section-title">Riwayat Rekam Medis</div>
+        ${isLoadingMedical
+          ? '<div class="pt-loading">Memuat rekam medis...</div>'
+          : records.length
             ? records.map(function(r, idx) {
                 return `
-                  <div style="border:1px solid rgba(255,255,255,0.08); border-radius:12px; padding:14px; margin-bottom:${idx === records.length - 1 ? '0' : '12px'}; background:#1e2235;">
-                    <div style="margin-bottom:8px;">
-                      <strong>Tanggal Kunjungan</strong><br>
-                      <div>${formatDateDmy(r.visit_date || '-')}</div>
-                    </div>
-
-                    <div style="margin-bottom:8px;">
-                      <strong>Dokter</strong><br>
-                      <div>${escapeHtml(r.doctor_name || '-')}</div>
-                    </div>
-
-                    <div style="margin-bottom:8px;">
-                      <strong>Keluhan Utama</strong><br>
-                      <div>${escapeHtml(r.chief_complaint || '-')}</div>
-                    </div>
-
-                    <div style="margin-bottom:8px;">
-                      <strong>Diagnosis</strong><br>
-                      <div>${escapeHtml(r.diagnosis || '-')}</div>
-                    </div>
-
-                    <div>
-                      <strong>Catatan Klinis</strong><br>
-                      <div>${escapeHtml(r.clinical_notes || '-')}</div>
+                  <div class="pt-record-card${idx === records.length - 1 ? ' pt-record-last' : ''}">
+                    <div class="pt-detail-grid">
+                      <div class="pt-detail-label">Tanggal</div>
+                      <div class="pt-detail-value">${formatDateDmy(r.visit_date || '-')}</div>
+                      <div class="pt-detail-label">Dokter</div>
+                      <div class="pt-detail-value">${escapeHtml(r.doctor_name || '-')}</div>
+                      <div class="pt-detail-label">Keluhan</div>
+                      <div class="pt-detail-value">${escapeHtml(r.chief_complaint || '-')}</div>
+                      <div class="pt-detail-label">Diagnosis</div>
+                      <div class="pt-detail-value">${escapeHtml(r.diagnosis || '-')}</div>
+                      <div class="pt-detail-label">Catatan Klinis</div>
+                      <div class="pt-detail-value">${escapeHtml(r.clinical_notes || '-')}</div>
                     </div>
                   </div>
                 `;
               }).join('')
-            : '<div>Belum ada riwayat rekam medis</div>'
+            : '<div class="pt-empty">Belum ada riwayat rekam medis.</div>'
         }
       </div>
     `;
@@ -1170,28 +1132,22 @@
     const orthoRecallHtml = renderPatientOrthoRecallSection(orthoRecall);
 
     return `
-      <div style="display:grid; grid-template-columns: 320px 1fr; gap:16px; align-items:start;">
+      <div class="pt-detail-layout">
         <div class="patient-detail-left-stack">
           ${profileHtml}
           ${orthoRecallHtml}
         </div>
-
         ${medicalHtml}
       </div>
 
-      <div id="patientDetailSecondaryWrap" style="margin-top:16px;">
+      <div id="patientDetailSecondaryWrap" style="margin-top:14px;">
         <div class="content-card">
-          <h3 style="margin-top:0; margin-bottom:16px;">Riwayat Treatment</h3>
-          <div style="color:#64748b;">Memuat riwayat treatment...</div>
+          <div class="pt-section-title">Riwayat Treatment</div>
+          <div class="pt-loading">Memuat riwayat treatment...</div>
         </div>
-
-        <div style="margin-top:16px;">
-          <div class="content-card">
-            <div style="display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap; margin-bottom:16px;">
-              <h3 style="margin:0;">Foto Before / After</h3>
-            </div>
-            <div style="color:#64748b;">Memuat dokumentasi foto...</div>
-          </div>
+        <div class="content-card" style="margin-top:14px;">
+          <div class="pt-section-title">Foto Before / After</div>
+          <div class="pt-loading">Memuat dokumentasi foto...</div>
         </div>
       </div>
     `;

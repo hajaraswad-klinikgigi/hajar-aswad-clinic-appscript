@@ -509,4 +509,120 @@
     min-width: 140px;
     margin-bottom: 0;
   }
+
+  /* =========================================================
+     PATIENT FORM MODAL — 2-column grid + section dividers
+     ========================================================= */
+  .patient-form-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0 16px;
+  }
+
+  .patient-form-col2 {
+    grid-column: 1 / -1;
+  }
+
+  .patient-form-section {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    color: #6b7280;
+    margin: 16px 0 10px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+  }
+
+  .patient-guardian-toggle {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 10px;
+    padding: 9px 14px;
+    font-size: 12px;
+    font-weight: 700;
+    color: #94a3b8;
+    cursor: pointer;
+    margin-bottom: 0;
+    min-height: 0;
+    box-shadow: none;
+    margin-top: 4px;
+  }
+
+  .patient-guardian-toggle:hover {
+    background: rgba(255, 255, 255, 0.07);
+    color: #f1f5f9;
+    transform: none;
+    box-shadow: none;
+  }
+
+  /* =========================================================
+     PATIENT DETAIL MODAL — compact label/value grid
+     ========================================================= */
+  .pt-detail-layout {
+    display: grid;
+    grid-template-columns: 290px 1fr;
+    gap: 14px;
+    align-items: start;
+  }
+
+  .pt-section-title {
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.07em;
+    color: #6b7280;
+    margin: 14px 0 10px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+  }
+
+  .content-card > .pt-section-title:first-child {
+    margin-top: 0;
+  }
+
+  .pt-detail-grid {
+    display: grid;
+    grid-template-columns: 110px 1fr;
+    gap: 7px 12px;
+    align-items: start;
+    margin-bottom: 4px;
+  }
+
+  .pt-detail-label {
+    font-size: 12px;
+    font-weight: 600;
+    color: #64748b;
+    line-height: 1.5;
+    padding-top: 1px;
+  }
+
+  .pt-detail-value {
+    font-size: 13px;
+    color: #e2e8f0;
+    line-height: 1.5;
+    word-break: break-word;
+  }
+
+  .pt-record-card {
+    border: 1px solid rgba(255, 255, 255, 0.07);
+    border-radius: 12px;
+    padding: 12px 14px;
+    background: #1e2235;
+    margin-bottom: 10px;
+  }
+
+  .pt-record-last {
+    margin-bottom: 0;
+  }
+
+  .pt-loading,
+  .pt-empty {
+    font-size: 13px;
+    color: #64748b;
+  }
 </style>
