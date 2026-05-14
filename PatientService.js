@@ -330,6 +330,28 @@ function getTreatmentsByPatientId(patientId, options) {
       const treatmentId = String(row.treatment_id || '').trim();
 
       normalizedTreatment.items = itemsMap[treatmentId] || [];
+
+      try {
+        const billing = treatmentId &&
+          typeof TreatmentRepository !== 'undefined' &&
+          typeof TreatmentRepository.findBillingByTreatmentId === 'function'
+          ? TreatmentRepository.findBillingByTreatmentId(treatmentId, opts)
+          : null;
+
+        if (billing) {
+          normalizedTreatment.has_billing        = true;
+          normalizedTreatment.billing_subtotal   = Number(billing.subtotal        || 0);
+          normalizedTreatment.billing_discount   = Number(billing.discount_total  || 0);
+          normalizedTreatment.billing_grand      = Number(billing.grand_total     || 0);
+          normalizedTreatment.billing_paid       = Number(billing.paid_total      || 0);
+          normalizedTreatment.billing_status     = String(billing.payment_status  || '');
+        } else {
+          normalizedTreatment.has_billing = false;
+        }
+      } catch (e) {
+        normalizedTreatment.has_billing = false;
+      }
+
       return normalizedTreatment;
     })
     .sort(function(a, b) {

@@ -561,6 +561,41 @@
     return 'Rp ' + num.toLocaleString('id-ID');
   }
 
+  function formatPatientTreatmentBilling(t) {
+    if (!t.has_billing) return '<span class="pt-empty">Belum ada billing</span>';
+
+    const sub   = Number(t.billing_subtotal || 0);
+    const disc  = Number(t.billing_discount || 0);
+    const grand = Number(t.billing_grand    || 0);
+    const paid  = Number(t.billing_paid     || 0);
+    const status = String(t.billing_status  || '').toLowerCase();
+
+    let biayaHtml;
+
+    if (sub === 0 && grand === 0) {
+      biayaHtml = '<span class="status-badge completed">Gratis</span>';
+    } else if (sub > 0 && grand === 0) {
+      biayaHtml = '<span class="status-badge completed">Diskon penuh</span> ' +
+        '<span style="text-decoration:line-through;color:#64748b;">' + formatRupiah(sub) + '</span>';
+    } else if (disc > 0) {
+      biayaHtml = formatRupiah(grand) +
+        '<div style="font-size:12px;color:#64748b;margin-top:2px;">Diskon ' + formatRupiah(disc) +
+        ' dari ' + formatRupiah(sub) + '</div>';
+    } else {
+      biayaHtml = formatRupiah(grand);
+    }
+
+    if (status === 'paid') {
+      biayaHtml += ' <span class="status-badge completed">Lunas</span>';
+    } else if (status === 'partial') {
+      biayaHtml += ' <span class="status-badge default">Partial</span>';
+    } else if (grand > 0 && paid === 0) {
+      biayaHtml += ' <span class="status-badge cancelled">Belum dibayar</span>';
+    }
+
+    return biayaHtml;
+  }
+
   function escapeHtml(value) {
     return String(value || '')
       .replace(/&/g, '&amp;')
@@ -1145,9 +1180,6 @@
                         <thead>
                           <tr>
                             <th class="pt-items-th">Tindakan</th>
-                            <th class="pt-items-th pt-items-center">Qty</th>
-                            <th class="pt-items-th pt-items-right">Harga</th>
-                            <th class="pt-items-th pt-items-right">Subtotal</th>
                           </tr>
                         </thead>
                         <tbody>
@@ -1155,9 +1187,6 @@
                             return `
                               <tr>
                                 <td class="pt-items-td">${escapeHtml(item.service_name || '-')}</td>
-                                <td class="pt-items-td pt-items-center">${escapeHtml(item.qty || 0)}</td>
-                                <td class="pt-items-td pt-items-right">${formatRupiah(item.unit_price || 0)}</td>
-                                <td class="pt-items-td pt-items-right">${formatRupiah(item.subtotal || 0)}</td>
                               </tr>
                             `;
                           }).join('')}
@@ -1180,8 +1209,8 @@
                       <div class="pt-detail-value">${escapeHtml(t.diagnosis || '-')}</div>
                       <div class="pt-detail-label">Catatan</div>
                       <div class="pt-detail-value">${escapeHtml(t.notes || '-')}</div>
-                      <div class="pt-detail-label">Total Biaya</div>
-                      <div class="pt-detail-value">${formatRupiah(t.total_cost || 0)}</div>
+                      <div class="pt-detail-label">Biaya</div>
+                      <div class="pt-detail-value">${formatPatientTreatmentBilling(t)}</div>
                     </div>
                     ${itemsHtml}
                   </div>
