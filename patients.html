@@ -651,8 +651,8 @@
     if (orthoRecallSummary === null) {
       return `
         <div class="content-card patient-ortho-recall-card">
-          <h3 class="patient-ortho-recall-title">Orthodontic Recall</h3>
-          <div class="patient-ortho-recall-empty" style="color:#64748b;">Memuat data recall...</div>
+          <div class="patient-ortho-recall-title">Orthodontic Recall</div>
+          <div class="pt-loading">Memuat data recall...</div>
         </div>
       `;
     }
@@ -663,10 +663,8 @@
     if (!summary.has_recall || !current) {
       return `
         <div class="content-card patient-ortho-recall-card">
-          <h3 class="patient-ortho-recall-title">Orthodontic Recall</h3>
-          <div class="patient-ortho-recall-empty">
-            Pasien ini belum memiliki program recall ortho.
-          </div>
+          <div class="patient-ortho-recall-title">Orthodontic Recall</div>
+          <div class="pt-empty">Pasien ini belum memiliki program recall ortho.</div>
         </div>
       `;
     }
@@ -983,34 +981,34 @@
       <div style="display:grid; grid-template-columns: 320px 1fr; gap:16px; align-items:start;">
         <div style="display:flex; flex-direction:column; gap:16px;">
           <div class="content-card" style="min-height:260px;">
-            <h3 style="margin-top:0; margin-bottom:16px;">Profil Pasien</h3>
-            <div style="color:#64748b;">Memuat profil pasien...</div>
+            <div class="pt-section-title">Profil Pasien</div>
+            <div class="pt-loading">Memuat profil pasien...</div>
           </div>
 
           <div class="content-card" style="min-height:220px;">
-            <div class="pt-section-title">Orthodontic Recall</div>
-            <div style="color:#64748b;">Memuat data recall...</div>
+            <div class="patient-ortho-recall-title">Orthodontic Recall</div>
+            <div class="pt-loading">Memuat data recall...</div>
           </div>
         </div>
 
         <div class="content-card" style="min-height:260px;">
-          <h3 style="margin-top:0; margin-bottom:16px;">Riwayat Rekam Medis</h3>
-          <div style="color:#64748b;">Memuat rekam medis...</div>
+          <div class="pt-section-title">Riwayat Rekam Medis</div>
+          <div class="pt-loading">Memuat rekam medis...</div>
         </div>
       </div>
 
       <div id="patientDetailSecondaryWrap" style="margin-top:16px;">
         <div class="content-card">
           <div class="pt-section-title">Riwayat Treatment</div>
-          <div style="color:#64748b;">Memuat riwayat treatment...</div>
+          <div class="pt-loading">Memuat riwayat treatment...</div>
         </div>
 
         <div style="margin-top:16px;">
           <div class="content-card">
-            <div style="display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap; margin-bottom:16px;">
-              <h3 style="margin:0;">Foto Before / After</h3>
+            <div class="patient-ortho-recall-header">
+              <div class="patient-ortho-recall-title">Foto Before / After</div>
             </div>
-            <div style="color:#64748b;">Memuat dokumentasi foto...</div>
+            <div class="pt-loading">Memuat dokumentasi foto...</div>
           </div>
         </div>
       </div>
@@ -1319,8 +1317,8 @@
     if (!Array.isArray(groups) || !groups.length) {
       return `
         <div class="content-card">
-          <div style="display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap; margin-bottom:16px;">
-            <h3 style="margin:0;">Foto Before / After</h3>
+          <div class="patient-ortho-recall-header">
+            <div class="patient-ortho-recall-title">Foto Before / After</div>
             <button type="button" class="btn btn-primary" onclick="openPatientPhotoUploadModal()">Tambah Foto</button>
           </div>
           <div class="patient-photo-empty">Belum ada dokumentasi foto</div>
@@ -1330,8 +1328,8 @@
 
     return `
       <div class="content-card">
-        <div style="display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap; margin-bottom:16px;">
-          <h3 style="margin:0;">Foto Before / After</h3>
+        <div class="patient-ortho-recall-header">
+          <div class="patient-ortho-recall-title">Foto Before / After</div>
           <button type="button" class="btn btn-primary" onclick="openPatientPhotoUploadModal()">Tambah Foto</button>
         </div>
 
@@ -1522,7 +1520,7 @@
           if (!fullRes || !fullRes.success) {
             content.innerHTML = `
               <div class="content-card">
-                <h3 style="margin-top:0; margin-bottom:12px;">Detail Pasien</h3>
+                <div class="pt-section-title">Detail Pasien</div>
                 <div style="color:#b91c1c;">${escapeHtml((fullRes && fullRes.message) || 'Gagal mengambil detail pasien')}</div>
               </div>
             `;
@@ -1537,7 +1535,7 @@
 
           content.innerHTML = `
             <div class="content-card">
-              <h3 style="margin-top:0; margin-bottom:12px;">Detail Pasien</h3>
+              <div class="pt-section-title">Detail Pasien</div>
               <div style="color:#b91c1c;">Error: ${escapeHtml(err && err.message ? err.message : err)}</div>
             </div>
           `;
