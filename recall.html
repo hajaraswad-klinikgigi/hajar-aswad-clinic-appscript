@@ -165,17 +165,10 @@
       </div>
 
       <div id="recallContactModal" class="modal hidden">
-        <div class="modal-box modal-box-sticky" style="width:680px; max-width:100%;">
+        <div class="modal-box modal-box-sticky recall-contact-modal-box">
           <div class="detail-modal-header-sticky">
             <h2 class="detail-modal-title-sticky">Log Recall Contact</h2>
-
-            <button
-              type="button"
-              class="detail-close-btn"
-              onclick="closeRecallContactModal()"
-              aria-label="Tutup modal recall contact"
-              title="Tutup"
-            >
+            <button type="button" class="detail-close-btn" onclick="closeRecallContactModal()" aria-label="Tutup modal recall contact" title="Tutup">
               <svg viewBox="0 0 24 24" fill="none" stroke-width="2">
                 <path d="M6 6l12 12"></path>
                 <path d="M18 6l-12 12"></path>
@@ -187,26 +180,33 @@
             <form onsubmit="submitRecallContact(event)">
               <input type="hidden" id="recall_contact_id_hidden">
 
-              <label>Patient</label>
-              <input type="text" id="recall_contact_patient_name" readonly>
+              <div class="patient-form-section">Info Pasien</div>
+              <div class="patient-form-grid">
+                <div>
+                  <label>Patient</label>
+                  <input type="text" id="recall_contact_patient_name" readonly>
+                </div>
+                <div>
+                  <label>Phone</label>
+                  <input type="text" id="recall_contact_phone" readonly>
+                </div>
+                <div>
+                  <label>Next Due</label>
+                  <input type="text" id="recall_contact_next_due" readonly>
+                </div>
+                <div>
+                  <label>Follow Up Status</label>
+                  <input type="text" id="recall_contact_followup_status" readonly>
+                </div>
+                <div>
+                  <label>Last Contact Date</label>
+                  <input type="text" id="recall_contact_last_date" readonly>
+                </div>
+              </div>
 
-              <label>Phone</label>
-              <input type="text" id="recall_contact_phone" readonly>
-
-              <label>Next Due</label>
-              <input type="text" id="recall_contact_next_due" readonly>
-
-              <label>Follow Up Status</label>
-              <input type="text" id="recall_contact_followup_status" readonly>
-
-              <label>Last Contact Date</label>
-              <input type="text" id="recall_contact_last_date" readonly>
-
+              <div class="patient-form-section">Log Kontak</div>
               <label>Contact Note</label>
-              <textarea
-                id="recall_contact_note"
-                placeholder="Contoh: Sudah dihubungi, pasien janji datang minggu depan"
-              ></textarea>
+              <textarea id="recall_contact_note" placeholder="Contoh: Sudah dihubungi, pasien janji datang minggu depan"></textarea>
               <div id="error_recall_contact_note" class="field-error"></div>
 
               <div class="modal-actions modal-actions-right">
@@ -218,17 +218,10 @@
         </div>
       </div>
       <div id="recallProgramActionModal" class="modal hidden">
-        <div class="modal-box modal-box-sticky" style="width:620px; max-width:100%;">
+        <div class="modal-box modal-box-sticky recall-program-action-modal-box">
           <div class="detail-modal-header-sticky">
             <h2 class="detail-modal-title-sticky" id="recallProgramActionTitle">Program Recall</h2>
-
-            <button
-              type="button"
-              class="detail-close-btn"
-              onclick="closeRecallProgramActionModal()"
-              aria-label="Tutup modal program recall"
-              title="Tutup"
-            >
+            <button type="button" class="detail-close-btn" onclick="closeRecallProgramActionModal()" aria-label="Tutup modal program recall" title="Tutup">
               <svg viewBox="0 0 24 24" fill="none" stroke-width="2">
                 <path d="M6 6l12 12"></path>
                 <path d="M18 6l-12 12"></path>
@@ -240,13 +233,10 @@
             <input type="hidden" id="recall_program_action_id_hidden">
             <input type="hidden" id="recall_program_action_type_hidden">
 
-            <div id="recallProgramActionMessage" style="color:#475569; line-height:1.6; margin-bottom:14px;"></div>
+            <div id="recallProgramActionMessage" class="recall-action-message"></div>
 
-            <label>Catatan / Alasan</label>
-            <textarea
-              id="recall_program_action_reason"
-              placeholder="Contoh: Program kontrol behel sudah selesai / pasien tidak melanjutkan program"
-            ></textarea>
+            <div class="patient-form-section">Catatan</div>
+            <textarea id="recall_program_action_reason" placeholder="Contoh: Program kontrol behel sudah selesai / pasien tidak melanjutkan program"></textarea>
 
             <div class="modal-actions modal-actions-right">
               <button type="button" class="btn btn-secondary" onclick="closeRecallProgramActionModal()">Batal</button>
