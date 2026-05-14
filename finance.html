@@ -3306,8 +3306,8 @@ function renderFinanceBillingDetailHeaderHtml(billing) {
     <div class="finance-detail-header-card">
       <div>
         <div class="finance-detail-label">Invoice</div>
-        <div class="finance-detail-invoice">${escapeFinanceHtml(data.billing_number || '-')}</div>
-        <div class="finance-detail-sub">${escapeFinanceHtml(data.billing_id || '-')}</div>
+        <div class="finance-detail-title">${escapeFinanceHtml(data.billing_number || '-')}</div>
+        <div class="finance-detail-subtitle">${escapeFinanceHtml(data.billing_id || '-')}</div>
       </div>
 
       <div class="finance-detail-statuses">
