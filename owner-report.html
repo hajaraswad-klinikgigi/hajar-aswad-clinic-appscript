@@ -325,13 +325,6 @@ function ownerRenderInContainer(containerId) {
         <div id="ownerDateControl" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
           <input type="date" id="ownerDateInput" class="finance-period-select"
             value="${ownerReportDate}" onchange="ownerOnDateChange(this.value)">
-          <a href="#" role="button" class="owner-pdf-btn" onclick="ownerPrintDailyReport();return false;" title="Download PDF Laporan Harian" aria-label="Download PDF Laporan Harian">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <polyline points="6 9 6 2 18 2 18 9"></polyline>
-              <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path>
-              <rect x="6" y="14" width="12" height="8"></rect>
-            </svg>
-          </a>
         </div>
       </div>
     </div>
@@ -377,18 +370,14 @@ function ownerSwitchTab(tab) {
     if (btn) btn.classList.toggle('active', t === tab);
   });
 
+  var pdfBtn = document.getElementById('ownerDailyPdfBtn');
+  if (pdfBtn) pdfBtn.style.display = tab === 'daily' ? '' : 'none';
+
   const dateCtrl = document.getElementById('ownerDateControl');
   if (dateCtrl) {
     if (tab === 'daily') {
       dateCtrl.innerHTML = `<input type="date" id="ownerDateInput" class="owner-date-input"
-        value="${ownerReportDate}" onchange="ownerOnDateChange(this.value)">
-        <a href="#" role="button" class="owner-pdf-btn" onclick="ownerPrintDailyReport();return false;" title="Download PDF Laporan Harian" aria-label="Download PDF Laporan Harian">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <polyline points="6 9 6 2 18 2 18 9"></polyline>
-            <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path>
-            <rect x="6" y="14" width="12" height="8"></rect>
-          </svg>
-        </a>`;
+        value="${ownerReportDate}" onchange="ownerOnDateChange(this.value)">`;
     } else if (tab === 'monthly') {
       dateCtrl.innerHTML = `
         <select id="ownerMonthInput" class="finance-period-select" onchange="ownerOnMonthChange()">
