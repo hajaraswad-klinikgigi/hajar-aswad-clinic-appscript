@@ -519,9 +519,7 @@ function ownerRenderDaily(data) {
       <div class="owner-kpi-card owner-kpi-teal">
         <div class="owner-kpi-label">Kas Masuk</div>
         <div class="owner-kpi-value">${ownerFmtRp(rev.total_cash_in)}</div>
-        <div style="font-size:12px;color:#6b7280;margin-top:4px;">
-          TF: ${ownerFmtRp(byPay.transfer)} | Cash: ${ownerFmtRp(byPay.cash)}
-        </div>
+        <div class="owner-kpi-sub">TF: ${ownerFmtRp(byPay.transfer)} &bull; Cash: ${ownerFmtRp(byPay.cash)}</div>
       </div>
       <div class="owner-kpi-card owner-kpi-red">
         <div class="owner-kpi-label">Total Pengeluaran</div>
@@ -534,12 +532,13 @@ function ownerRenderDaily(data) {
       <div class="owner-kpi-card">
         <div class="owner-kpi-label">Total Omset</div>
         <div class="owner-kpi-value">${ownerFmtRp(rev.total_billing)}</div>
+        <div class="owner-kpi-sub">sebelum diskon</div>
       </div>
       <div class="owner-kpi-card">
         <div class="owner-kpi-label">Jumlah Pasien</div>
         <div class="owner-kpi-value">${rev.patient_count || 0}</div>
       </div>
-      <div class="owner-kpi-card">
+      <div class="owner-kpi-card owner-kpi-red">
         <div class="owner-kpi-label">Piutang Baru</div>
         <div class="owner-kpi-value">${ownerFmtRp(rev.piutang_baru)}</div>
       </div>
@@ -667,12 +666,13 @@ function ownerRenderMonthly(data) {
       <div class="owner-kpi-card">
         <div class="owner-kpi-label">Total Omset</div>
         <div class="owner-kpi-value">${ownerFmtRp(rev.total_billing)}</div>
+        <div class="owner-kpi-sub">sebelum diskon</div>
       </div>
       <div class="owner-kpi-card">
         <div class="owner-kpi-label">Jumlah Pasien</div>
         <div class="owner-kpi-value">${rev.patient_count || 0}</div>
       </div>
-      <div class="owner-kpi-card">
+      <div class="owner-kpi-card owner-kpi-red">
         <div class="owner-kpi-label">Pengeluaran Bln Lalu</div>
         <div class="owner-kpi-value">${ownerFmtRp(prev.expense)}</div>
       </div>

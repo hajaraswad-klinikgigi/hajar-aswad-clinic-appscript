@@ -2123,6 +2123,7 @@ function renderFinanceKpiCard(card) {
     <div class="finance-kpi-card finance-kpi-${escapeFinanceHtml(card.tone)}">
       <div class="finance-kpi-label">${escapeFinanceHtml(card.label)}</div>
       <div class="finance-kpi-value">${escapeFinanceHtml(card.value)}</div>
+      ${card.sub ? `<div class="finance-kpi-sub">${escapeFinanceHtml(card.sub)}</div>` : ''}
     </div>
   `;
 }
@@ -2130,6 +2131,15 @@ function renderFinanceKpiCard(card) {
 function renderFinanceKpis(kpi) {
   const grid = document.getElementById('financeKpiGrid');
   if (!grid) return;
+
+  const grossBilling = Number(kpi.gross_billing || 0);
+  const discountTotal = Number(kpi.discount_total || 0);
+  const netBilling = Number(kpi.net_billing || 0);
+  const cashIn = Number(kpi.cash_in || 0);
+  const unpaidCount = Number(kpi.unpaid_billing_count || 0);
+
+  const cashInRate = netBilling > 0 ? Math.round((cashIn / netBilling) * 100) : 0;
+  const discountRate = grossBilling > 0 ? Math.round((discountTotal / grossBilling) * 100) : 0;
 
   const cards = [
     {
@@ -2139,32 +2149,37 @@ function renderFinanceKpis(kpi) {
     },
     {
       label: 'Gross Billing',
-      value: financeFormatRupiah(kpi.gross_billing || 0),
-      tone: 'neutral'
+      value: financeFormatRupiah(grossBilling),
+      tone: 'neutral',
+      sub: 'sebelum diskon'
     },
     {
       label: 'Diskon',
-      value: financeFormatRupiah(kpi.discount_total || 0),
-      tone: 'danger'
+      value: financeFormatRupiah(discountTotal),
+      tone: 'danger',
+      sub: discountRate + '% dari Gross Billing'
     },
     {
       label: 'Net Billing',
-      value: financeFormatRupiah(kpi.net_billing || 0),
-      tone: 'primary'
+      value: financeFormatRupiah(netBilling),
+      tone: 'primary',
+      sub: 'setelah diskon'
     },
     {
       label: 'Kas Masuk',
-      value: financeFormatRupiah(kpi.cash_in || 0),
-      tone: 'success'
+      value: financeFormatRupiah(cashIn),
+      tone: 'success',
+      sub: cashInRate + '% dari Net Billing'
     },
     {
       label: 'Piutang',
-      value: financeFormatRupiah(kpi.outstanding_total || 0),
-      tone: 'danger'
+      value: financeFormatRupiah(Number(kpi.outstanding_total || 0)),
+      tone: 'danger',
+      sub: unpaidCount + ' billing belum lunas'
     },
     {
       label: 'Billing Belum Lunas',
-      value: Number(kpi.unpaid_billing_count || 0),
+      value: unpaidCount,
       tone: 'danger'
     }
   ];
