@@ -206,12 +206,12 @@
   .dashboard-stat-warning .dashboard-stat-value { color: #fbbf24; }
 
   /* =========================================================
-     DASHBOARD PANELS — 3-column grid
+     DASHBOARD PANELS — full-width stacked vertical
      ========================================================= */
   .dashboard-panels {
-    display: grid;
-    grid-template-columns: 1fr 1fr 1fr;
-    gap: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
   }
 
   .dashboard-panel {
@@ -220,7 +220,6 @@
     padding: 18px;
     box-shadow: 0 10px 26px rgba(15, 23, 42, 0.05);
     border: 1px solid rgba(255, 255, 255, 0.07);
-    min-height: 200px;
   }
 
   .dashboard-panel-header {
@@ -300,59 +299,6 @@
     border: 1px solid #dcfce7;
   }
 
-  /* =========================================================
-     GENERIC DASHBOARD LISTS
-     ========================================================= */
-  .dashboard-list {
-    display: flex;
-    flex-direction: column;
-    gap: 12px;
-  }
-
-  .dashboard-list-item {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    padding: 14px 0;
-    border-bottom: 1px solid rgba(255,255,255,0.06);
-  }
-
-  .dashboard-list-item:last-child {
-    border-bottom: none;
-  }
-
-  .dashboard-list-rank {
-    width: 32px;
-    height: 32px;
-    border-radius: 999px;
-    background: #0f172a;
-    color: #fff;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 13px;
-    font-weight: 800;
-    flex: 0 0 32px;
-  }
-
-  .dashboard-list-main {
-    flex: 1;
-    min-width: 0;
-  }
-
-  .dashboard-list-title {
-    font-size: 15px;
-    font-weight: 700;
-    color: #f1f5f9;
-    margin-bottom: 4px;
-  }
-
-  .dashboard-list-subtitle {
-    font-size: 13px;
-    color: #64748b;
-    line-height: 1.4;
-  }
-
   .dashboard-empty {
     color: #64748b;
     font-size: 14px;
@@ -361,60 +307,69 @@
   }
 
   /* =========================================================
-     OPS LIST — Appointment terbaru, recall due
+     DASHBOARD TABLE — Top Tindakan, Appointment, Recall
      ========================================================= */
-  .dashboard-ops-list {
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
+  .dashboard-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 14px;
   }
 
-  .dashboard-ops-item {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 14px;
-    padding: 14px 0;
-    border-bottom: 1px solid rgba(255,255,255,0.06);
+  .dashboard-table thead th {
+    padding: 0 20px 10px 0;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: #6b7280;
+    text-align: left;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    white-space: nowrap;
   }
 
-  .dashboard-ops-item:last-child {
+  .dashboard-table thead th:last-child {
+    padding-right: 0;
+  }
+
+  .dashboard-table tbody td {
+    padding: 12px 20px 12px 0;
+    color: #e2e8f0;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    vertical-align: middle;
+  }
+
+  .dashboard-table tbody td:last-child {
+    padding-right: 0;
+  }
+
+  .dashboard-table tbody tr:last-child td {
     border-bottom: none;
   }
 
-  .dashboard-ops-main {
-    flex: 1;
-    min-width: 0;
+  .dashboard-table tbody tr:hover td {
+    background: rgba(255, 255, 255, 0.02);
   }
 
-  .dashboard-ops-title {
-    font-size: 15px;
+  .dashboard-table .col-num {
+    width: 36px;
+    color: #475569;
     font-weight: 700;
-    color: #f1f5f9;
-    margin-bottom: 4px;
-    line-height: 1.3;
-  }
-
-  .dashboard-ops-meta {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 6px;
     font-size: 13px;
+  }
+
+  .dashboard-table .col-muted {
     color: #64748b;
-    line-height: 1.4;
+    font-size: 13px;
+    white-space: nowrap;
   }
 
-  .dashboard-ops-side {
-    display: flex;
-    align-items: center;
-    justify-content: flex-end;
-    flex-shrink: 0;
+  .dashboard-table .col-right {
+    text-align: right;
   }
 
-  .dashboard-ops-value {
-    font-size: 14px;
-    font-weight: 800;
+  .dashboard-table .col-value {
     color: #4f6ef7;
+    font-weight: 700;
     white-space: nowrap;
   }
 </style>

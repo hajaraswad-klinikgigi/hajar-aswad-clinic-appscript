@@ -149,15 +149,6 @@
     return '<span class="dashboard-status-chip">Upcoming</span>';
   }
 
-  function renderDashboardOpsList(rows, mapper) {
-    if (!Array.isArray(rows) || !rows.length) return '';
-
-    return `
-      <div class="dashboard-ops-list">
-        ${rows.map(mapper).join('')}
-      </div>
-    `;
-  }
 
   function showDashboardPage() {
     setActiveMenu('menuDashboard');
@@ -390,21 +381,28 @@
     }
 
     el.innerHTML = `
-      <div class="dashboard-list">
-        ${rows.map(function(row, idx) {
-          return `
-            <div class="dashboard-list-item">
-              <div class="dashboard-list-rank">${idx + 1}</div>
-              <div class="dashboard-list-main">
-                <div class="dashboard-list-title">${row.name || '-'}</div>
-                <div class="dashboard-list-subtitle">
-                  Qty ${Number(row.qty || 0)} &bull; ${formatDashboardRupiah(row.total || 0)}
-                </div>
-              </div>
-            </div>
-          `;
-        }).join('')}
-      </div>
+      <table class="dashboard-table">
+        <thead>
+          <tr>
+            <th class="col-num">#</th>
+            <th>Tindakan</th>
+            <th class="col-right">Qty</th>
+            <th class="col-right">Total</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${rows.map(function(row, idx) {
+            return `
+              <tr>
+                <td class="col-num">${idx + 1}</td>
+                <td>${row.name || '-'}</td>
+                <td class="col-right col-muted">${Number(row.qty || 0)}</td>
+                <td class="col-right col-value">${formatDashboardRupiah(row.total || 0)}</td>
+              </tr>
+            `;
+          }).join('')}
+        </tbody>
+      </table>
     `;
   }
 
@@ -417,24 +415,30 @@
       return;
     }
 
-    el.innerHTML = renderDashboardOpsList(rows, function(row) {
-      return `
-        <div class="dashboard-ops-item">
-          <div class="dashboard-ops-main">
-            <div class="dashboard-ops-title">${row.patient_name || '-'}</div>
-            <div class="dashboard-ops-meta">
-              <span>${formatDashboardDateDmy(row.appointment_date || '')}</span>
-              <span>&bull;</span>
-              <span>${row.appointment_time || '-'}</span>
-            </div>
-          </div>
-
-          <div class="dashboard-ops-side">
-            ${getDashboardStatusChip(row.status)}
-          </div>
-        </div>
-      `;
-    });
+    el.innerHTML = `
+      <table class="dashboard-table">
+        <thead>
+          <tr>
+            <th>Pasien</th>
+            <th>Tanggal</th>
+            <th>Waktu</th>
+            <th class="col-right">Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${rows.map(function(row) {
+            return `
+              <tr>
+                <td>${row.patient_name || '-'}</td>
+                <td class="col-muted">${formatDashboardDateDmy(row.appointment_date || '')}</td>
+                <td class="col-muted">${row.appointment_time || '-'}</td>
+                <td class="col-right">${getDashboardStatusChip(row.status)}</td>
+              </tr>
+            `;
+          }).join('')}
+        </tbody>
+      </table>
+    `;
   }
 
   function renderRecallDueList(rows) {
@@ -446,27 +450,33 @@
       return;
     }
 
-    el.innerHTML = renderDashboardOpsList(rows, function(row) {
-      const contactText = row.last_contact_date
-        ? 'Contacted: ' + formatDashboardDateDmy(row.last_contact_date)
-        : 'Belum dihubungi';
+    el.innerHTML = `
+      <table class="dashboard-table">
+        <thead>
+          <tr>
+            <th>Pasien</th>
+            <th>Next Due</th>
+            <th>Last Contact</th>
+            <th class="col-right">Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${rows.map(function(row) {
+            const contactText = row.last_contact_date
+              ? formatDashboardDateDmy(row.last_contact_date)
+              : 'Belum dihubungi';
 
-      return `
-        <div class="dashboard-ops-item">
-          <div class="dashboard-ops-main">
-            <div class="dashboard-ops-title">${row.patient_name || '-'}</div>
-            <div class="dashboard-ops-meta">
-              <span>Next Due: ${formatDashboardDateDmy(row.next_due_date || '')}</span>
-              <span>&bull;</span>
-              <span>${contactText}</span>
-            </div>
-          </div>
-
-          <div class="dashboard-ops-side">
-            ${getDashboardRecallChip(row.followup_status)}
-          </div>
-        </div>
-      `;
-    });
+            return `
+              <tr>
+                <td>${row.patient_name || '-'}</td>
+                <td class="col-muted">${formatDashboardDateDmy(row.next_due_date || '')}</td>
+                <td class="col-muted">${contactText}</td>
+                <td class="col-right">${getDashboardRecallChip(row.followup_status)}</td>
+              </tr>
+            `;
+          }).join('')}
+        </tbody>
+      </table>
+    `;
   }
 </script>
