@@ -87,10 +87,10 @@
       `;
     }
 
-    if (topServices) topServices.innerHTML = `<div class="dashboard-empty">Memuat top tindakan...</div>`;
-    if (latestAppt) latestAppt.innerHTML = `<div class="dashboard-empty">Memuat appointment...</div>`;
+    if (topServices) topServices.innerHTML = `<div class="pt-loading">Memuat top tindakan...</div>`;
+    if (latestAppt) latestAppt.innerHTML = `<div class="pt-loading">Memuat appointment...</div>`;
     const feedbackSection = document.getElementById('dashboardFeedbackSection');
-    if (feedbackSection) feedbackSection.innerHTML = `<div class="dashboard-empty">Memuat kepuasan layanan...</div>`;
+    if (feedbackSection) feedbackSection.innerHTML = `<div class="pt-loading">Memuat kepuasan layanan...</div>`;
   }
 
   function renderDashboardError(message) {
@@ -103,16 +103,16 @@
     const recallDueList = document.getElementById('recallDueList');
 
     if (periodInfo) periodInfo.innerHTML = 'Dashboard gagal dimuat';
-    if (heroKpi) heroKpi.innerHTML = `<div class="dashboard-empty">${msg}</div>`;
+    if (heroKpi) heroKpi.innerHTML = `<div class="pt-empty">${msg}</div>`;
     if (statStrip) statStrip.innerHTML = '';
-    if (topServices) topServices.innerHTML = `<div class="dashboard-empty">${msg}</div>`;
-    if (latestAppt) latestAppt.innerHTML = `<div class="dashboard-empty">${msg}</div>`;
+    if (topServices) topServices.innerHTML = `<div class="pt-empty">${msg}</div>`;
+    if (latestAppt) latestAppt.innerHTML = `<div class="pt-empty">${msg}</div>`;
     const feedbackSection = document.getElementById('dashboardFeedbackSection');
-    if (feedbackSection) feedbackSection.innerHTML = `<div class="dashboard-empty">${msg}</div>`;
+    if (feedbackSection) feedbackSection.innerHTML = `<div class="pt-empty">${msg}</div>`;
   }
 
   function renderDashboardEmpty(message) {
-    return `<div class="dashboard-empty">${message || 'Belum ada data'}</div>`;
+    return `<div class="pt-empty">${message || 'Belum ada data'}</div>`;
   }
 
   function getDashboardStatusChip(status) {
@@ -472,7 +472,7 @@
                 `;
               }).join('')}
             </div>`
-          : `<div class="dashboard-empty">Belum ada feedback pada periode ini.</div>`
+          : `<div class="pt-empty">Belum ada feedback pada periode ini.</div>`
         }
       </div>
     `;

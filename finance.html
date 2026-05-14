@@ -804,7 +804,7 @@ function showFinancePage() {
         </div>
 
         <div id="financeReceivableSummary" class="finance-receivable-summary-grid">
-          <div class="finance-empty">Memuat ringkasan piutang...</div>
+          <div class="pt-loading">Memuat ringkasan piutang...</div>
         </div>
 
         <div class="finance-receivable-toolbar">
@@ -2656,7 +2656,7 @@ function renderFinanceDetailSectionLoadingHtml(title, subtitle, loadingTitle, lo
     <div class="finance-detail-section">
       <div class="finance-detail-section-head">
         <div>
-          <h3>${escapeFinanceHtml(title || '')}</h3>
+          <div class="patient-ortho-recall-title">${escapeFinanceHtml(title || '')}</div>
           ${
             subtitle
               ? `<div class="finance-detail-section-subtitle">${escapeFinanceHtml(subtitle)}</div>`
@@ -2828,7 +2828,7 @@ function renderFinanceDetailPreviewSectionHtml_(title, subtitle, message) {
     <div class="finance-detail-section">
       <div class="finance-detail-section-head">
         <div>
-          <h3>${escapeFinanceHtml(title || '')}</h3>
+          <div class="patient-ortho-recall-title">${escapeFinanceHtml(title || '')}</div>
           ${
             subtitle
               ? `<div class="finance-detail-section-subtitle">${escapeFinanceHtml(subtitle)}</div>`
@@ -3095,7 +3095,7 @@ function getFinanceFeedbackStatusBadge(status) {
 function renderFinanceFeedbackDetailEmptyHtml() {
   return `
     <div class="finance-detail-section">
-      <h3>Feedback Kepuasan Layanan</h3>
+      <div class="pt-section-title">Feedback Kepuasan Layanan</div>
 
       <div class="finance-feedback-detail-empty">
         Belum ada link feedback yang dibuat untuk billing ini.
@@ -3108,7 +3108,7 @@ function renderFinanceFeedbackDetailEmptyHtml() {
 function renderFinanceFeedbackDetailPendingHtml(feedback) {
   return `
     <div class="finance-detail-section">
-      <h3>Feedback Kepuasan Layanan</h3>
+      <div class="pt-section-title">Feedback Kepuasan Layanan</div>
 
       <div class="finance-feedback-detail-card">
         <div class="finance-feedback-detail-head">
@@ -3139,7 +3139,7 @@ function renderFinanceFeedbackDetailSubmittedItemHtml(label, value, isFull) {
 function renderFinanceFeedbackDetailSubmittedHtml(feedback) {
   return `
     <div class="finance-detail-section">
-      <h3>Feedback Kepuasan Layanan</h3>
+      <div class="pt-section-title">Feedback Kepuasan Layanan</div>
 
       <div class="finance-feedback-detail-card">
         <div class="finance-feedback-detail-head">
@@ -3221,7 +3221,7 @@ function renderFinanceBillingItemsSectionHtml(items) {
 
   return `
     <div class="finance-detail-section">
-      <h3>Item Billing</h3>
+      <div class="pt-section-title">Item Billing</div>
       ${
         rows.length
           ? `
@@ -3241,7 +3241,7 @@ function renderFinanceBillingItemsSectionHtml(items) {
               </table>
             </div>
           `
-          : `<div class="finance-empty">Belum ada item billing</div>`
+          : `<div class="pt-empty">Belum ada item billing</div>`
       }
     </div>
   `;
@@ -3264,7 +3264,7 @@ function renderFinanceAdjustmentsSectionHtml(adjustments) {
 
   return `
     <div class="finance-detail-section">
-      <h3>Diskon / Adjustment</h3>
+      <div class="pt-section-title">Diskon / Adjustment</div>
       ${
         rows.length
           ? `
@@ -3272,7 +3272,7 @@ function renderFinanceAdjustmentsSectionHtml(adjustments) {
               ${rows.map(renderFinanceAdjustmentItemHtml).join('')}
             </div>
           `
-          : `<div class="finance-empty">Belum ada diskon atau adjustment</div>`
+          : `<div class="pt-empty">Belum ada diskon atau adjustment</div>`
       }
     </div>
   `;
@@ -3303,7 +3303,7 @@ function renderFinancePaymentHistorySectionHtml(payments) {
 
   return `
     <div class="finance-detail-section">
-      <h3>Riwayat Pembayaran</h3>
+      <div class="pt-section-title">Riwayat Pembayaran</div>
       ${
         rows.length
           ? `
@@ -3311,7 +3311,7 @@ function renderFinancePaymentHistorySectionHtml(payments) {
               ${rows.map(renderFinancePaymentHistoryItemHtml).join('')}
             </div>
           `
-          : `<div class="finance-empty">Belum ada pembayaran</div>`
+          : `<div class="pt-empty">Belum ada pembayaran</div>`
       }
     </div>
   `;
@@ -3588,7 +3588,7 @@ function renderFinanceBillingDetail(data, options) {
     <div class="finance-detail-section">
       <div class="finance-detail-section-head">
         <div>
-          <h3>Invoice Digital</h3>
+          <div class="patient-ortho-recall-title">Invoice Digital</div>
           <div class="finance-detail-section-subtitle">
             Generate PDF invoice dan kirim billing digital ke email pasien.
           </div>
@@ -3607,7 +3607,7 @@ function renderFinanceBillingDetail(data, options) {
     <div class="finance-detail-section">
       <div class="finance-detail-section-head">
         <div>
-          <h3>Jadwal Cicilan</h3>
+          <div class="patient-ortho-recall-title">Jadwal Cicilan</div>
           <div class="finance-detail-section-subtitle">
             Termin cicilan akan otomatis mengikuti total pembayaran yang sudah masuk
           </div>
@@ -5913,7 +5913,7 @@ function loadFinanceInstallmentPlan(billingId) {
     .withSuccessHandler(function(res) {
       if (!res || !res.success) {
         currentFinanceInstallmentPlan = null;
-        wrap.innerHTML = `<div class="finance-empty">Belum ada jadwal cicilan</div>`;
+        wrap.innerHTML = `<div class="pt-empty">Belum ada jadwal cicilan</div>`;
         return;
       }
 
@@ -5928,7 +5928,7 @@ function loadFinanceInstallmentPlan(billingId) {
     .withFailureHandler(function(err) {
       currentFinanceInstallmentPlan = null;
       wrap.innerHTML = `
-        <div class="finance-empty">
+        <div class="pt-empty">
           Gagal memuat jadwal cicilan: ${escapeFinanceHtml(err && err.message ? err.message : err)}
         </div>
       `;
