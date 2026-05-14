@@ -470,35 +470,7 @@
     font-size: 14px;
   }
 
-  .patient-ortho-recall-grid {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 14px 16px;
-  }
-
-  .patient-ortho-recall-item {
-    min-width: 0;
-  }
-
-  .patient-ortho-recall-item.full {
-    grid-column: 1 / -1;
-  }
-
-  .patient-ortho-recall-label {
-    font-size: 13px;
-    font-weight: 600;
-    color: #94a3b8;
-    margin-bottom: 4px;
-  }
-
-  .patient-ortho-recall-value {
-    font-size: 14px;
-    color: #f1f5f9;
-    line-height: 1.5;
-    word-break: break-word;
-  }
-
-    .patient-ortho-recall-actions {
+  .patient-ortho-recall-actions {
     display: flex;
     flex-wrap: wrap;
     gap: 10px;
@@ -627,5 +599,44 @@
   .pt-empty {
     font-size: 13px;
     color: #64748b;
+  }
+
+  .pt-items-table {
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 10px;
+    overflow: hidden;
+  }
+
+  .pt-items-table table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+  }
+
+  .pt-items-th {
+    text-align: left;
+    padding: 9px 10px;
+    background: #161b2e;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    color: #94a3b8;
+    font-weight: 600;
+  }
+
+  .pt-items-td {
+    padding: 9px 10px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    color: #e2e8f0;
+  }
+
+  .pt-items-table tbody tr:last-child .pt-items-td {
+    border-bottom: none;
+  }
+
+  .pt-items-center {
+    text-align: center;
+  }
+
+  .pt-items-right {
+    text-align: right;
   }
 </style>

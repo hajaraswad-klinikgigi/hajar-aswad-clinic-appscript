@@ -695,46 +695,23 @@
           </div>
         </div>
 
-        <div class="patient-ortho-recall-grid">
-          <div class="patient-ortho-recall-item">
-            <div class="patient-ortho-recall-label">Install Date</div>
-            <div class="patient-ortho-recall-value">${formatDateDmy(current.install_date || '-')}</div>
-          </div>
-
-          <div class="patient-ortho-recall-item">
-            <div class="patient-ortho-recall-label">Last Control</div>
-            <div class="patient-ortho-recall-value">${formatDateDmy(current.last_control_date || '-')}</div>
-          </div>
-
-          <div class="patient-ortho-recall-item">
-            <div class="patient-ortho-recall-label">Next Due</div>
-            <div class="patient-ortho-recall-value">${formatDateDmy(current.next_due_date || '-')}</div>
-          </div>
-
-          <div class="patient-ortho-recall-item">
-            <div class="patient-ortho-recall-label">Controls</div>
-            <div class="patient-ortho-recall-value">${escapeHtml(current.control_count || 0)}</div>
-          </div>
-
-          <div class="patient-ortho-recall-item">
-            <div class="patient-ortho-recall-label">Contact Status</div>
-            <div class="patient-ortho-recall-value">${getPatientRecallContactBadgeHtml(current.last_contact_date)}</div>
-          </div>
-
-          <div class="patient-ortho-recall-item">
-            <div class="patient-ortho-recall-label">Last Contact Date</div>
-            <div class="patient-ortho-recall-value">${formatDateDmy(current.last_contact_date || '-')}</div>
-          </div>
-
-          <div class="patient-ortho-recall-item full">
-            <div class="patient-ortho-recall-label">Last Contact Note</div>
-            <div class="patient-ortho-recall-value">${escapeHtml(current.last_contact_note || '-')}</div>
-          </div>
-
-          <div class="patient-ortho-recall-item full">
-            <div class="patient-ortho-recall-label">Notes</div>
-            <div class="patient-ortho-recall-value">${escapeHtml(current.notes || '-')}</div>
-          </div>
+        <div class="pt-detail-grid">
+          <div class="pt-detail-label">Install Date</div>
+          <div class="pt-detail-value">${formatDateDmy(current.install_date || '-')}</div>
+          <div class="pt-detail-label">Last Control</div>
+          <div class="pt-detail-value">${formatDateDmy(current.last_control_date || '-')}</div>
+          <div class="pt-detail-label">Next Due</div>
+          <div class="pt-detail-value">${formatDateDmy(current.next_due_date || '-')}</div>
+          <div class="pt-detail-label">Controls</div>
+          <div class="pt-detail-value">${escapeHtml(current.control_count || 0)}</div>
+          <div class="pt-detail-label">Contact Status</div>
+          <div class="pt-detail-value">${getPatientRecallContactBadgeHtml(current.last_contact_date)}</div>
+          <div class="pt-detail-label">Last Contact Date</div>
+          <div class="pt-detail-value">${formatDateDmy(current.last_contact_date || '-')}</div>
+          <div class="pt-detail-label">Last Contact Note</div>
+          <div class="pt-detail-value">${escapeHtml(current.last_contact_note || '-')}</div>
+          <div class="pt-detail-label">Notes</div>
+          <div class="pt-detail-value">${escapeHtml(current.notes || '-')}</div>
         </div>
 
         ${
@@ -1164,73 +1141,55 @@
 
                 const itemsHtml = items.length
                   ? `
-                    <div style="margin-top:12px;">
-                      <strong>Daftar Tindakan</strong>
-                      <div style="margin-top:8px; border:1px solid rgba(255,255,255,0.08); border-radius:10px; overflow:hidden;">
-                        <table style="width:100%; border-collapse:collapse; font-size:14px;">
-                          <thead>
-                            <tr style="background:#161b2e;">
-                              <th style="text-align:left; padding:10px; border-bottom:1px solid rgba(255,255,255,0.08); color:#94a3b8;">Tindakan</th>
-                              <th style="text-align:center; padding:10px; border-bottom:1px solid rgba(255,255,255,0.08); color:#94a3b8;">Qty</th>
-                              <th style="text-align:right; padding:10px; border-bottom:1px solid rgba(255,255,255,0.08); color:#94a3b8;">Harga</th>
-                              <th style="text-align:right; padding:10px; border-bottom:1px solid rgba(255,255,255,0.08); color:#94a3b8;">Subtotal</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            ${items.map(function(item) {
-                              return `
-                                <tr>
-                                  <td style="padding:10px; border-bottom:1px solid rgba(255,255,255,0.05); color:#e2e8f0;">${escapeHtml(item.service_name || '-')}</td>
-                                  <td style="padding:10px; text-align:center; border-bottom:1px solid rgba(255,255,255,0.05); color:#e2e8f0;">${escapeHtml(item.qty || 0)}</td>
-                                  <td style="padding:10px; text-align:right; border-bottom:1px solid rgba(255,255,255,0.05); color:#e2e8f0;">${formatRupiah(item.unit_price || 0)}</td>
-                                  <td style="padding:10px; text-align:right; border-bottom:1px solid rgba(255,255,255,0.05); color:#e2e8f0;">${formatRupiah(item.subtotal || 0)}</td>
-                                </tr>
-                              `;
-                            }).join('')}
-                          </tbody>
-                        </table>
-                      </div>
+                    <div class="pt-section-title">Daftar Tindakan</div>
+                    <div class="pt-items-table">
+                      <table>
+                        <thead>
+                          <tr>
+                            <th class="pt-items-th">Tindakan</th>
+                            <th class="pt-items-th pt-items-center">Qty</th>
+                            <th class="pt-items-th pt-items-right">Harga</th>
+                            <th class="pt-items-th pt-items-right">Subtotal</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          ${items.map(function(item) {
+                            return `
+                              <tr>
+                                <td class="pt-items-td">${escapeHtml(item.service_name || '-')}</td>
+                                <td class="pt-items-td pt-items-center">${escapeHtml(item.qty || 0)}</td>
+                                <td class="pt-items-td pt-items-right">${formatRupiah(item.unit_price || 0)}</td>
+                                <td class="pt-items-td pt-items-right">${formatRupiah(item.subtotal || 0)}</td>
+                              </tr>
+                            `;
+                          }).join('')}
+                        </tbody>
+                      </table>
                     </div>
                   `
-                  : '<div style="margin-top:12px;">Tidak ada item tindakan</div>';
+                  : '<div class="pt-empty">Tidak ada item tindakan</div>';
 
                 return `
-                  <div style="border:1px solid rgba(255,255,255,0.08); border-radius:12px; padding:14px; margin-bottom:${idx === treatments.length - 1 ? '0' : '12px'}; background:#1e2235;">
-                    <div style="margin-bottom:8px;">
-                      <strong>Tanggal Treatment</strong><br>
-                      <div>${formatDateDmy(t.treatment_date || '-')}</div>
+                  <div class="pt-record-card${idx === treatments.length - 1 ? ' pt-record-last' : ''}">
+                    <div class="pt-detail-grid">
+                      <div class="pt-detail-label">Tanggal Treatment</div>
+                      <div class="pt-detail-value">${formatDateDmy(t.treatment_date || '-')}</div>
+                      <div class="pt-detail-label">Dokter</div>
+                      <div class="pt-detail-value">${escapeHtml(t.doctor_name || '-')}</div>
+                      <div class="pt-detail-label">Keluhan</div>
+                      <div class="pt-detail-value">${escapeHtml(t.chief_complaint || '-')}</div>
+                      <div class="pt-detail-label">Diagnosis</div>
+                      <div class="pt-detail-value">${escapeHtml(t.diagnosis || '-')}</div>
+                      <div class="pt-detail-label">Catatan</div>
+                      <div class="pt-detail-value">${escapeHtml(t.notes || '-')}</div>
+                      <div class="pt-detail-label">Total Biaya</div>
+                      <div class="pt-detail-value">${formatRupiah(t.total_cost || 0)}</div>
                     </div>
-
-                    <div style="margin-bottom:8px;">
-                      <strong>Dokter</strong><br>
-                      <div>${escapeHtml(t.doctor_name || '-')}</div>
-                    </div>
-
-                    <div style="margin-bottom:8px;">
-                      <strong>Keluhan</strong><br>
-                      <div>${escapeHtml(t.chief_complaint || '-')}</div>
-                    </div>
-
-                    <div style="margin-bottom:8px;">
-                      <strong>Diagnosis</strong><br>
-                      <div>${escapeHtml(t.diagnosis || '-')}</div>
-                    </div>
-
-                    <div style="margin-bottom:8px;">
-                      <strong>Catatan</strong><br>
-                      <div>${escapeHtml(t.notes || '-')}</div>
-                    </div>
-
-                    <div style="margin-bottom:8px;">
-                      <strong>Total Biaya</strong><br>
-                      <div>${formatRupiah(t.total_cost || 0)}</div>
-                    </div>
-
                     ${itemsHtml}
                   </div>
                 `;
               }).join('')
-            : '<div>Belum ada riwayat treatment</div>'
+            : '<div class="pt-empty">Belum ada riwayat treatment</div>'
         }
       </div>
     `;
