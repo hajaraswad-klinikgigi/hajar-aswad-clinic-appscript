@@ -195,6 +195,11 @@
     loadDashboard();
   }
 
+  function setDashboardPeriodDisabled(disabled) {
+    const select = document.getElementById('dashboardPeriodSelect');
+    if (select) select.disabled = disabled;
+  }
+
   function loadDashboard() {
     const period = dashboardPeriod;
 
@@ -204,14 +209,18 @@
       renderDashboardSkeleton();
     }
 
+    setDashboardPeriodDisabled(true);
+
     google.script.run
       .withSuccessHandler(function(res) {
+        setDashboardPeriodDisabled(false);
         if (res && res.success) {
           dashboardCache[period] = res;
         }
         renderDashboard(res);
       })
       .withFailureHandler(function(err) {
+        setDashboardPeriodDisabled(false);
         const msg = 'Error: ' + (err && err.message ? err.message : err);
         if (!dashboardCache[period]) renderDashboardError(msg);
         showToast(msg, 'error');
