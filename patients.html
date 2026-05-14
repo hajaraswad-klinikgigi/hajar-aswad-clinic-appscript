@@ -1026,25 +1026,26 @@
           </div>
         </div>
 
-        <div class="content-card" style="min-height:260px;">
-          <div class="pt-section-title">Riwayat Rekam Medis</div>
-          <div class="pt-loading">Memuat rekam medis...</div>
+        <div style="display:flex; flex-direction:column; gap:14px;">
+          <div class="content-card" style="min-height:260px;">
+            <div class="pt-section-title">Riwayat Rekam Medis</div>
+            <div class="pt-loading">Memuat rekam medis...</div>
+          </div>
+          <div id="patientDetailTreatmentWrap">
+            <div class="content-card">
+              <div class="pt-section-title">Riwayat Treatment</div>
+              <div class="pt-loading">Memuat riwayat treatment...</div>
+            </div>
+          </div>
         </div>
       </div>
 
       <div id="patientDetailSecondaryWrap" style="margin-top:16px;">
         <div class="content-card">
-          <div class="pt-section-title">Riwayat Treatment</div>
-          <div class="pt-loading">Memuat riwayat treatment...</div>
-        </div>
-
-        <div style="margin-top:16px;">
-          <div class="content-card">
-            <div class="patient-ortho-recall-header">
-              <div class="patient-ortho-recall-title">Foto Before / After</div>
-            </div>
-            <div class="pt-loading">Memuat dokumentasi foto...</div>
+          <div class="patient-ortho-recall-header">
+            <div class="patient-ortho-recall-title">Foto Before / After</div>
           </div>
+          <div class="pt-loading">Memuat dokumentasi foto...</div>
         </div>
       </div>
     `;
@@ -1147,15 +1148,19 @@
           ${profileHtml}
           ${orthoRecallHtml}
         </div>
-        ${medicalHtml}
+        <div class="patient-detail-right-stack">
+          ${medicalHtml}
+          <div id="patientDetailTreatmentWrap">
+            <div class="content-card">
+              <div class="pt-section-title">Riwayat Treatment</div>
+              <div class="pt-loading">Memuat riwayat treatment...</div>
+            </div>
+          </div>
+        </div>
       </div>
 
       <div id="patientDetailSecondaryWrap" style="margin-top:14px;">
         <div class="content-card">
-          <div class="pt-section-title">Riwayat Treatment</div>
-          <div class="pt-loading">Memuat riwayat treatment...</div>
-        </div>
-        <div class="content-card" style="margin-top:14px;">
           <div class="pt-section-title">Foto Before / After</div>
           <div class="pt-loading">Memuat dokumentasi foto...</div>
         </div>
@@ -1163,8 +1168,8 @@
     `;
   }
 
-  function renderPatientSecondarySection(treatments, photoGroups) {
-    const treatmentHtml = `
+  function renderPatientTreatmentHtml(treatments) {
+    return `
       <div class="content-card">
         <div class="pt-section-title">Riwayat Treatment</div>
         ${
@@ -1203,12 +1208,10 @@
                       <div class="pt-detail-value">${formatDateDmy(t.treatment_date || '-')}</div>
                       <div class="pt-detail-label">Diagnosis</div>
                       <div class="pt-detail-value">${escapeHtml(t.diagnosis || '-')}</div>
-
                       <div class="pt-detail-label">Dokter</div>
                       <div class="pt-detail-value">${escapeHtml(t.doctor_name || '-')}</div>
                       <div class="pt-detail-label">Catatan</div>
                       <div class="pt-detail-value">${escapeHtml(t.notes || '-')}</div>
-
                       <div class="pt-detail-label">Keluhan</div>
                       <div class="pt-detail-value">${escapeHtml(t.chief_complaint || '-')}</div>
                       <div class="pt-detail-label">Biaya</div>
@@ -1222,15 +1225,17 @@
         }
       </div>
     `;
+  }
 
-    const photoHtml = renderPatientPhotoSection(photoGroups);
-
-    return `
-      ${treatmentHtml}
-      <div style="margin-top:16px;">
-        ${photoHtml}
-      </div>
-    `;
+  function applyPatientSecondarySection(treatments, photoGroups) {
+    const treatWrap = document.getElementById('patientDetailTreatmentWrap');
+    if (treatWrap) {
+      treatWrap.innerHTML = renderPatientTreatmentHtml(treatments);
+    }
+    const photoWrap = document.getElementById('patientDetailSecondaryWrap');
+    if (photoWrap) {
+      photoWrap.innerHTML = renderPatientPhotoSection(photoGroups);
+    }
   }
 
   function setPatientDetailFrontendCache(patientId, primaryData, secondaryData) {
@@ -1443,10 +1448,7 @@
         currentPatientDetailTreatments = treatments;
         currentPatientDetailPhotoGroups = photoGroups;
 
-        const wrap = document.getElementById('patientDetailSecondaryWrap');
-        if (wrap) {
-          wrap.innerHTML = renderPatientSecondarySection(treatments, photoGroups);
-        }
+        applyPatientSecondarySection(treatments, photoGroups);
       }
     } else {
       // Fast preview: tampilkan profil dari allPatients sambil tunggu server
@@ -1478,10 +1480,7 @@
     }
 
     function renderSecondaryNow() {
-      const wrap = document.getElementById('patientDetailSecondaryWrap');
-      if (!wrap) return;
-
-      wrap.innerHTML = renderPatientSecondarySection(
+      applyPatientSecondarySection(
         secondaryTreatments || [],
         secondaryPhotoGroups || []
       );
@@ -1524,10 +1523,7 @@
 
       content.innerHTML = renderPatientPrimarySection(p, medicalRecords, orthoRecall);
 
-      const wrap = document.getElementById('patientDetailSecondaryWrap');
-      if (wrap) {
-        wrap.innerHTML = renderPatientSecondarySection(treatments, photoGroups);
-      }
+      applyPatientSecondarySection(treatments, photoGroups);
 
       setPatientDetailFrontendCache(
         patientId,
