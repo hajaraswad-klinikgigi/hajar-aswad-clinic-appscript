@@ -197,7 +197,13 @@
 
   function setDashboardPeriodDisabled(disabled) {
     const select = document.getElementById('dashboardPeriodSelect');
-    if (select) select.disabled = disabled;
+    if (!select) return;
+    select.disabled = disabled;
+    if (disabled) {
+      select.classList.add('finance-is-disabled');
+    } else {
+      select.classList.remove('finance-is-disabled');
+    }
   }
 
   function loadDashboard() {
