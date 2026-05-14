@@ -996,23 +996,23 @@ function showFinancePage() {
           <form onsubmit="submitFinanceDiscount(event)">
             <input type="hidden" id="finance_discount_billing_id">
 
-            <label>Billing</label>
+            <div class="patient-form-section">Billing</div>
+            <label>No Billing</label>
             <input type="text" id="finance_discount_billing_number" readonly>
 
-            <label>Label Diskon</label>
-            <input type="text" id="finance_discount_label" placeholder="Contoh: Diskon manual owner">
-            <div id="error_finance_discount_label" class="field-error"></div>
-
-            <label>Nominal Diskon</label>
-            <input
-              type="text"
-              id="finance_discount_amount"
-              inputmode="numeric"
-              autocomplete="off"
-              placeholder="Contoh: 50000"
-              oninput="handleFinanceAmountInput(this)"
-            >
-            <div id="error_finance_discount_amount" class="field-error"></div>
+            <div class="patient-form-section">Diskon</div>
+            <div class="patient-form-grid">
+              <div>
+                <label>Label Diskon</label>
+                <input type="text" id="finance_discount_label" placeholder="Contoh: Diskon manual owner">
+                <div id="error_finance_discount_label" class="field-error"></div>
+              </div>
+              <div>
+                <label>Nominal Diskon</label>
+                <input type="text" id="finance_discount_amount" inputmode="numeric" autocomplete="off" placeholder="Contoh: 50000" oninput="handleFinanceAmountInput(this)">
+                <div id="error_finance_discount_amount" class="field-error"></div>
+              </div>
+            </div>
 
             <label>Alasan / Catatan</label>
             <textarea id="finance_discount_reason" placeholder="Contoh: Diskon khusus pasien"></textarea>
@@ -1053,7 +1053,8 @@ function showFinancePage() {
             <input type="hidden" id="finance_payment_billing_id">
             <input type="hidden" id="finance_payment_scope" value="full">
 
-            <label>Billing</label>
+            <div class="patient-form-section">Billing</div>
+            <label>No Billing</label>
             <input type="text" id="finance_payment_billing_number" readonly>
 
             <div id="finance_payment_installment_wrap" class="finance-payment-installment-wrap" style="display:none;">
@@ -1065,39 +1066,43 @@ function showFinancePage() {
               <div id="finance_payment_installment_info" class="finance-installment-payment-info"></div>
             </div>
 
-            <label>Tanggal Pembayaran</label>
-            <input type="date" id="finance_payment_date">
-            <div id="error_finance_payment_date" class="field-error"></div>
-
-            <label>Metode Pembayaran</label>
-            <select id="finance_payment_method">
-              <option value="">Pilih metode</option>
-              <option value="cash">Cash</option>
-              <option value="transfer">Transfer</option>
-              <option value="qris">QRIS</option>
-              <option value="edc">EDC</option>
-              <option value="other">Other</option>
-            </select>
-            <div id="error_finance_payment_method" class="field-error"></div>
+            <div class="patient-form-section">Pembayaran</div>
+            <div class="patient-form-grid">
+              <div>
+                <label>Tanggal</label>
+                <input type="date" id="finance_payment_date">
+                <div id="error_finance_payment_date" class="field-error"></div>
+              </div>
+              <div>
+                <label>Metode</label>
+                <select id="finance_payment_method">
+                  <option value="">Pilih metode</option>
+                  <option value="cash">Cash</option>
+                  <option value="transfer">Transfer</option>
+                  <option value="qris">QRIS</option>
+                  <option value="edc">EDC</option>
+                  <option value="other">Other</option>
+                </select>
+                <div id="error_finance_payment_method" class="field-error"></div>
+              </div>
+            </div>
 
             <label>Nominal Pembayaran</label>
-            <input
-              type="text"
-              id="finance_payment_amount"
-              inputmode="numeric"
-              autocomplete="off"
-              placeholder="Contoh: 100000"
-              oninput="handleFinanceAmountInput(this)"
-            >
+            <input type="text" id="finance_payment_amount" inputmode="numeric" autocomplete="off" placeholder="Contoh: 100000" oninput="handleFinanceAmountInput(this)">
             <div id="error_finance_payment_amount" class="field-error"></div>
 
-            <label>Nomor Referensi</label>
-            <input type="text" id="finance_payment_reference_no" placeholder="Opsional, contoh: nomor transfer/QRIS">
-            <div id="error_finance_payment_reference_no" class="field-error"></div>
-
-            <label>Catatan</label>
-            <textarea id="finance_payment_notes" placeholder="Opsional"></textarea>
-            <div id="error_finance_payment_notes" class="field-error"></div>
+            <div class="patient-form-grid">
+              <div>
+                <label>Nomor Referensi</label>
+                <input type="text" id="finance_payment_reference_no" placeholder="Opsional, nomor transfer/QRIS">
+                <div id="error_finance_payment_reference_no" class="field-error"></div>
+              </div>
+              <div>
+                <label>Catatan</label>
+                <textarea id="finance_payment_notes" placeholder="Opsional"></textarea>
+                <div id="error_finance_payment_notes" class="field-error"></div>
+              </div>
+            </div>
 
             <div class="finance-modal-note" id="finance_payment_outstanding_info"></div>
 
@@ -5265,30 +5270,26 @@ function ensureFinanceInvoiceEmailModal() {
           <form onsubmit="submitFinanceInvoiceEmail(event)">
             <input type="hidden" id="finance_invoice_email_billing_id">
 
-            <label>Billing</label>
+            <div class="patient-form-section">Billing</div>
+            <label>No Billing</label>
             <input type="text" id="finance_invoice_email_billing_number" readonly>
 
-            <label>Email Tujuan</label>
-            <input
-              type="email"
-              id="finance_invoice_email_to"
-              placeholder="contoh: pasien@email.com"
-            >
-            <div id="error_finance_invoice_email_to" class="field-error"></div>
-
-            <label>Subject</label>
-            <input
-              type="text"
-              id="finance_invoice_email_subject"
-              placeholder="Invoice Billing Klinik"
-            >
-            <div id="error_finance_invoice_email_subject" class="field-error"></div>
+            <div class="patient-form-section">Email</div>
+            <div class="patient-form-grid">
+              <div>
+                <label>Email Tujuan</label>
+                <input type="email" id="finance_invoice_email_to" placeholder="contoh: pasien@email.com">
+                <div id="error_finance_invoice_email_to" class="field-error"></div>
+              </div>
+              <div>
+                <label>Subject</label>
+                <input type="text" id="finance_invoice_email_subject" placeholder="Invoice Billing Klinik">
+                <div id="error_finance_invoice_email_subject" class="field-error"></div>
+              </div>
+            </div>
 
             <label>Pesan Email</label>
-            <textarea
-              id="finance_invoice_email_message"
-              placeholder="Berikut kami kirimkan invoice billing digital Anda."
-            ></textarea>
+            <textarea id="finance_invoice_email_message" placeholder="Berikut kami kirimkan invoice billing digital Anda."></textarea>
             <div id="error_finance_invoice_email_message" class="field-error"></div>
 
             <div class="finance-modal-note" id="finance_invoice_email_note">
