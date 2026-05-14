@@ -885,9 +885,9 @@ function ownerPrintDailyReport() {
     y += 9;
   }
 
-  var headStyle = { fillColor: BLUE, textColor: [255,255,255], fontSize: 8, fontStyle: 'bold', cellPadding: 3 };
-  var bodyStyle = { fontSize: 9, cellPadding: 3, textColor: DARK };
-  var footStyle = { fillColor: [240,244,255], textColor: DARK, fontSize: 9, fontStyle: 'bold', cellPadding: 3 };
+  var headStyle = { fillColor: BLUE, textColor: [255,255,255], fontSize: 8, fontStyle: 'bold', cellPadding: 3, valign: 'middle' };
+  var bodyStyle = { fontSize: 9, cellPadding: 3, textColor: DARK, valign: 'middle' };
+  var footStyle = { fillColor: [240,244,255], textColor: DARK, fontSize: 9, fontStyle: 'bold', cellPadding: 3, valign: 'middle' };
 
   /* ── RINGKASAN KEUANGAN ──────────────────────────────── */
   sectionTitle('Ringkasan Keuangan');
