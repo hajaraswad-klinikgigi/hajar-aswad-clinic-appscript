@@ -3,12 +3,9 @@
      1. GLOBAL RESPONSIVE <= 1100px
      ========================================================= */
   @media (max-width: 1100px) {
-    .dashboard-kpi-subgrid {
-      grid-template-columns: repeat(3, minmax(0, 1fr));
-    }
-
-    .dashboard-feedback-summary-grid {
-      grid-template-columns: repeat(3, minmax(0, 1fr));
+    .dashboard-hero-grid,
+    .dashboard-stat-strip {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
     }
   }
 
@@ -37,32 +34,9 @@
   }
 
   /* =========================================================
-     3. DASHBOARD RESPONSIVE <= 900px
-     ========================================================= */
-  @media (max-width: 900px) {
-    .dashboard-summary-grid {
-      grid-template-columns: 1fr;
-    }
-  }
-
-  /* =========================================================
      4. DASHBOARD / APPOINTMENTS / PATIENTS <= 860px
      ========================================================= */
   @media (max-width: 860px) {
-    .dashboard-kpi-subgrid,
-    .dashboard-feedback-summary-grid {
-      grid-template-columns: repeat(2, minmax(0, 1fr));
-    }
-
-    .dashboard-panels {
-      grid-template-columns: 1fr;
-    }
-
-    .dashboard-title,
-    .appointments-title,
-    .patients-title {
-      font-size: 28px;
-    }
 
     .appointments-toolbar,
     .patients-toolbar {
@@ -351,17 +325,9 @@
       width: 100%;
     }
 
-    .dashboard-kpi-subgrid,
-    .dashboard-feedback-summary-grid {
+    .dashboard-hero-grid,
+    .dashboard-stat-strip {
       grid-template-columns: 1fr;
-    }
-
-    .dashboard-highlight-time {
-      font-size: 24px;
-    }
-
-    .dashboard-highlight-name {
-      font-size: 18px;
     }
   }
 
@@ -422,26 +388,12 @@
      11. DASHBOARD SMALL MOBILE <= 480px
      ========================================================= */
   @media (max-width: 480px) {
-    .dashboard-kpi-section {
-      padding: 14px;
-      border-radius: 16px;
+    .dashboard-hero-value {
+      font-size: 18px;
     }
 
-    .dashboard-kpi-subgrid,
-    .dashboard-feedback-summary-grid {
-      gap: 10px;
-    }
-
-    .dashboard-kpi-card {
-      min-height: 86px;
-    }
-
-    .dashboard-kpi-value {
-      font-size: 20px;
-    }
-
-    .dashboard-feedback-summary-value {
-      font-size: 19px;
+    .dashboard-stat-value {
+      font-size: 15px;
     }
   }
 
@@ -564,7 +516,7 @@
     }
 
     .finance-title {
-      font-size: 28px;
+      font-size: 18px;
     }
   }
 
