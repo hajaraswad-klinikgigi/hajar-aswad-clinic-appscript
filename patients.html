@@ -1198,17 +1198,19 @@
 
                 return `
                   <div class="pt-record-card${idx === treatments.length - 1 ? ' pt-record-last' : ''}">
-                    <div class="pt-detail-grid">
+                    <div class="pt-detail-grid-2col">
                       <div class="pt-detail-label">Tanggal Treatment</div>
                       <div class="pt-detail-value">${formatDateDmy(t.treatment_date || '-')}</div>
-                      <div class="pt-detail-label">Dokter</div>
-                      <div class="pt-detail-value">${escapeHtml(t.doctor_name || '-')}</div>
-                      <div class="pt-detail-label">Keluhan</div>
-                      <div class="pt-detail-value">${escapeHtml(t.chief_complaint || '-')}</div>
                       <div class="pt-detail-label">Diagnosis</div>
                       <div class="pt-detail-value">${escapeHtml(t.diagnosis || '-')}</div>
+
+                      <div class="pt-detail-label">Dokter</div>
+                      <div class="pt-detail-value">${escapeHtml(t.doctor_name || '-')}</div>
                       <div class="pt-detail-label">Catatan</div>
                       <div class="pt-detail-value">${escapeHtml(t.notes || '-')}</div>
+
+                      <div class="pt-detail-label">Keluhan</div>
+                      <div class="pt-detail-value">${escapeHtml(t.chief_complaint || '-')}</div>
                       <div class="pt-detail-label">Biaya</div>
                       <div class="pt-detail-value">${formatPatientTreatmentBilling(t)}</div>
                     </div>
