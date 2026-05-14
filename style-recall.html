@@ -56,7 +56,7 @@
      RECALL FILTER CHIP
      ========================================================= */
   .recall-filter-chip {
-    min-height: 42px;
+    min-height: 40px;
     margin-bottom: 0;
     padding: 0 14px;
     display: inline-flex;
@@ -68,23 +68,21 @@
     border-radius: 999px;
     box-shadow: none;
     font-size: 14px;
-    font-weight: 700;
+    font-weight: 600;
     line-height: 1;
     transition:
-      transform 0.18s ease,
-      box-shadow 0.18s ease,
-      border-color 0.18s ease,
-      background 0.18s ease,
-      color 0.18s ease;
+      filter 0.15s ease,
+      border-color 0.15s ease,
+      background 0.15s ease,
+      color 0.15s ease;
   }
 
   .recall-filter-chip:hover {
-    transform: translateY(-1px);
-    box-shadow: 0 10px 20px rgba(15, 23, 42, 0.09);
+    filter: brightness(1.12);
   }
 
   .recall-filter-chip:active {
-    transform: translateY(0);
+    filter: brightness(0.93);
   }
 
   .recall-filter-chip.active {
