@@ -1,4 +1,4 @@
-﻿<style>
+<style>
   /* =========================================================
      DASHBOARD PAGE SHELL & HEADER
      ========================================================= */
@@ -70,243 +70,147 @@
   }
 
   /* =========================================================
-     DASHBOARD KPI GROUPED SECTIONS
-     KPI dibagi per konteks agar tidak terasa padat
+     HERO KPI — 4 large metric cards
      ========================================================= */
-  .dashboard-kpi-grid {
-    display: flex;
-    flex-direction: column;
-    gap: 16px;
-  }
-
-  .dashboard-kpi-section {
-    padding: 16px;
-    border-radius: 20px;
-    border: 1px solid rgba(255, 255, 255, 0.07);
-    background: #1e2235;
-    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.25);
-  }
-
-  .dashboard-kpi-section-head {
-    display: flex;
-    justify-content: space-between;
-    align-items: flex-start;
-    gap: 12px;
-    margin-bottom: 14px;
-  }
-
-  .dashboard-kpi-section-title {
-    font-size: 16px;
-    font-weight: 700;
-    color: #f1f5f9;
-    letter-spacing: -0.02em;
-    margin-bottom: 4px;
-  }
-
-  .dashboard-kpi-section-subtitle {
-    font-size: 13px;
-    color: #64748b;
-    line-height: 1.45;
-  }
-
-  .dashboard-kpi-subgrid {
+  .dashboard-hero-grid {
     display: grid;
     grid-template-columns: repeat(4, minmax(0, 1fr));
     gap: 14px;
   }
 
-  .dashboard-kpi-card {
+  .dashboard-hero-card {
     background: #1e2235;
-    border-radius: 18px;
-    padding: 16px;
-    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.30);
+    border-radius: 20px;
+    padding: 20px 18px 18px 22px;
     border: 1px solid rgba(255, 255, 255, 0.07);
-    min-width: 0;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.25);
+    position: relative;
+    overflow: hidden;
   }
 
-  .dashboard-kpi-label {
-    font-size: 12px;
+  .dashboard-hero-card::before {
+    content: '';
+    position: absolute;
+    inset: 0 auto 0 0;
+    width: 4px;
+    background: #475569;
+  }
+
+  .dashboard-hero-label {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
     color: #6b7280;
-    font-weight: 700;
-    margin-bottom: 8px;
-    line-height: 1.35;
+    margin-bottom: 10px;
   }
 
-  .dashboard-kpi-value {
-    font-size: 23px;
-    line-height: 1.12;
-    font-weight: 700;
-    color: #f1f5f9;
-    word-break: break-word;
-  }
-
-  .dashboard-kpi-neutral {
-    background: #1e2235;
-  }
-
-  .dashboard-kpi-primary {
-    background: rgba(79, 110, 247, 0.12);
-  }
-
-  .dashboard-kpi-success {
-    background: rgba(34, 197, 94, 0.10);
-  }
-
-  .dashboard-kpi-danger {
-    background: rgba(239, 68, 68, 0.10);
-  }
-
-  .dashboard-kpi-primary .dashboard-kpi-value {
-    color: #4f6ef7;
-  }
-
-  .dashboard-kpi-success .dashboard-kpi-value {
-    color: #86efac;
-  }
-
-  .dashboard-kpi-danger .dashboard-kpi-value {
-    color: #fca5a5;
-  }
-
-  .kpi-section-title {
-    margin: 0;
-    font-size: 22px;
-    color: #f1f5f9;
-    font-weight: 600;
-  }
-
-  /* =========================================================
-     DASHBOARD FEEDBACK SUMMARY
-     Ringkasan Kepuasan Layanan dari modul Finance
-     Selector dibuat spesifik, tidak lagi memakai last-child
-     ========================================================= */
-  .dashboard-feedback-section {
-    min-width: 0;
-  }
-
-  .dashboard-feedback-dashboard-card {
-    border-color: #c7d2fe;
-    background: linear-gradient(180deg, #1e2a4a 0%, #1a2035 100%);
-  }
-
-  .dashboard-feedback-dashboard-card .dashboard-kpi-section-title {
-    color: #4f6ef7;
-  }
-
-  .dashboard-feedback-dashboard-card .dashboard-kpi-section-subtitle {
-    color: #94a3b8;
-  }
-
-  .dashboard-feedback-summary-grid {
-    display: grid;
-    grid-template-columns: repeat(6, minmax(0, 1fr));
-    gap: 12px;
-  }
-
-  .dashboard-feedback-summary-card {
-    border-radius: 16px;
-    padding: 14px;
-    border: 1px solid rgba(255, 255, 255, 0.07);
-    background: #1e2235;
-    min-width: 0;
-  }
-
-  .dashboard-feedback-summary-label {
-    font-size: 12px;
-    color: #64748b;
+  .dashboard-hero-value {
+    font-size: 26px;
     font-weight: 800;
-    margin-bottom: 8px;
-    line-height: 1.35;
-  }
-
-  .dashboard-feedback-summary-value {
-    font-size: 20px;
-    font-weight: 700;
     color: #f1f5f9;
-    line-height: 1.2;
+    letter-spacing: -0.03em;
+    line-height: 1.1;
+    margin-bottom: 8px;
     word-break: break-word;
   }
 
-  .dashboard-feedback-primary {
-    background: rgba(79, 110, 247, 0.12);
-    border-color: #c7d2fe;
-  }
-
-  .dashboard-feedback-primary .dashboard-feedback-summary-value {
-    color: #4f6ef7;
-  }
-
-  .dashboard-feedback-success {
-    background: rgba(34, 197, 94, 0.10);
-    border-color: rgba(34, 197, 94, 0.20);
-  }
-
-  .dashboard-feedback-success .dashboard-feedback-summary-value {
-    color: #86efac;
-  }
-
-  .dashboard-feedback-danger {
-    background: rgba(239, 68, 68, 0.10);
-    border-color: rgba(251, 146, 60, 0.20);
-  }
-
-  .dashboard-feedback-danger .dashboard-feedback-summary-value {
-    color: #fca5a5;
-  }
-
-  .dashboard-feedback-neutral {
-    background: #1e2235;
-  }
-
-  .dashboard-feedback-latest-wrap {
-    margin-top: 16px;
-    padding-top: 14px;
-    border-top: 1px dashed rgba(255,255,255,0.08);
-  }
-
-  .dashboard-feedback-latest-list {
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
-  }
-
-  .dashboard-feedback-latest-item {
-    padding: 12px;
-    border-radius: 14px;
-    border: 1px solid rgba(255, 255, 255, 0.07);
-    background: rgba(255, 255, 255, 0.04);
-  }
-
-  .dashboard-feedback-latest-title {
-    font-size: 15px;
-    font-weight: 700;
-    color: #f1f5f9;
-    margin-bottom: 4px;
-    line-height: 1.35;
-  }
-
-  .dashboard-feedback-latest-sub {
+  .dashboard-hero-sub {
     font-size: 12px;
     color: #64748b;
     line-height: 1.45;
   }
 
-  .dashboard-feedback-latest-comment {
-    margin-top: 8px;
-    padding: 10px 12px;
-    border-radius: 12px;
-    background: #0d1117;
-    color: #cbd5e1;
-    font-size: 13px;
-    line-height: 1.5;
+  .dashboard-hero-cashin {
+    background: rgba(34, 197, 94, 0.06);
+    border-color: rgba(34, 197, 94, 0.18);
   }
+  .dashboard-hero-cashin::before { background: #22c55e; }
+  .dashboard-hero-cashin .dashboard-hero-value { color: #86efac; }
+
+  .dashboard-hero-netbilling {
+    background: rgba(79, 110, 247, 0.08);
+    border-color: rgba(79, 110, 247, 0.20);
+  }
+  .dashboard-hero-netbilling::before { background: #4f6ef7; }
+  .dashboard-hero-netbilling .dashboard-hero-value { color: #93c5fd; }
+
+  .dashboard-hero-appointment::before { background: #475569; }
+
+  .dashboard-hero-piutang {
+    background: rgba(249, 115, 22, 0.07);
+    border-color: rgba(249, 115, 22, 0.20);
+  }
+  .dashboard-hero-piutang::before { background: #f97316; }
+  .dashboard-hero-piutang .dashboard-hero-value { color: #fdba74; }
 
   /* =========================================================
-     DASHBOARD PANELS
+     STAT STRIP — 4 compact secondary metrics
+     ========================================================= */
+  .dashboard-stat-strip {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 10px;
+  }
+
+  .dashboard-stat-item {
+    background: #1e2235;
+    border-radius: 14px;
+    padding: 14px 16px 14px 20px;
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    position: relative;
+    overflow: hidden;
+  }
+
+  .dashboard-stat-item::before {
+    content: '';
+    position: absolute;
+    inset: 0 auto 0 0;
+    width: 3px;
+    background: #374151;
+  }
+
+  .dashboard-stat-label {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: #6b7280;
+    margin-bottom: 4px;
+  }
+
+  .dashboard-stat-value {
+    font-size: 20px;
+    font-weight: 800;
+    color: #f1f5f9;
+    line-height: 1.2;
+    margin-bottom: 2px;
+  }
+
+  .dashboard-stat-sub {
+    font-size: 12px;
+    color: #64748b;
+    line-height: 1.4;
+  }
+
+  .dashboard-stat-primary::before { background: #4f6ef7; }
+  .dashboard-stat-primary .dashboard-stat-value { color: #93c5fd; }
+
+  .dashboard-stat-success::before { background: #22c55e; }
+  .dashboard-stat-success .dashboard-stat-value { color: #86efac; }
+
+  .dashboard-stat-danger::before { background: #ef4444; }
+  .dashboard-stat-danger .dashboard-stat-value { color: #fca5a5; }
+
+  .dashboard-stat-warning::before { background: #f97316; }
+  .dashboard-stat-warning .dashboard-stat-value { color: #fbbf24; }
+
+  /* =========================================================
+     DASHBOARD PANELS — 3-column grid
      ========================================================= */
   .dashboard-panels {
     display: grid;
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: 1fr 1fr 1fr;
     gap: 16px;
   }
 
@@ -316,7 +220,7 @@
     padding: 18px;
     box-shadow: 0 10px 26px rgba(15, 23, 42, 0.05);
     border: 1px solid rgba(255, 255, 255, 0.07);
-    min-height: 220px;
+    min-height: 200px;
   }
 
   .dashboard-panel-header {
@@ -329,7 +233,7 @@
 
   .dashboard-panel-header h3 {
     margin: 0;
-    font-size: 20px;
+    font-size: 16px;
     font-weight: 800;
     letter-spacing: -0.02em;
     color: #f1f5f9;
@@ -346,15 +250,6 @@
     white-space: nowrap;
   }
 
-  .dashboard-panel-subsection {
-    min-width: 0;
-    margin-top: 4px;
-  }
-
-  .dashboard-panel-subsection + .dashboard-panel-subsection {
-    margin-top: 16px;
-  }
-
   .dashboard-panel-subtitle {
     margin-bottom: 10px;
     font-size: 13px;
@@ -368,47 +263,6 @@
     height: 1px;
     margin: 16px 0;
     background: rgba(255, 255, 255, 0.06);
-  }
-
-  /* =========================================================
-     HIGHLIGHT CARD
-     ========================================================= */
-  .dashboard-highlight-card {
-    border-radius: 18px;
-    border: 1px solid rgba(255, 255, 255, 0.07);
-    padding: 18px;
-    background: #1e2235;
-    box-shadow: inset 0 1px 0 rgba(255,255,255,0.06);
-  }
-
-  .dashboard-highlight-time {
-    font-size: 30px;
-    font-weight: 800;
-    line-height: 1;
-    margin-bottom: 8px;
-    color: #f1f5f9;
-  }
-
-  .dashboard-highlight-name {
-    font-size: 22px;
-    font-weight: 700;
-    margin-bottom: 10px;
-    color: #f1f5f9;
-  }
-
-  .dashboard-highlight-meta {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 10px;
-    color: #64748b;
-    font-size: 14px;
-  }
-
-  .dashboard-priority-note {
-    margin-top: 14px;
-    font-size: 13px;
-    color: #64748b;
-    line-height: 1.5;
   }
 
   /* =========================================================
@@ -463,10 +317,6 @@
     border-bottom: 1px solid rgba(255,255,255,0.06);
   }
 
-  .dashboard-list-item.compact {
-    align-items: start;
-  }
-
   .dashboard-list-item:last-child {
     border-bottom: none;
   }
@@ -491,7 +341,7 @@
   }
 
   .dashboard-list-title {
-    font-size: 16px;
+    font-size: 15px;
     font-weight: 700;
     color: #f1f5f9;
     margin-bottom: 4px;
@@ -503,13 +353,6 @@
     line-height: 1.4;
   }
 
-  .dashboard-list-value {
-    font-size: 14px;
-    font-weight: 800;
-    color: #4f6ef7;
-    white-space: nowrap;
-  }
-
   .dashboard-empty {
     color: #64748b;
     font-size: 14px;
@@ -518,58 +361,7 @@
   }
 
   /* =========================================================
-     SUMMARY GRID
-     Digunakan Finance Snapshot dan Recall Snapshot
-     ========================================================= */
-  .dashboard-summary-card {
-    margin-top: 24px;
-    padding: 18px;
-    border: 1px solid rgba(255, 255, 255, 0.07);
-    border-radius: 16px;
-    background: #161b2e;
-    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.04);
-  }
-
-  .dashboard-summary-title {
-    font-size: 18px;
-    font-weight: 700;
-    color: #f1f5f9;
-    margin-bottom: 14px;
-  }
-
-  .dashboard-summary-grid {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 12px;
-  }
-
-  .dashboard-summary-box {
-    border-radius: 14px;
-    padding: 14px;
-    background: #161b2e;
-    border: 1px solid rgba(255, 255, 255, 0.07);
-    min-width: 0;
-  }
-
-  .dashboard-summary-box h4 {
-    margin: 0 0 8px;
-    font-size: 13px;
-    color: #64748b;
-    font-weight: 800;
-    line-height: 1.35;
-  }
-
-  .dashboard-summary-text {
-    font-size: 16px;
-    font-weight: 700;
-    color: #f1f5f9;
-    line-height: 1.35;
-    word-break: break-word;
-  }
-
-  /* =========================================================
-     OPS LIST
-     Appointment terbaru, treatment terbaru, recall due
+     OPS LIST — Appointment terbaru, recall due
      ========================================================= */
   .dashboard-ops-list {
     display: flex;
@@ -596,7 +388,7 @@
   }
 
   .dashboard-ops-title {
-    font-size: 16px;
+    font-size: 15px;
     font-weight: 700;
     color: #f1f5f9;
     margin-bottom: 4px;
@@ -624,92 +416,5 @@
     font-weight: 800;
     color: #4f6ef7;
     white-space: nowrap;
-  }
-
-  /* =========================================================
-     DASH-FIN-1H — DASHBOARD FINANCE SNAPSHOT POLISH
-     Polish ringan Finance Snapshot dan panel aktivitas terbaru
-     ========================================================= */
-  .dashboard-finance-snapshot-item {
-    position: relative;
-    overflow: hidden;
-  }
-
-  .dashboard-finance-snapshot-item::before {
-    content: '';
-    position: absolute;
-    inset: 0 auto 0 0;
-    width: 4px;
-    background: #cbd5e1;
-  }
-
-  .dashboard-finance-snapshot-item h4 {
-    padding-left: 4px;
-  }
-
-  .dashboard-finance-snapshot-value {
-    font-size: 17px;
-    font-weight: 700;
-    line-height: 1.25;
-  }
-
-  .dashboard-finance-neutral::before {
-    background: #94a3b8;
-  }
-
-  .dashboard-finance-primary {
-    background: rgba(79, 110, 247, 0.10);
-    border-color: rgba(79, 110, 247, 0.20);
-  }
-
-  .dashboard-finance-primary::before {
-    background: #4f6ef7;
-  }
-
-  .dashboard-finance-primary .dashboard-finance-snapshot-value {
-    color: #4f6ef7;
-  }
-
-  .dashboard-finance-success {
-    background: rgba(34, 197, 94, 0.10);
-    border-color: rgba(34, 197, 94, 0.20);
-  }
-
-  .dashboard-finance-success::before {
-    background: #16a34a;
-  }
-
-  .dashboard-finance-success .dashboard-finance-snapshot-value {
-    color: #86efac;
-  }
-
-  .dashboard-finance-danger {
-    background: rgba(251, 146, 60, 0.12);
-    border-color: rgba(251, 146, 60, 0.20);
-  }
-
-  .dashboard-finance-danger::before {
-    background: #ea580c;
-  }
-
-  .dashboard-finance-danger .dashboard-finance-snapshot-value {
-    color: #fca5a5;
-  }
-
-  .dashboard-finance-snapshot-item .dashboard-list-subtitle {
-    margin-top: 7px;
-    font-size: 12px;
-    line-height: 1.45;
-  }
-
-  .dashboard-panels .dashboard-panel:first-child {
-    border-color: #c7d2fe;
-    background: linear-gradient(180deg, #1e2a4a 0%, #1a2035 100%);
-  }
-
-  .dashboard-panels .dashboard-panel:first-child .dashboard-panel-badge {
-    color: #a5b4fc;
-    background: rgba(79, 110, 247, 0.15);
-    border-color: rgba(79, 110, 247, 0.25);
   }
 </style>
