@@ -115,7 +115,7 @@
         <div class="content-card">
           <div class="patients-table-head">
             <div>
-              <h3 class="patients-section-title">Recall List</h3>
+              <h3 class="recall-section-title">Recall List</h3>
               <div class="patients-section-subtitle">Active monitoring for orthodontic follow-up</div>
             </div>
           </div>
@@ -780,53 +780,53 @@
             <div class="recall-expand-box">
               <div class="recall-expand-grid">
                 <div class="recall-expand-item">
-                  <div class="recall-expand-label">Patient ID</div>
-                  <div class="recall-expand-value">${row.patient_id || '-'}</div>
+                  <div class="pt-detail-label">Patient ID</div>
+                  <div class="pt-detail-value">${row.patient_id || '-'}</div>
                 </div>
 
                 <div class="recall-expand-item">
-                  <div class="recall-expand-label">Phone</div>
-                  <div class="recall-expand-value">${row.phone || '-'}</div>
+                  <div class="pt-detail-label">Phone</div>
+                  <div class="pt-detail-value">${row.phone || '-'}</div>
                 </div>
 
                 <div class="recall-expand-item">
-                  <div class="recall-expand-label">Install Date</div>
-                  <div class="recall-expand-value">${formatRecallDate(row.install_date || '')}</div>
+                  <div class="pt-detail-label">Install Date</div>
+                  <div class="pt-detail-value">${formatRecallDate(row.install_date || '')}</div>
                 </div>
 
                 <div class="recall-expand-item">
-                  <div class="recall-expand-label">Last Control</div>
-                  <div class="recall-expand-value">${formatRecallDate(row.last_control_date || '')}</div>
+                  <div class="pt-detail-label">Last Control</div>
+                  <div class="pt-detail-value">${formatRecallDate(row.last_control_date || '')}</div>
                 </div>
 
                 <div class="recall-expand-item">
-                  <div class="recall-expand-label">Controls</div>
-                  <div class="recall-expand-value">${Number(row.control_count || 0)}</div>
+                  <div class="pt-detail-label">Controls</div>
+                  <div class="pt-detail-value">${Number(row.control_count || 0)}</div>
                 </div>
 
                 <div class="recall-expand-item">
-                  <div class="recall-expand-label">Program</div>
-                  <div class="recall-expand-value">${getRecallProgramBadge(row.program_status)}</div>
+                  <div class="pt-detail-label">Program</div>
+                  <div class="pt-detail-value">${getRecallProgramBadge(row.program_status)}</div>
                 </div>
 
                 <div class="recall-expand-item">
-                  <div class="recall-expand-label">Last Contact Date</div>
-                  <div class="recall-expand-value">${formatRecallDate(row.last_contact_date || '')}</div>
+                  <div class="pt-detail-label">Last Contact Date</div>
+                  <div class="pt-detail-value">${formatRecallDate(row.last_contact_date || '')}</div>
                 </div>
 
                 <div class="recall-expand-item">
-                  <div class="recall-expand-label">Contact Status</div>
-                  <div class="recall-expand-value">${getRecallContactBadge(row.last_contact_date)}</div>
+                  <div class="pt-detail-label">Contact Status</div>
+                  <div class="pt-detail-value">${getRecallContactBadge(row.last_contact_date)}</div>
                 </div>
 
                 <div class="recall-expand-item" style="grid-column: 1 / -1;">
-                  <div class="recall-expand-label">Last Contact Note</div>
-                  <div class="recall-expand-value">${escapeRecallHtml(lastContactNote)}</div>
+                  <div class="pt-detail-label">Last Contact Note</div>
+                  <div class="pt-detail-value">${escapeRecallHtml(lastContactNote)}</div>
                 </div>
 
                 <div class="recall-expand-item" style="grid-column: 1 / -1;">
-                  <div class="recall-expand-label">Notes</div>
-                  <div class="recall-expand-value">${escapeRecallHtml(recallNotes)}</div>
+                  <div class="pt-detail-label">Notes</div>
+                  <div class="pt-detail-value">${escapeRecallHtml(recallNotes)}</div>
                 </div>
               </div>
             </div>
