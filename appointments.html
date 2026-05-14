@@ -333,7 +333,11 @@
       applyAppointmentFilters();
     }
 
-    loadAppointments();
+    // Auto-cancel overdue scheduled appointments sebelum load data segar
+    google.script.run
+      .withSuccessHandler(function() { loadAppointments(); })
+      .withFailureHandler(function() { loadAppointments(); })
+      .autoUpdateOverdueScheduledAppointments();
     syncAppointmentsFullscreenState();
     syncAppointmentsRefreshMode();
   }  
@@ -836,7 +840,7 @@
       const canStartTreatment = !isAppointmentsFullscreenMode && status === 'scheduled' && (admin || owner);  
       const canEdit = !isAppointmentsFullscreenMode && (admin || owner) && status !== 'completed';  
       const canCancel = !isAppointmentsFullscreenMode && (admin || owner) && status !== 'completed' && status !== 'cancelled';  
-      const canRestore = !isAppointmentsFullscreenMode && (admin || owner) && status === 'cancelled';  
+      const canRestore = !isAppointmentsFullscreenMode && (admin || owner) && status === 'cancelled' && !isCancelRestoreLocked(row);
   
       const safePatientName = String(row.patient_name || '').replace(/'/g, "\\'");  
       const topActionCount = 1 + (canEdit ? 1 : 0) + ((canStartTreatment || canCancel || canRestore) ? 1 : 0);  
@@ -988,6 +992,14 @@
     }  
   }  
   
+  function isCancelRestoreLocked(row) {
+    const updatedAt = row && row.updated_at;
+    if (!updatedAt) return false;
+    const cancelledMs = new Date(updatedAt).getTime();
+    if (isNaN(cancelledMs)) return false;
+    return (Date.now() - cancelledMs) >= 24 * 60 * 60 * 1000;
+  }
+
   function getAppointmentStatusBadge(status) {  
     const value = String(status || '').toLowerCase();  
   

@@ -672,7 +672,7 @@
 
           <td>${Number(row.control_count || 0)}</td>
 
-          <td>${formatRecallDate(row.next_due_date || '')}</td>
+          <td>${String(row.followup_status || '').toLowerCase() === 'done' ? '-' : formatRecallDate(row.next_due_date || '')}</td>
 
           <td>${getRecallFollowupBadge(row.followup_status)}</td>
 

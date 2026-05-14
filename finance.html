@@ -441,14 +441,9 @@ function financeGetFailureErrorMessage(err, fallbackMessage) {
 function financeRenderInlineStateHtml(type, title, message) {
   const stateType = String(type || 'info').trim().toLowerCase();
 
-  const spinnerHtml = stateType === 'loading'
-    ? '<span class="finance-loading-spinner" aria-hidden="true"></span>'
-    : '';
-
   return `
     <div class="finance-ui-state finance-ui-state-${escapeFinanceHtml(stateType)}">
       <div class="finance-ui-state-head">
-        ${spinnerHtml}
         <div class="finance-ui-state-title">${escapeFinanceHtml(title || '')}</div>
       </div>
       ${

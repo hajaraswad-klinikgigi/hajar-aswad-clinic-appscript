@@ -775,6 +775,17 @@ function restoreAppointment(id, options) {
       };
     }
 
+    const cancelledAt = existing.updated_at;
+    if (cancelledAt) {
+      const cancelledMs = new Date(cancelledAt).getTime();
+      if (!isNaN(cancelledMs) && (Date.now() - cancelledMs) >= 24 * 60 * 60 * 1000) {
+        return {
+          success: false,
+          message: 'Appointment sudah tidak bisa direstore (lebih dari 24 jam sejak dibatalkan)'
+        };
+      }
+    }
+
     if (hasOpenAppointmentForPatientFromRows(snapshot.rows, existing.patient_id, id)) {
       return {
         success: false,
@@ -808,6 +819,63 @@ function restoreAppointment(id, options) {
     };
   } finally {
     lock.releaseLock();
+  }
+}
+
+/* =========================================================
+   AUTO-CANCEL OVERDUE APPOINTMENTS
+   ========================================================= */
+
+/**
+ * Auto-cancel semua appointment berstatus 'scheduled' yang tanggalnya
+ * sudah lewat 1x24 jam (appointment_date < hari ini).
+ *
+ * Dipanggil dari client saat halaman Appointments dibuka.
+ * Supabase mode: satu bulk PATCH — efisien.
+ * Spreadsheet mode: fetch snapshot → loop → update satu per satu.
+ */
+function autoUpdateOverdueScheduledAppointments(options) {
+  try {
+    var today = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd');
+
+    if (dbIsSupabaseMode_(options)) {
+      var targetTable = repoGetTargetTableForSheet_(
+        repoNormalizeTableName_(REPO_TABLES.APPOINTMENTS)
+      );
+      // Satu PATCH request ke Supabase:
+      // WHERE status = 'scheduled' AND appointment_date < today
+      // SET status = 'cancelled', updated_at = now
+      supabaseUpdate_(
+        targetTable,
+        { status: 'eq.scheduled', appointment_date: 'lt.' + today },
+        { status: 'cancelled', updated_at: nowIso() }
+      );
+      clearAppointmentsListCache();
+      return { success: true };
+    }
+
+    // Spreadsheet mode: filter manual lalu update satu per satu
+    var snapshot = getAppointmentsSheetSnapshot();
+    var overdue = (snapshot.rows || []).filter(function(row) {
+      return String(row.status || '').toLowerCase() === 'scheduled'
+        && String(row.appointment_date || '').trim() < today;
+    });
+
+    overdue.forEach(function(row) {
+      updateAppointmentRowFromSnapshot(snapshot, row.appointment_id, {
+        status: 'cancelled',
+        updated_at: nowIso()
+      });
+    });
+
+    if (overdue.length > 0) clearAppointmentsListCache();
+    return { success: true, updated: overdue.length };
+
+  } catch (err) {
+    return {
+      success: false,
+      message: String(err && err.message ? err.message : err || '')
+    };
   }
 }
 
