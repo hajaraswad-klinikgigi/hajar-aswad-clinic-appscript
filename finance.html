@@ -2682,36 +2682,31 @@ function renderFinanceBillingDetailLoadingState() {
 
   content.innerHTML = `
     <div class="finance-detail-header-card">
-      <div style="width:100%;">
+      <div class="finance-detail-header-full">
         <div class="finance-detail-label">Detail Billing</div>
-
-        ${financeRenderInlineStateHtml(
-          'loading',
-          'Memuat ringkasan billing...',
-          'Sistem sedang mengambil data invoice, pasien, status pembayaran, dan total billing.'
-        )}
+        <div class="pt-loading">Memuat ringkasan billing...</div>
       </div>
     </div>
 
     <div class="finance-detail-grid">
       <div class="finance-detail-box">
         <div class="finance-detail-label">Pasien</div>
-        ${financeRenderInlineStateHtml('loading', 'Memuat data pasien...', 'Mohon tunggu sebentar.')}
+        <div class="pt-loading">Memuat...</div>
       </div>
 
       <div class="finance-detail-box">
         <div class="finance-detail-label">Tanggal Billing</div>
-        ${financeRenderInlineStateHtml('loading', 'Memuat tanggal...', 'Mohon tunggu sebentar.')}
+        <div class="pt-loading">Memuat...</div>
       </div>
 
       <div class="finance-detail-box">
         <div class="finance-detail-label">Treatment ID</div>
-        ${financeRenderInlineStateHtml('loading', 'Memuat treatment...', 'Mohon tunggu sebentar.')}
+        <div class="pt-loading">Memuat...</div>
       </div>
 
       <div class="finance-detail-box">
         <div class="finance-detail-label">Due Date</div>
-        ${financeRenderInlineStateHtml('loading', 'Memuat due date...', 'Mohon tunggu sebentar.')}
+        <div class="pt-loading">Memuat...</div>
       </div>
     </div>
 
