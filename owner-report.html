@@ -893,7 +893,12 @@ function ownerPrintDailyReport() {
   sectionTitle('Ringkasan Keuangan');
   doc.autoTable({
     startY: y,
-    head: [['Keterangan', 'Jumlah', 'Keterangan', 'Jumlah']],
+    head: [[
+      { content: 'Keterangan', styles: { halign: 'left' } },
+      { content: 'Jumlah',     styles: { halign: 'right' } },
+      { content: 'Keterangan', styles: { halign: 'left' } },
+      { content: 'Jumlah',     styles: { halign: 'right' } },
+    ]],
     body: [
       ['Kas Masuk',          ownerFmtRp(rev.total_cash_in),   'Total Omset',   ownerFmtRp(rev.total_billing)],
       ['  – Transfer',  ownerFmtRp(byPay.transfer || 0), 'Jml Pasien',    (rev.patient_count || 0) + ' orang'],
@@ -904,10 +909,10 @@ function ownerPrintDailyReport() {
     headStyles: headStyle,
     bodyStyles: bodyStyle,
     columnStyles: {
-      0: { cellWidth: 42, textColor: GRAY },
-      1: { cellWidth: 50, fontStyle: 'bold' },
-      2: { cellWidth: 42, textColor: GRAY },
-      3: { cellWidth: 48, fontStyle: 'bold' },
+      0: { cellWidth: 42, textColor: GRAY, halign: 'left' },
+      1: { cellWidth: 50, fontStyle: 'bold', halign: 'right' },
+      2: { cellWidth: 42, textColor: GRAY, halign: 'left' },
+      3: { cellWidth: 48, fontStyle: 'bold', halign: 'right' },
     },
     alternateRowStyles: { fillColor: STRIPE },
     margin: { left: MARGIN, right: MARGIN },
@@ -945,7 +950,12 @@ function ownerPrintDailyReport() {
             { content: ownerFmtRp(d.total_cash_in),
               styles: { fillColor: BLUE, textColor: [255,255,255], fontStyle: 'bold', fontSize: 9, cellPadding: 3.5, halign: 'right' } },
           ],
-          ['Pasien', 'Layanan / Treatment', 'Biaya', 'Bayar'],
+          [
+            { content: 'Pasien',             styles: { halign: 'left' } },
+            { content: 'Layanan / Treatment', styles: { halign: 'left' } },
+            { content: 'Biaya',              styles: { halign: 'right' } },
+            { content: 'Bayar',              styles: { halign: 'right' } },
+          ],
         ],
         body: patients.length
           ? patients.map(function(p) {
@@ -979,7 +989,11 @@ function ownerPrintDailyReport() {
     sectionTitle('Per Jenis Layanan');
     doc.autoTable({
       startY: y,
-      head: [['Layanan', 'Jumlah', 'Total']],
+      head: [[
+        { content: 'Layanan', styles: { halign: 'left' } },
+        { content: 'Jumlah',  styles: { halign: 'center' } },
+        { content: 'Total',   styles: { halign: 'right' } },
+      ]],
       body: bySvc.map(function(s) {
         return [s.service_name || '-', String(s.count || 0), ownerFmtRp(s.total)];
       }),
@@ -987,9 +1001,9 @@ function ownerPrintDailyReport() {
       headStyles: headStyle,
       bodyStyles: bodyStyle,
       columnStyles: {
-        0: { cellWidth: 112 },
-        1: { cellWidth: 26, halign: 'center' },
-        2: { cellWidth: 44, halign: 'right' },
+        0: { cellWidth: 112, halign: 'left' },
+        1: { cellWidth: 26,  halign: 'center' },
+        2: { cellWidth: 44,  halign: 'right' },
       },
       alternateRowStyles: { fillColor: STRIPE },
       margin: { left: MARGIN, right: MARGIN },
@@ -1007,16 +1021,22 @@ function ownerPrintDailyReport() {
     sectionTitle('Pengeluaran per Kategori');
     doc.autoTable({
       startY: y,
-      head: [['Kategori', 'Total']],
+      head: [[
+        { content: 'Kategori', styles: { halign: 'left' } },
+        { content: 'Total',    styles: { halign: 'right' } },
+      ]],
       body: catRows,
-      foot: [['Total Pengeluaran', ownerFmtRp(exp.total_expense)]],
+      foot: [[
+        { content: 'Total Pengeluaran',          styles: { halign: 'left' } },
+        { content: ownerFmtRp(exp.total_expense), styles: { halign: 'right' } },
+      ]],
       theme: 'striped',
       headStyles: headStyle,
       bodyStyles: bodyStyle,
       footStyles: footStyle,
       columnStyles: {
-        0: { cellWidth: 120 },
-        1: { cellWidth: 62, halign: 'right' },
+        0: { cellWidth: 120, halign: 'left' },
+        1: { cellWidth: 62,  halign: 'right' },
       },
       alternateRowStyles: { fillColor: STRIPE },
       margin: { left: MARGIN, right: MARGIN },
@@ -1029,7 +1049,11 @@ function ownerPrintDailyReport() {
     sectionTitle('Detail Pengeluaran');
     doc.autoTable({
       startY: y,
-      head: [['Kategori', 'Keterangan', 'Nominal']],
+      head: [[
+        { content: 'Kategori',   styles: { halign: 'left' } },
+        { content: 'Keterangan', styles: { halign: 'left' } },
+        { content: 'Nominal',    styles: { halign: 'right' } },
+      ]],
       body: items.map(function(e) {
         var desc = e.description || '-';
         if (e.doctor_name) desc += ' (' + e.doctor_name + ')';
@@ -1039,15 +1063,19 @@ function ownerPrintDailyReport() {
           ownerFmtRp(e.amount),
         ];
       }),
-      foot: [['', 'Total', ownerFmtRp(exp.total_expense)]],
+      foot: [[
+        { content: '',                            styles: { halign: 'left' } },
+        { content: 'Total',                       styles: { halign: 'left' } },
+        { content: ownerFmtRp(exp.total_expense), styles: { halign: 'right' } },
+      ]],
       theme: 'striped',
       headStyles: headStyle,
       bodyStyles: bodyStyle,
       footStyles: footStyle,
       columnStyles: {
-        0: { cellWidth: 34 },
-        1: { cellWidth: 108 },
-        2: { cellWidth: 40, halign: 'right' },
+        0: { cellWidth: 34,  halign: 'left' },
+        1: { cellWidth: 108, halign: 'left' },
+        2: { cellWidth: 40,  halign: 'right' },
       },
       alternateRowStyles: { fillColor: STRIPE },
       margin: { left: MARGIN, right: MARGIN },
