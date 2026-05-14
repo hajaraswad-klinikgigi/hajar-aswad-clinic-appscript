@@ -849,9 +849,10 @@
             <div class="appointment-queue-number">${queueNumber}</div>  
           </td>  
   
-          <td>  
-            <span class="appointment-patient-name">${row.patient_name || ''}</span>  
-          </td>  
+          <td>
+            <div class="appointment-patient-name">${row.patient_name || ''}</div>
+            <div class="finance-invoice-sub">${row.patient_id || ''}</div>
+          </td>
   
           <td>${formatAppointmentDateDisplay(row.appointment_date)}</td>  
   
