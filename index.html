@@ -262,14 +262,7 @@
       <div class="modal-box modal-box-sticky patient-photo-upload-modal-box">
         <div class="detail-modal-header-sticky">
           <h2 class="detail-modal-title-sticky">Upload Foto Pasien</h2>
-
-          <button
-            type="button"
-            class="detail-close-btn"
-            onclick="closePatientPhotoUploadModal()"
-            aria-label="Tutup modal upload foto pasien"
-            title="Tutup"
-          >
+          <button type="button" class="detail-close-btn" onclick="closePatientPhotoUploadModal()" aria-label="Tutup modal upload foto pasien" title="Tutup">
             <svg viewBox="0 0 24 24" fill="none" stroke-width="2">
               <path d="M6 6l12 12"></path>
               <path d="M18 6l-12 12"></path>
@@ -281,25 +274,32 @@
           <form onsubmit="submitPatientPhotoUpload(event)">
             <input type="hidden" id="photo_patient_id_hidden">
 
-            <label>Treatment</label>
-            <select id="photo_treatment_id" required onchange="handlePatientPhotoTreatmentChange()"></select>
-            <div id="error_photo_treatment_id" class="field-error"></div>
-            <div id="photo_treatment_warning" class="field-error" style="display:none;"></div>
+            <div class="patient-form-section">Referensi</div>
+            <div class="patient-form-grid">
+              <div>
+                <label>Treatment</label>
+                <select id="photo_treatment_id" required onchange="handlePatientPhotoTreatmentChange()"></select>
+                <div id="error_photo_treatment_id" class="field-error"></div>
+                <div id="photo_treatment_warning" class="field-error" style="display:none;"></div>
+              </div>
+              <div>
+                <label>Tipe Foto</label>
+                <select id="photo_type" required>
+                  <option value="">Pilih tipe</option>
+                  <option value="before">before</option>
+                  <option value="after">after</option>
+                </select>
+                <div id="error_photo_type" class="field-error"></div>
+              </div>
+            </div>
 
-            <label>Tipe Foto</label>
-            <select id="photo_type" required>
-              <option value="">Pilih tipe</option>
-              <option value="before">before</option>
-              <option value="after">after</option>
-            </select>
-            <div id="error_photo_type" class="field-error"></div>
-
+            <div class="patient-form-section">Upload</div>
             <label>File Foto</label>
             <input type="file" id="photo_file_input" accept="image/png,image/jpeg,image/webp" required onchange="previewPatientPhotoFile(this)">
             <div id="error_photo_file" class="field-error"></div>
 
-            <div id="photoPreviewWrap" style="display:none; margin-bottom:14px;">
-              <img id="photoPreviewImage" alt="Preview Foto" style="width:100%; max-height:280px; object-fit:cover; border-radius:14px; border:1px solid #e5e7eb;">
+            <div id="photoPreviewWrap" style="display:none; margin-bottom:12px;">
+              <img id="photoPreviewImage" alt="Preview Foto" style="width:100%; max-height:260px; object-fit:cover; border-radius:12px; border:1px solid rgba(255,255,255,0.08);">
             </div>
 
             <label>Catatan Foto</label>
@@ -342,38 +342,31 @@
     </div>
 
     <div id="confirmDeletePatientPhotoModal" class="modal hidden">
-      <div class="modal-box" style="width:420px;">
-        <h2>Konfirmasi</h2>
-        <p id="confirmDeletePatientPhotoText" class="confirm-text">Yakin ingin menghapus foto pasien ini?</p>
-        <div class="confirm-modal-actions">
-          <button
-            type="button"
-            class="btn btn-secondary"
-            id="confirmDeletePatientPhotoCancelBtn"
-            onclick="closeDeletePatientPhotoModal()"
-          >
-            Batal
-          </button>
-
-          <button
-            type="button"
-            class="btn btn-danger"
-            id="confirmDeletePatientPhotoSubmitBtn"
-            onclick="executeDeletePatientPhoto()"
-          >
-            Hapus Foto
-          </button>
+      <div class="modal-box confirm-modal-box">
+        <div class="detail-modal-header-sticky">
+          <h2 class="detail-modal-title-sticky">Konfirmasi</h2>
+        </div>
+        <div style="padding:16px 24px 20px;">
+          <p id="confirmDeletePatientPhotoText" class="confirm-text">Yakin ingin menghapus foto pasien ini?</p>
+          <div class="confirm-modal-actions">
+            <button type="button" class="btn btn-secondary" id="confirmDeletePatientPhotoCancelBtn" onclick="closeDeletePatientPhotoModal()">Batal</button>
+            <button type="button" class="btn btn-danger" id="confirmDeletePatientPhotoSubmitBtn" onclick="executeDeletePatientPhoto()">Hapus Foto</button>
+          </div>
         </div>
       </div>
     </div>
 
     <div id="confirmDeactivateModal" class="modal hidden">
-      <div class="modal-box" style="width:420px;">
-        <h2>Konfirmasi</h2>
-        <p id="confirmDeactivateText" class="confirm-text">Yakin ingin menonaktifkan pasien?</p>
-        <div class="confirm-modal-actions">
-          <button type="button" class="btn btn-secondary" onclick="closeDeactivateModal()">Batal</button>
-          <button type="button" class="btn btn-danger" onclick="executeDeactivatePatient()">Nonaktifkan</button>
+      <div class="modal-box confirm-modal-box">
+        <div class="detail-modal-header-sticky">
+          <h2 class="detail-modal-title-sticky">Konfirmasi</h2>
+        </div>
+        <div style="padding:16px 24px 20px;">
+          <p id="confirmDeactivateText" class="confirm-text">Yakin ingin menonaktifkan pasien?</p>
+          <div class="confirm-modal-actions">
+            <button type="button" class="btn btn-secondary" onclick="closeDeactivateModal()">Batal</button>
+            <button type="button" class="btn btn-danger" onclick="executeDeactivatePatient()">Nonaktifkan</button>
+          </div>
         </div>
       </div>
     </div>
