@@ -1029,7 +1029,7 @@ function ownerPrintDailyReport() {
     sectionTitle('Detail Pengeluaran');
     doc.autoTable({
       startY: y,
-      head: [['Kategori', 'Keterangan', 'Nominal', 'Oleh']],
+      head: [['Kategori', 'Keterangan', 'Nominal']],
       body: items.map(function(e) {
         var desc = e.description || '-';
         if (e.doctor_name) desc += ' (' + e.doctor_name + ')';
@@ -1037,19 +1037,17 @@ function ownerPrintDailyReport() {
           OWNER_CATEGORY_LABELS[e.category] || e.category || '-',
           desc,
           ownerFmtRp(e.amount),
-          e.recorded_by || '-',
         ];
       }),
-      foot: [['', 'Total', ownerFmtRp(exp.total_expense), '']],
+      foot: [['', 'Total', ownerFmtRp(exp.total_expense)]],
       theme: 'striped',
       headStyles: headStyle,
       bodyStyles: bodyStyle,
       footStyles: footStyle,
       columnStyles: {
         0: { cellWidth: 34 },
-        1: { cellWidth: 78 },
+        1: { cellWidth: 108 },
         2: { cellWidth: 40, halign: 'right' },
-        3: { cellWidth: 30 },
       },
       alternateRowStyles: { fillColor: STRIPE },
       margin: { left: MARGIN, right: MARGIN },
