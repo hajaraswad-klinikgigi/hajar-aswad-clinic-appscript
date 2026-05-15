@@ -1488,10 +1488,10 @@
         });
 
         showToast('Error: ' + (err && err.message ? err.message : err), 'error');
-      })[action](payload);
-  }  
-  
-  function setAppointmentStatusOptions(mode) {  
+      })[action](attachAuthContext(payload));
+  }
+
+  function setAppointmentStatusOptions(mode) {
     const select = document.getElementById('appointment_status');  
     if (!select) return;  
   
@@ -2291,7 +2291,7 @@
 
         showToast('Error: ' + (err && err.message ? err.message : err), 'error');
       })
-      .cancelAppointment(targetAppointmentId);
+      .cancelAppointment(targetAppointmentId, getCurrentAuthContext());
   }  
   
   function confirmRestoreAppointment(id, name) {  
@@ -2365,7 +2365,7 @@
 
         showToast('Error: ' + (err && err.message ? err.message : err), 'error');
       })
-      .restoreAppointment(targetAppointmentId);
+      .restoreAppointment(targetAppointmentId, getCurrentAuthContext());
   } 
   
   function preloadTreatmentMasters() {  

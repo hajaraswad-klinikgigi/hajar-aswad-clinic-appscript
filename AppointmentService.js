@@ -450,6 +450,12 @@ function checkPatientOpenAppointment(patientId, excludeAppointmentId, options) {
 }
 
 function createAppointment(data) {
+  const auth = readAuthSession_(data);
+  if (!auth.success) return auth;
+  if (auth.user.role !== 'admin' && auth.user.role !== 'owner') {
+    return { success: false, message: 'Hanya admin atau owner yang dapat menambah appointment.' };
+  }
+
   const freezeCheck = repoCheckProductionMutationAllowed_({
     operation: 'CREATE_APPOINTMENT',
     module: 'AppointmentService',
@@ -542,6 +548,12 @@ function createAppointment(data) {
 }
 
 function updateAppointment(data) {
+  const auth = readAuthSession_(data);
+  if (!auth.success) return auth;
+  if (auth.user.role !== 'admin' && auth.user.role !== 'owner') {
+    return { success: false, message: 'Hanya admin atau owner yang dapat mengubah appointment.' };
+  }
+
   const freezeCheck = repoCheckProductionMutationAllowed_({
     operation: 'UPDATE_APPOINTMENT',
     module: 'AppointmentService',
@@ -664,6 +676,12 @@ function updateAppointment(data) {
 }
 
 function cancelAppointment(id, options) {
+  const auth = readAuthSession_(options || {});
+  if (!auth.success) return auth;
+  if (auth.user.role !== 'admin' && auth.user.role !== 'owner') {
+    return { success: false, message: 'Hanya admin atau owner yang dapat membatalkan appointment.' };
+  }
+
   const freezeCheck = repoCheckProductionMutationAllowed_({
     operation: 'CANCEL_APPOINTMENT',
     module: 'AppointmentService',
@@ -739,6 +757,12 @@ function cancelAppointment(id, options) {
 }
 
 function restoreAppointment(id, options) {
+  const auth = readAuthSession_(options || {});
+  if (!auth.success) return auth;
+  if (auth.user.role !== 'admin' && auth.user.role !== 'owner') {
+    return { success: false, message: 'Hanya admin atau owner yang dapat merestore appointment.' };
+  }
+
   const freezeCheck = repoCheckProductionMutationAllowed_({
     operation: 'RESTORE_APPOINTMENT',
     module: 'AppointmentService',
