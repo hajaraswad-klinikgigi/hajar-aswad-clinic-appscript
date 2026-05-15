@@ -1057,6 +1057,18 @@ function getOwnerDailyReport(payload) {
     });
     const piutangBaru = piutangBillings.reduce(function(s, b) { return s + Number(b.outstanding_total || 0); }, 0);
 
+    var doctorFeeDraft = null;
+    try {
+      if (typeof calculateDoctorFeeDraft === 'function') {
+        var draftResult = calculateDoctorFeeDraft({ session_token: payload.session_token, date: date });
+        if (draftResult && draftResult.success) {
+          doctorFeeDraft = draftResult.data;
+        }
+      }
+    } catch (errDraft) {
+      doctorFeeDraft = { error: errDraft.message, doctors: [], warnings: [] };
+    }
+
     return {
       success: true,
       data: {
@@ -1067,7 +1079,8 @@ function getOwnerDailyReport(payload) {
           cash_in:       revenue.total_cash_in,
           total_expense: expSummary.total_expense,
           net_cash:      revenue.total_cash_in - expSummary.total_expense
-        }
+        },
+        doctor_fee_draft: doctorFeeDraft
       }
     };
 
