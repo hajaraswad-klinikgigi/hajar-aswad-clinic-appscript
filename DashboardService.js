@@ -359,8 +359,7 @@ function buildDashboardFeedbackSummary(startYmd, endYmd) {
       return String(b.submitted_at || b.submitted_ymd || '').localeCompare(
         String(a.submitted_at || a.submitted_ymd || '')
       );
-    })
-    .slice(0, 5);
+    });
 
   return summary;
 }
