@@ -474,6 +474,12 @@ function syncOrthoRecallAfterTreatment(orthoMode, treatment, patient) {
 }
 
 function createTreatment(payload) {
+  const auth = readAuthSession_(payload);
+  if (!auth.success) return auth;
+  if (!isTreatmentManagerRole(auth.user.role)) {
+    return rejectTreatmentAccess();
+  }
+
   const freezeCheck = repoCheckProductionMutationAllowed_({
     operation: 'CREATE_TREATMENT',
     module: 'TreatmentService',
@@ -493,10 +499,6 @@ function createTreatment(payload) {
 
   try {
     lock.waitLock(5000);
-
-    if (!isTreatmentManagerRole(payload.actor_role)) {
-      return rejectTreatmentAccess();
-    }
 
     const errors = validateTreatmentPayload(payload);
 

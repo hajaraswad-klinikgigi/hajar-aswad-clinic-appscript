@@ -2049,7 +2049,7 @@
 
         showToast('Error: ' + (err && err.message ? err.message : err), 'error');
       })
-      .createTreatment(payload);
+      .createTreatment(attachAuthContext(payload));
   }  
   
   function handleAppointmentPatientSearch() {  
