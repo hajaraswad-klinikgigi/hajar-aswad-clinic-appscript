@@ -1,0 +1,654 @@
+<script>
+/* =========================================================
+   SETTINGS PAGE — STATE
+   ========================================================= */
+var settingsTab = 'clinic';
+var settingsDoctorRules = [];
+var settingsServices = [];
+var settingsUsers = [];
+
+/* =========================================================
+   ENTRY POINT
+   ========================================================= */
+function showSettingsPage() {
+  document.querySelectorAll('.sidebar-menu').forEach(function(b) { b.classList.remove('active'); });
+  var btn = document.getElementById('menuSettings');
+  if (btn) btn.classList.add('active');
+
+  var contentArea = document.getElementById('contentArea');
+  if (!contentArea) return;
+
+  contentArea.innerHTML =
+    '<div class="settings-shell">' +
+      '<div class="settings-header">' +
+        '<div class="owner-eyebrow">Pengaturan</div>' +
+        '<h1 class="owner-title">Pengaturan Sistem</h1>' +
+      '</div>' +
+      '<div class="settings-tab-bar" id="settingsTabBar">' +
+        '<button class="settings-tab-btn" onclick="settingsSwitchTab(\'clinic\')">Info Klinik</button>' +
+        '<button class="settings-tab-btn" onclick="settingsSwitchTab(\'doctor\')">Fee Dokter</button>' +
+        '<button class="settings-tab-btn" onclick="settingsSwitchTab(\'service\')">Katalog Layanan</button>' +
+        '<button class="settings-tab-btn" onclick="settingsSwitchTab(\'user\')">Pengguna</button>' +
+      '</div>' +
+      '<div id="settingsTabContent"><div class="settings-empty">Memuat...</div></div>' +
+    '</div>';
+
+  settingsSwitchTab('clinic');
+}
+
+function settingsSwitchTab(tab) {
+  settingsTab = tab;
+  var tabs = ['clinic','doctor','service','user'];
+  var bar = document.getElementById('settingsTabBar');
+  if (bar) {
+    var btns = bar.querySelectorAll('.settings-tab-btn');
+    btns.forEach(function(b, i) {
+      b.classList.toggle('active', tabs[i] === tab);
+    });
+  }
+  settingsLoadTab(tab);
+}
+
+function settingsLoadTab(tab) {
+  var el = document.getElementById('settingsTabContent');
+  if (el) el.innerHTML = '<div class="settings-empty">Memuat...</div>';
+  var token = getCurrentSessionToken();
+
+  if (tab === 'clinic') {
+    google.script.run
+      .withSuccessHandler(function(res) {
+        if (!res || !res.success) { settingsRenderError(res && res.message); return; }
+        settingsRenderClinicTab(res.data);
+      })
+      .withFailureHandler(function(err) { settingsRenderError(err && err.message); })
+      .getClinicInfo({ session_token: token });
+
+  } else if (tab === 'doctor') {
+    google.script.run
+      .withSuccessHandler(function(res) {
+        if (!res || !res.success) { settingsRenderError(res && res.message); return; }
+        settingsDoctorRules = res.data || [];
+        settingsRenderDoctorTab();
+      })
+      .withFailureHandler(function(err) { settingsRenderError(err && err.message); })
+      .getDoctorCompensationRules({ session_token: token });
+
+  } else if (tab === 'service') {
+    google.script.run
+      .withSuccessHandler(function(res) {
+        if (!res || !res.success) { settingsRenderError(res && res.message); return; }
+        settingsServices = res.data || [];
+        settingsRenderServiceTab();
+      })
+      .withFailureHandler(function(err) { settingsRenderError(err && err.message); })
+      .getServiceCatalogList({ session_token: token, include_inactive: true });
+
+  } else if (tab === 'user') {
+    google.script.run
+      .withSuccessHandler(function(res) {
+        if (!res || !res.success) { settingsRenderError(res && res.message); return; }
+        settingsUsers = res.data || [];
+        settingsRenderUserTab();
+      })
+      .withFailureHandler(function(err) { settingsRenderError(err && err.message); })
+      .getUserList({ session_token: token });
+  }
+}
+
+function settingsRenderError(msg) {
+  var el = document.getElementById('settingsTabContent');
+  if (el) el.innerHTML = '<div class="settings-empty">Gagal memuat: ' + escapeAppHtml(msg || 'Terjadi kesalahan') + '</div>';
+}
+
+/* =========================================================
+   TAB 1 — INFO KLINIK
+   ========================================================= */
+function settingsRenderClinicTab(data) {
+  var el = document.getElementById('settingsTabContent');
+  if (!el) return;
+  var d = data || {};
+  el.innerHTML =
+    '<div class="settings-section-card">' +
+      '<div class="settings-section-title">Info Klinik</div>' +
+      '<form onsubmit="settingsSubmitClinic(event)">' +
+        '<div class="settings-form-grid">' +
+          '<div class="full-width">' +
+            '<label>Nama Klinik</label>' +
+            '<input type="text" id="s_clinic_name" value="' + escapeAppHtml(d.clinic_name||'') + '" required>' +
+          '</div>' +
+          '<div>' +
+            '<label>Telepon</label>' +
+            '<input type="text" id="s_clinic_phone" value="' + escapeAppHtml(d.phone||'') + '">' +
+          '</div>' +
+          '<div>' +
+            '<label>Email</label>' +
+            '<input type="email" id="s_clinic_email" value="' + escapeAppHtml(d.email||'') + '">' +
+          '</div>' +
+          '<div class="full-width">' +
+            '<label>Alamat</label>' +
+            '<textarea id="s_clinic_address" rows="3">' + escapeAppHtml(d.address||'') + '</textarea>' +
+          '</div>' +
+        '</div>' +
+        '<div style="margin-top:4px">' +
+          '<button type="submit" class="btn btn-primary" id="settingsClinicSaveBtn">Simpan Perubahan</button>' +
+        '</div>' +
+      '</form>' +
+    '</div>';
+}
+
+function settingsSubmitClinic(e) {
+  e.preventDefault();
+  var btn = document.getElementById('settingsClinicSaveBtn');
+  if (btn) btn.disabled = true;
+  google.script.run
+    .withSuccessHandler(function(res) {
+      if (btn) btn.disabled = false;
+      if (!res || !res.success) { showToast(res && res.message || 'Gagal menyimpan', 'error'); return; }
+      showToast('Info klinik berhasil disimpan', 'success');
+    })
+    .withFailureHandler(function(err) {
+      if (btn) btn.disabled = false;
+      showToast('Error: ' + (err && err.message || err), 'error');
+    })
+    .updateClinicInfo({
+      session_token: getCurrentSessionToken(),
+      clinic_name:   document.getElementById('s_clinic_name').value.trim(),
+      phone:         document.getElementById('s_clinic_phone').value.trim(),
+      email:         document.getElementById('s_clinic_email').value.trim(),
+      address:       document.getElementById('s_clinic_address').value.trim()
+    });
+}
+
+/* =========================================================
+   TAB 2 — FEE DOKTER
+   ========================================================= */
+function settingsRenderDoctorTab() {
+  var el = document.getElementById('settingsTabContent');
+  if (!el) return;
+
+  var rows = settingsDoctorRules.map(function(r) {
+    var typeBadge = r.fee_type === 'fixed'
+      ? '<span class="settings-badge settings-badge-fixed">Gaji Tetap</span>'
+      : '<span class="settings-badge settings-badge-pct">Persentase</span>';
+    var activeBadge = r.is_active !== false
+      ? '<span class="settings-badge settings-badge-active">Aktif</span>'
+      : '<span class="settings-badge settings-badge-inactive">Nonaktif</span>';
+    var detail = r.fee_type === 'fixed'
+      ? (r.fixed_salary ? formatAppRupiah(r.fixed_salary) + '/bln' : '-')
+      : [
+          r.base_percentage    ? 'Base: ' + (r.base_percentage*100) + '%'    : '',
+          r.control_percentage ? 'Kontrol: ' + (r.control_percentage*100) + '%' : '',
+          r.material_deduction ? 'Potongan: ' + (r.material_deduction*100) + '%' : ''
+        ].filter(Boolean).join(' &bull; ');
+    return '<tr>' +
+      '<td>' + escapeAppHtml(r.doctor_name) + '</td>' +
+      '<td>' + typeBadge + '</td>' +
+      '<td style="font-size:12px;color:#94a3b8">' + detail + '</td>' +
+      '<td>' + activeBadge + '</td>' +
+      '<td><div class="settings-row-actions">' +
+        '<button class="btn btn-secondary" style="padding:5px 12px;font-size:12px" ' +
+          'onclick="settingsOpenDoctorModal(\'' + escapeAppHtml(r.doctor_name) + '\')">Edit</button>' +
+        (r.is_active !== false
+          ? '<button class="btn btn-danger" style="padding:5px 12px;font-size:12px" ' +
+              'onclick="settingsDeactivateDoctor(\'' + escapeAppHtml(r.doctor_name) + '\')">Nonaktifkan</button>'
+          : '<button class="btn btn-secondary" style="padding:5px 12px;font-size:12px" ' +
+              'onclick="settingsActivateDoctor(\'' + escapeAppHtml(r.doctor_name) + '\')">Aktifkan</button>') +
+      '</div></td>' +
+    '</tr>';
+  }).join('');
+
+  el.innerHTML =
+    '<div class="settings-section-card">' +
+      '<div class="settings-table-header">' +
+        '<div class="settings-table-title">Aturan Fee Dokter</div>' +
+        '<button class="btn btn-primary" style="padding:7px 14px;font-size:13px" onclick="settingsOpenDoctorModal(null)">+ Tambah Dokter</button>' +
+      '</div>' +
+      '<div class="table-wrapper"><table class="table">' +
+        '<thead><tr><th>Nama Dokter</th><th>Tipe</th><th>Detail</th><th>Status</th><th></th></tr></thead>' +
+        '<tbody>' + (rows || '<tr><td colspan="5" class="settings-empty">Belum ada data</td></tr>') + '</tbody>' +
+      '</table></div>' +
+    '</div>' +
+    settingsDoctorModalHtml();
+}
+
+function settingsDoctorModalHtml() {
+  return '<div class="settings-modal-overlay" id="settingsDoctorModalOverlay">' +
+    '<div class="settings-modal-box">' +
+      '<div class="settings-modal-head">' +
+        '<h3 class="settings-modal-title" id="settingsDoctorModalTitle">Tambah Dokter</h3>' +
+        '<button type="button" class="detail-close-btn" onclick="settingsCloseDoctorModal()">&#x2715;</button>' +
+      '</div>' +
+      '<div class="settings-modal-body">' +
+        '<form id="settingsDoctorForm" onsubmit="settingsSubmitDoctor(event)">' +
+          '<label>Nama Dokter</label>' +
+          '<input type="text" id="sd_doctor_name" required>' +
+          '<label>Tipe Fee</label>' +
+          '<select id="sd_fee_type" onchange="settingsDoctorFeeTypeChange()">' +
+            '<option value="percentage">Persentase</option>' +
+            '<option value="fixed">Gaji Tetap</option>' +
+          '</select>' +
+          '<div id="sd_pct_fields">' +
+            '<label>Base Persentase (contoh: 0.35 = 35%)</label>' +
+            '<input type="number" id="sd_base_pct" step="0.01" min="0" max="1" placeholder="0.35">' +
+            '<label>Persentase Kontrol (opsional, biarkan kosong = sama dengan base)</label>' +
+            '<input type="number" id="sd_ctrl_pct" step="0.01" min="0" max="1" placeholder="0.50">' +
+            '<label>Potongan Material (opsional, contoh: 0.15 = 15%)</label>' +
+            '<input type="number" id="sd_mat_ded" step="0.01" min="0" max="1" placeholder="0.15">' +
+          '</div>' +
+          '<div id="sd_fixed_fields" style="display:none">' +
+            '<label>Gaji Tetap (Rp/bulan)</label>' +
+            '<input type="number" id="sd_fixed_salary" min="0" placeholder="5000000">' +
+          '</div>' +
+          '<label>Catatan (opsional)</label>' +
+          '<input type="text" id="sd_notes" placeholder="Contoh: Belum SIP penuh">' +
+        '</form>' +
+      '</div>' +
+      '<div class="settings-modal-footer">' +
+        '<button type="button" class="btn btn-secondary" onclick="settingsCloseDoctorModal()">Batal</button>' +
+        '<button type="submit" form="settingsDoctorForm" class="btn btn-primary" id="settingsDoctorSaveBtn">Simpan</button>' +
+      '</div>' +
+    '</div>' +
+  '</div>';
+}
+
+function settingsOpenDoctorModal(doctorName) {
+  var overlay = document.getElementById('settingsDoctorModalOverlay');
+  if (!overlay) return;
+  overlay.classList.add('open');
+
+  var title = document.getElementById('settingsDoctorModalTitle');
+  if (doctorName) {
+    if (title) title.textContent = 'Edit Fee Dokter';
+    var rule = settingsDoctorRules.find(function(r) { return r.doctor_name === doctorName; });
+    if (rule) {
+      document.getElementById('sd_doctor_name').value = rule.doctor_name;
+      document.getElementById('sd_doctor_name').readOnly = true;
+      document.getElementById('sd_fee_type').value = rule.fee_type || 'percentage';
+      document.getElementById('sd_base_pct').value = rule.base_percentage || '';
+      document.getElementById('sd_ctrl_pct').value = rule.control_percentage || '';
+      document.getElementById('sd_mat_ded').value = rule.material_deduction || '';
+      document.getElementById('sd_fixed_salary').value = rule.fixed_salary || '';
+      document.getElementById('sd_notes').value = rule.notes || '';
+      settingsDoctorFeeTypeChange();
+    }
+  } else {
+    if (title) title.textContent = 'Tambah Dokter';
+    document.getElementById('settingsDoctorForm').reset();
+    document.getElementById('sd_doctor_name').readOnly = false;
+    settingsDoctorFeeTypeChange();
+  }
+}
+
+function settingsCloseDoctorModal() {
+  var overlay = document.getElementById('settingsDoctorModalOverlay');
+  if (overlay) overlay.classList.remove('open');
+}
+
+function settingsDoctorFeeTypeChange() {
+  var type = document.getElementById('sd_fee_type') && document.getElementById('sd_fee_type').value;
+  var pct  = document.getElementById('sd_pct_fields');
+  var fix  = document.getElementById('sd_fixed_fields');
+  if (pct) pct.style.display = (type === 'percentage') ? '' : 'none';
+  if (fix) fix.style.display = (type === 'fixed') ? '' : 'none';
+}
+
+function settingsSubmitDoctor(e) {
+  e.preventDefault();
+  var btn = document.getElementById('settingsDoctorSaveBtn');
+  if (btn) btn.disabled = true;
+
+  var doctorName = document.getElementById('sd_doctor_name').value.trim();
+  var isEdit = document.getElementById('sd_doctor_name').readOnly;
+  var feeType = document.getElementById('sd_fee_type').value;
+
+  var payload = {
+    session_token:      getCurrentSessionToken(),
+    doctor_name:        doctorName,
+    fee_type:           feeType,
+    base_percentage:    document.getElementById('sd_base_pct').value    ? Number(document.getElementById('sd_base_pct').value) : null,
+    control_percentage: document.getElementById('sd_ctrl_pct').value    ? Number(document.getElementById('sd_ctrl_pct').value) : null,
+    material_deduction: document.getElementById('sd_mat_ded').value     ? Number(document.getElementById('sd_mat_ded').value)  : null,
+    fixed_salary:       document.getElementById('sd_fixed_salary').value ? Number(document.getElementById('sd_fixed_salary').value) : null,
+    notes:              document.getElementById('sd_notes').value.trim() || null
+  };
+
+  var fn = isEdit ? 'updateDoctorCompensationRule' : 'addDoctorCompensationRule';
+  google.script.run
+    .withSuccessHandler(function(res) {
+      if (btn) btn.disabled = false;
+      if (!res || !res.success) { showToast(res && res.message || 'Gagal menyimpan', 'error'); return; }
+      showToast('Data fee dokter berhasil disimpan', 'success');
+      settingsCloseDoctorModal();
+      settingsLoadTab('doctor');
+    })
+    .withFailureHandler(function(err) {
+      if (btn) btn.disabled = false;
+      showToast('Error: ' + (err && err.message || err), 'error');
+    })
+    [fn](payload);
+}
+
+function settingsDeactivateDoctor(doctorName) {
+  if (!confirm('Nonaktifkan aturan fee untuk ' + doctorName + '?')) return;
+  google.script.run
+    .withSuccessHandler(function(res) {
+      if (!res || !res.success) { showToast(res && res.message || 'Gagal', 'error'); return; }
+      showToast('Dokter dinonaktifkan', 'success');
+      settingsLoadTab('doctor');
+    })
+    .withFailureHandler(function(err) { showToast('Error: ' + (err && err.message || err), 'error'); })
+    .updateDoctorCompensationRule({ session_token: getCurrentSessionToken(), doctor_name: doctorName, is_active: false });
+}
+
+function settingsActivateDoctor(doctorName) {
+  google.script.run
+    .withSuccessHandler(function(res) {
+      if (!res || !res.success) { showToast(res && res.message || 'Gagal', 'error'); return; }
+      showToast('Dokter diaktifkan', 'success');
+      settingsLoadTab('doctor');
+    })
+    .withFailureHandler(function(err) { showToast('Error: ' + (err && err.message || err), 'error'); })
+    .updateDoctorCompensationRule({ session_token: getCurrentSessionToken(), doctor_name: doctorName, is_active: true });
+}
+
+/* =========================================================
+   TAB 3 — KATALOG LAYANAN
+   ========================================================= */
+function settingsRenderServiceTab() {
+  var el = document.getElementById('settingsTabContent');
+  if (!el) return;
+
+  var rows = settingsServices.map(function(s) {
+    var activeBadge = s.is_active !== false
+      ? '<span class="settings-badge settings-badge-active">Aktif</span>'
+      : '<span class="settings-badge settings-badge-inactive">Nonaktif</span>';
+    var flags = [
+      s.is_ortho_install ? '<span class="settings-badge settings-badge-pct">Pasang</span>' : '',
+      s.is_ortho_control ? '<span class="settings-badge settings-badge-fixed">Kontrol</span>' : ''
+    ].filter(Boolean).join(' ');
+    return '<tr>' +
+      '<td style="font-size:12px;color:#64748b">' + escapeAppHtml(s.service_id||'') + '</td>' +
+      '<td>' + escapeAppHtml(s.service_name||'') + '</td>' +
+      '<td>' + formatAppRupiah(s.default_price) + '</td>' +
+      '<td>' + (flags || '-') + '</td>' +
+      '<td>' + activeBadge + '</td>' +
+      '<td><div class="settings-row-actions">' +
+        '<button class="btn btn-secondary" style="padding:5px 12px;font-size:12px" ' +
+          'onclick="settingsOpenServiceModal(\'' + escapeAppHtml(s.service_id) + '\')">Edit</button>' +
+        (s.is_active !== false
+          ? '<button class="btn btn-danger" style="padding:5px 12px;font-size:12px" ' +
+              'onclick="settingsDeactivateService(\'' + escapeAppHtml(s.service_id) + '\')">Nonaktifkan</button>'
+          : '<button class="btn btn-secondary" style="padding:5px 12px;font-size:12px" ' +
+              'onclick="settingsActivateService(\'' + escapeAppHtml(s.service_id) + '\')">Aktifkan</button>') +
+      '</div></td>' +
+    '</tr>';
+  }).join('');
+
+  el.innerHTML =
+    '<div class="settings-section-card">' +
+      '<div class="settings-table-header">' +
+        '<div class="settings-table-title">Katalog Layanan</div>' +
+        '<button class="btn btn-primary" style="padding:7px 14px;font-size:13px" onclick="settingsOpenServiceModal(null)">+ Tambah Layanan</button>' +
+      '</div>' +
+      '<div class="table-wrapper"><table class="table">' +
+        '<thead><tr><th>ID</th><th>Nama Layanan</th><th>Harga Default</th><th>Flag Ortho</th><th>Status</th><th></th></tr></thead>' +
+        '<tbody>' + (rows || '<tr><td colspan="6" class="settings-empty">Belum ada data</td></tr>') + '</tbody>' +
+      '</table></div>' +
+    '</div>' +
+    settingsServiceModalHtml();
+}
+
+function settingsServiceModalHtml() {
+  return '<div class="settings-modal-overlay" id="settingsServiceModalOverlay">' +
+    '<div class="settings-modal-box">' +
+      '<div class="settings-modal-head">' +
+        '<h3 class="settings-modal-title" id="settingsServiceModalTitle">Tambah Layanan</h3>' +
+        '<button type="button" class="detail-close-btn" onclick="settingsCloseServiceModal()">&#x2715;</button>' +
+      '</div>' +
+      '<div class="settings-modal-body">' +
+        '<form id="settingsServiceForm" onsubmit="settingsSubmitService(event)">' +
+          '<label>Nama Layanan</label>' +
+          '<input type="text" id="ss_service_name" required>' +
+          '<label>Harga Default (Rp)</label>' +
+          '<input type="number" id="ss_default_price" min="0" placeholder="0">' +
+          '<div style="display:flex;gap:16px;margin-bottom:12px">' +
+            '<label style="display:flex;align-items:center;gap:6px;text-transform:none;font-size:13px;color:#e2e8f0">' +
+              '<input type="checkbox" id="ss_is_ortho_install" style="width:auto;margin:0"> Pasang Behel' +
+            '</label>' +
+            '<label style="display:flex;align-items:center;gap:6px;text-transform:none;font-size:13px;color:#e2e8f0">' +
+              '<input type="checkbox" id="ss_is_ortho_control" style="width:auto;margin:0"> Kontrol Behel' +
+            '</label>' +
+          '</div>' +
+          '<label>Catatan (opsional)</label>' +
+          '<input type="text" id="ss_notes">' +
+        '</form>' +
+      '</div>' +
+      '<div class="settings-modal-footer">' +
+        '<button type="button" class="btn btn-secondary" onclick="settingsCloseServiceModal()">Batal</button>' +
+        '<button type="submit" form="settingsServiceForm" class="btn btn-primary" id="settingsServiceSaveBtn">Simpan</button>' +
+      '</div>' +
+    '</div>' +
+  '</div>';
+}
+
+function settingsOpenServiceModal(serviceId) {
+  var overlay = document.getElementById('settingsServiceModalOverlay');
+  if (!overlay) return;
+  overlay.classList.add('open');
+
+  var title = document.getElementById('settingsServiceModalTitle');
+  var idInput = document.getElementById('ss_service_id_hidden');
+
+  if (serviceId) {
+    if (title) title.textContent = 'Edit Layanan';
+    var svc = settingsServices.find(function(s) { return s.service_id === serviceId; });
+    if (svc) {
+      document.getElementById('ss_service_name').value = svc.service_name || '';
+      document.getElementById('ss_default_price').value = svc.default_price || '';
+      document.getElementById('ss_is_ortho_install').checked = svc.is_ortho_install === true;
+      document.getElementById('ss_is_ortho_control').checked = svc.is_ortho_control === true;
+      document.getElementById('ss_notes').value = svc.notes || '';
+      document.getElementById('settingsServiceForm').dataset.serviceId = serviceId;
+    }
+  } else {
+    if (title) title.textContent = 'Tambah Layanan';
+    document.getElementById('settingsServiceForm').reset();
+    delete document.getElementById('settingsServiceForm').dataset.serviceId;
+  }
+}
+
+function settingsCloseServiceModal() {
+  var overlay = document.getElementById('settingsServiceModalOverlay');
+  if (overlay) overlay.classList.remove('open');
+}
+
+function settingsSubmitService(e) {
+  e.preventDefault();
+  var btn = document.getElementById('settingsServiceSaveBtn');
+  if (btn) btn.disabled = true;
+
+  var form = document.getElementById('settingsServiceForm');
+  var serviceId = form && form.dataset.serviceId;
+  var isEdit = !!serviceId;
+
+  var payload = {
+    session_token:    getCurrentSessionToken(),
+    service_name:     document.getElementById('ss_service_name').value.trim(),
+    default_price:    Number(document.getElementById('ss_default_price').value) || 0,
+    is_ortho_install: document.getElementById('ss_is_ortho_install').checked,
+    is_ortho_control: document.getElementById('ss_is_ortho_control').checked,
+    notes:            document.getElementById('ss_notes').value.trim() || null
+  };
+  if (isEdit) payload.service_id = serviceId;
+
+  var fn = isEdit ? 'updateServiceCatalog' : 'addServiceCatalog';
+  google.script.run
+    .withSuccessHandler(function(res) {
+      if (btn) btn.disabled = false;
+      if (!res || !res.success) { showToast(res && res.message || 'Gagal menyimpan', 'error'); return; }
+      showToast('Layanan berhasil disimpan', 'success');
+      settingsCloseServiceModal();
+      settingsLoadTab('service');
+    })
+    .withFailureHandler(function(err) {
+      if (btn) btn.disabled = false;
+      showToast('Error: ' + (err && err.message || err), 'error');
+    })
+    [fn](payload);
+}
+
+function settingsDeactivateService(serviceId) {
+  var svc = settingsServices.find(function(s) { return s.service_id === serviceId; });
+  if (!confirm('Nonaktifkan layanan "' + (svc && svc.service_name || serviceId) + '"?\n\nLayanan tidak akan muncul saat input treatment baru, tapi data lama tetap aman.')) return;
+  google.script.run
+    .withSuccessHandler(function(res) {
+      if (!res || !res.success) { showToast(res && res.message || 'Gagal', 'error'); return; }
+      showToast('Layanan dinonaktifkan', 'success');
+      settingsLoadTab('service');
+    })
+    .withFailureHandler(function(err) { showToast('Error: ' + (err && err.message || err), 'error'); })
+    .deleteServiceCatalog({ session_token: getCurrentSessionToken(), service_id: serviceId });
+}
+
+function settingsActivateService(serviceId) {
+  google.script.run
+    .withSuccessHandler(function(res) {
+      if (!res || !res.success) { showToast(res && res.message || 'Gagal', 'error'); return; }
+      showToast('Layanan diaktifkan', 'success');
+      settingsLoadTab('service');
+    })
+    .withFailureHandler(function(err) { showToast('Error: ' + (err && err.message || err), 'error'); })
+    .updateServiceCatalog({ session_token: getCurrentSessionToken(), service_id: serviceId, is_active: true });
+}
+
+/* =========================================================
+   TAB 4 — MANAJEMEN USER
+   ========================================================= */
+function settingsRenderUserTab() {
+  var el = document.getElementById('settingsTabContent');
+  if (!el) return;
+
+  var rows = settingsUsers.map(function(u) {
+    var activeBadge = u.is_active !== false
+      ? '<span class="settings-badge settings-badge-active">Aktif</span>'
+      : '<span class="settings-badge settings-badge-inactive">Nonaktif</span>';
+    return '<tr>' +
+      '<td>' + escapeAppHtml(u.username||'') + '</td>' +
+      '<td>' + escapeAppHtml(u.full_name||'') + '</td>' +
+      '<td>' + escapeAppHtml(u.role||'') + '</td>' +
+      '<td>' + activeBadge + '</td>' +
+      '<td><div class="settings-row-actions">' +
+        (u.is_active !== false
+          ? '<button class="btn btn-danger" style="padding:5px 12px;font-size:12px" ' +
+              'onclick="settingsDeactivateUser(\'' + escapeAppHtml(u.user_id) + '\',\'' + escapeAppHtml(u.username) + '\')">Nonaktifkan</button>'
+          : '<button class="btn btn-secondary" style="padding:5px 12px;font-size:12px" ' +
+              'onclick="settingsActivateUser(\'' + escapeAppHtml(u.user_id) + '\')">Aktifkan</button>') +
+      '</div></td>' +
+    '</tr>';
+  }).join('');
+
+  el.innerHTML =
+    '<div class="settings-section-card">' +
+      '<div class="settings-table-header">' +
+        '<div class="settings-table-title">Pengguna</div>' +
+        '<button class="btn btn-primary" style="padding:7px 14px;font-size:13px" onclick="settingsOpenUserModal()">+ Tambah Pengguna</button>' +
+      '</div>' +
+      '<div class="table-wrapper"><table class="table">' +
+        '<thead><tr><th>Username</th><th>Nama Lengkap</th><th>Role</th><th>Status</th><th></th></tr></thead>' +
+        '<tbody>' + (rows || '<tr><td colspan="5" class="settings-empty">Belum ada data</td></tr>') + '</tbody>' +
+      '</table></div>' +
+    '</div>' +
+    settingsUserModalHtml();
+}
+
+function settingsUserModalHtml() {
+  return '<div class="settings-modal-overlay" id="settingsUserModalOverlay">' +
+    '<div class="settings-modal-box">' +
+      '<div class="settings-modal-head">' +
+        '<h3 class="settings-modal-title">Tambah Pengguna</h3>' +
+        '<button type="button" class="detail-close-btn" onclick="settingsCloseUserModal()">&#x2715;</button>' +
+      '</div>' +
+      '<div class="settings-modal-body">' +
+        '<form id="settingsUserForm" onsubmit="settingsSubmitUser(event)">' +
+          '<label>Username</label>' +
+          '<input type="text" id="su_username" required autocomplete="off">' +
+          '<label>Password</label>' +
+          '<input type="password" id="su_password" required autocomplete="new-password">' +
+          '<label>Nama Lengkap</label>' +
+          '<input type="text" id="su_full_name" required>' +
+          '<label>Role</label>' +
+          '<select id="su_role">' +
+            '<option value="admin">Admin</option>' +
+            '<option value="dokter">Dokter</option>' +
+            '<option value="owner">Owner</option>' +
+          '</select>' +
+        '</form>' +
+      '</div>' +
+      '<div class="settings-modal-footer">' +
+        '<button type="button" class="btn btn-secondary" onclick="settingsCloseUserModal()">Batal</button>' +
+        '<button type="submit" form="settingsUserForm" class="btn btn-primary" id="settingsUserSaveBtn">Simpan</button>' +
+      '</div>' +
+    '</div>' +
+  '</div>';
+}
+
+function settingsOpenUserModal() {
+  var overlay = document.getElementById('settingsUserModalOverlay');
+  if (!overlay) return;
+  document.getElementById('settingsUserForm').reset();
+  overlay.classList.add('open');
+}
+
+function settingsCloseUserModal() {
+  var overlay = document.getElementById('settingsUserModalOverlay');
+  if (overlay) overlay.classList.remove('open');
+}
+
+function settingsSubmitUser(e) {
+  e.preventDefault();
+  var btn = document.getElementById('settingsUserSaveBtn');
+  if (btn) btn.disabled = true;
+  google.script.run
+    .withSuccessHandler(function(res) {
+      if (btn) btn.disabled = false;
+      if (!res || !res.success) { showToast(res && res.message || 'Gagal menyimpan', 'error'); return; }
+      showToast('Pengguna berhasil ditambahkan', 'success');
+      settingsCloseUserModal();
+      settingsLoadTab('user');
+    })
+    .withFailureHandler(function(err) {
+      if (btn) btn.disabled = false;
+      showToast('Error: ' + (err && err.message || err), 'error');
+    })
+    .addUser({
+      session_token: getCurrentSessionToken(),
+      username:      document.getElementById('su_username').value.trim(),
+      password:      document.getElementById('su_password').value,
+      full_name:     document.getElementById('su_full_name').value.trim(),
+      role:          document.getElementById('su_role').value
+    });
+}
+
+function settingsDeactivateUser(userId, username) {
+  if (!confirm('Nonaktifkan pengguna "' + username + '"?')) return;
+  google.script.run
+    .withSuccessHandler(function(res) {
+      if (!res || !res.success) { showToast(res && res.message || 'Gagal', 'error'); return; }
+      showToast('Pengguna dinonaktifkan', 'success');
+      settingsLoadTab('user');
+    })
+    .withFailureHandler(function(err) { showToast('Error: ' + (err && err.message || err), 'error'); })
+    .deleteUser({ session_token: getCurrentSessionToken(), user_id: userId });
+}
+
+function settingsActivateUser(userId) {
+  google.script.run
+    .withSuccessHandler(function(res) {
+      if (!res || !res.success) { showToast(res && res.message || 'Gagal', 'error'); return; }
+      showToast('Pengguna diaktifkan', 'success');
+      settingsLoadTab('user');
+    })
+    .withFailureHandler(function(err) { showToast('Error: ' + (err && err.message || err), 'error'); })
+    .updateUser({ session_token: getCurrentSessionToken(), user_id: userId, is_active: true });
+}
+</script>
