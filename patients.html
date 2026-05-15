@@ -1953,10 +1953,9 @@
 
         showToast('Error: ' + (err && err.message ? err.message : err), 'error');
       })
-      .deletePatientPhoto({
-        photo_id: targetPhotoId,
-        actor_role: currentUser ? String(currentUser.role || '').toLowerCase() : ''
-      });
+      .deletePatientPhoto(attachAuthContext({
+        photo_id: targetPhotoId
+      }));
   }
 
   function clearPatientPhotoUploadErrors() {
@@ -2079,7 +2078,7 @@
       const dataUrl = String(evt.target.result || '');
       const base64Data = dataUrl.split(',')[1] || '';
 
-      const payload = {
+      const payload = attachAuthContext({
         patient_id: document.getElementById('photo_patient_id_hidden').value,
         treatment_id: treatmentId,
         photo_type: document.getElementById('photo_type').value,
@@ -2088,9 +2087,8 @@
         base64_data: base64Data,
         photo_note: document.getElementById('photo_note').value.trim(),
         photo_group: '',
-        sort_order: 0,
-        actor_role: currentUser ? String(currentUser.role || '').toLowerCase() : ''
-      };
+        sort_order: 0
+      });
 
       google.script.run
         .withSuccessHandler(function(res) {
