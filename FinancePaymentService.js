@@ -34,6 +34,8 @@ function validateBillingPaymentPayload(payload) {
     errors.payment_date = 'Tanggal pembayaran wajib diisi';
   } else if (!isValidYmdDate(paymentDate)) {
     errors.payment_date = 'Tanggal pembayaran tidak valid';
+  } else if (paymentDate < getFinanceTodayYmd_()) {
+    errors.payment_date = 'Tanggal pembayaran tidak boleh mundur dari hari ini';
   }
 
   if (!paymentMethod) {
