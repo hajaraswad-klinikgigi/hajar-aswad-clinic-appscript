@@ -51,7 +51,8 @@ function normalizeDashboardAppointment(row) {
     patient_name: String(row.patient_name || ''),
     appointment_date: extractYmd(row.appointment_date),
     appointment_time: timeValue,
-    status: String(row.status || '').toLowerCase()
+    status: String(row.status || '').toLowerCase(),
+    created_at: formatCellValue(row.created_at || '')
   };
 }
 
@@ -602,9 +603,7 @@ function getDashboardOwnerSummary(period) {
   const latestAppointments = appointments
     .slice()
     .sort(function(a, b) {
-      const dateCompare = String(b.appointment_date || '').localeCompare(String(a.appointment_date || ''));
-      if (dateCompare !== 0) return dateCompare;
-      return String(b.appointment_time || '').localeCompare(String(a.appointment_time || ''));
+      return String(b.created_at || '').localeCompare(String(a.created_at || ''));
     })
     .slice(0, 5);
 
