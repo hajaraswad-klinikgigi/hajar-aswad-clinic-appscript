@@ -415,7 +415,7 @@
         });
 
         showToast('Error: ' + (err && err.message ? err.message : err), 'error');
-      })[action](payload);
+      })[action](attachAuthContext(payload));
   }
 
   function clearPatientForm() {

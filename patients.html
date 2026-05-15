@@ -2240,6 +2240,6 @@
 
         showToast('Error: ' + (err && err.message ? err.message : err), 'error');
       })
-      .deactivatePatient(targetPatientId);
+      .deactivatePatient(targetPatientId, getCurrentAuthContext());
   }
 </script>

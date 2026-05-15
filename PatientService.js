@@ -867,6 +867,12 @@ function validatePatientData(data, excludePatientId) {
 }
 
 function createPatient(data) {
+  const auth = readAuthSession_(data);
+  if (!auth.success) return auth;
+  if (auth.user.role !== 'admin' && auth.user.role !== 'owner') {
+    return { success: false, message: 'Hanya admin atau owner yang dapat menambah pasien.' };
+  }
+
   const freezeCheck = repoCheckProductionMutationAllowed_({
     operation: 'CREATE_PATIENT',
     module: 'PatientService',
@@ -976,6 +982,12 @@ function createPatient(data) {
 }
 
 function updatePatient(data) {
+  const auth = readAuthSession_(data);
+  if (!auth.success) return auth;
+  if (auth.user.role !== 'admin' && auth.user.role !== 'owner') {
+    return { success: false, message: 'Hanya admin atau owner yang dapat mengubah data pasien.' };
+  }
+
   const freezeCheck = repoCheckProductionMutationAllowed_({
     operation: 'UPDATE_PATIENT',
     module: 'PatientService',
@@ -989,7 +1001,7 @@ function updatePatient(data) {
       message: freezeCheck.message
     };
   }
-  
+
   const lock = LockService.getScriptLock();
 
   try {
@@ -1110,7 +1122,24 @@ function updatePatient(data) {
   }
 }
 
-function deactivatePatient(patientId) {
+function deactivatePatient(patientId, options) {
+  const auth = readAuthSession_(options || {});
+  if (!auth.success) return auth;
+  if (auth.user.role !== 'admin' && auth.user.role !== 'owner') {
+    return { success: false, message: 'Hanya admin atau owner yang dapat menonaktifkan pasien.' };
+  }
+
+  const freezeCheck = repoCheckProductionMutationAllowed_({
+    operation: 'DEACTIVATE_PATIENT',
+    module: 'PatientService',
+    action: 'deactivatePatient',
+    __test_freeze_enabled: options && options.__test_freeze_enabled === true
+  });
+
+  if (!freezeCheck.allowed) {
+    return { success: false, message: freezeCheck.message };
+  }
+
   if (!patientId) {
     return {
       success: false,
