@@ -440,8 +440,8 @@
 
     .feedback-field select:focus,
     .feedback-comment-textarea:focus {
-      border-color: rgba(20, 184, 166, 0.92);
-      box-shadow: 0 0 0 3px rgba(20, 184, 166, 0.14);
+      border-color: rgba(79, 110, 247, 0.85);
+      box-shadow: 0 0 0 3px rgba(79, 110, 247, 0.16);
     }
 
     .feedback-comment-textarea::placeholder {
@@ -469,13 +469,15 @@
     }
 
     .rating-btn {
+      position: relative;
+      isolation: isolate;
       width: 100%;
       max-width: 100%;
       min-width: 0;
       height: var(--fb-rating-height);
       min-height: var(--fb-rating-height);
       padding: 0;
-      border: 1px solid var(--fb-border-strong);
+      border: none;
       border-radius: 8px;
       background: rgba(7, 11, 18, 0.74);
       color: #d2dbe8;
@@ -486,11 +488,28 @@
       box-shadow: none;
     }
 
+    .rating-btn::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      padding: 1.5px;
+      border-radius: inherit;
+      background: linear-gradient(135deg, rgba(255,255,255,0.28) 0%, rgba(148,163,184,0.16) 50%, rgba(255,255,255,0.09) 100%);
+      -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+      -webkit-mask-composite: xor;
+      mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+      mask-composite: exclude;
+      pointer-events: none;
+    }
+
     .rating-btn.active {
-      border-color: rgba(45, 212, 191, 0.78);
-      background: linear-gradient(135deg, rgba(20, 184, 166, 0.96), rgba(15, 118, 110, 0.98));
-      color: #ffffff;
-      box-shadow: 0 8px 18px rgba(20, 184, 166, 0.18);
+      background: rgba(20, 184, 166, 0.15);
+      color: #2dd4bf;
+      box-shadow: 0 4px 12px rgba(20, 184, 166, 0.12);
+    }
+
+    .rating-btn.active::before {
+      background: linear-gradient(135deg, #38bdf8 0%, #4f6ef7 50%, #a78bfa 100%);
     }
 
     .rating-help {
@@ -517,6 +536,8 @@
       display: inline-flex;
       align-items: center;
       justify-content: center;
+      position: relative;
+      isolation: isolate;
       width: 100%;
       max-width: 100%;
       min-width: 0;
@@ -525,19 +546,36 @@
       padding: 0 14px;
       border: none;
       border-radius: 10px;
-      background: linear-gradient(135deg, #14b8a6 0%, #0f766e 100%);
-      color: #ffffff;
+      background: rgba(20, 184, 166, 0.13);
+      color: #2dd4bf;
       font-family: inherit;
       font-size: var(--fb-button-size);
       line-height: 1.15;
       font-weight: 950;
-      box-shadow: 0 10px 24px rgba(20, 184, 166, 0.22);
+      box-shadow: none;
+    }
+
+    .submit-btn::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      padding: 1.5px;
+      border-radius: inherit;
+      background: linear-gradient(135deg, #38bdf8 0%, #4f6ef7 50%, #a78bfa 100%);
+      -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+      -webkit-mask-composite: xor;
+      mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+      mask-composite: exclude;
+      pointer-events: none;
+    }
+
+    .submit-btn:hover:not(:disabled) {
+      background: rgba(20, 184, 166, 0.20);
     }
 
     .submit-btn:disabled {
-      opacity: 0.68;
+      opacity: 0.60;
       cursor: not-allowed;
-      box-shadow: none;
     }
 
     @media (max-width: 360px) {
