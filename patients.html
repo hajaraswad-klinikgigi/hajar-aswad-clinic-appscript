@@ -1895,6 +1895,18 @@
 
     const targetPhotoId = pendingDeletePatientPhotoId;
 
+    // Cari foto di groups sebelum async call — dipakai di closure withSuccessHandler
+    var photoGroupForDelete = null;
+    var photoTypeForDelete  = null;
+    (currentPatientDetailPhotoGroups || []).forEach(function(g) {
+      (g.before || []).forEach(function(p) {
+        if (p.photo_id === targetPhotoId) { photoGroupForDelete = g; photoTypeForDelete = 'before'; }
+      });
+      (g.after || []).forEach(function(p) {
+        if (p.photo_id === targetPhotoId) { photoGroupForDelete = g; photoTypeForDelete = 'after'; }
+      });
+    });
+
     google.script.run
       .withSuccessHandler(function(res) {
         deletePatientPhotoInFlight = false;
@@ -1910,9 +1922,26 @@
         }
 
         closeDeletePatientPhotoModal();
-        clearPatientDetailFrontendCache(currentPatientDetailId);
-        openPatientDetail(currentPatientDetailId);
         showToast('Foto pasien berhasil dihapus', 'success');
+
+        if (photoGroupForDelete && photoTypeForDelete) {
+          var arr = photoGroupForDelete[photoTypeForDelete];
+          if (Array.isArray(arr)) {
+            var pidx = arr.findIndex(function(p) { return p.photo_id === targetPhotoId; });
+            if (pidx !== -1) arr.splice(pidx, 1);
+          }
+          if (!(photoGroupForDelete.before && photoGroupForDelete.before.length) &&
+              !(photoGroupForDelete.after  && photoGroupForDelete.after.length)) {
+            var gidx = currentPatientDetailPhotoGroups.indexOf(photoGroupForDelete);
+            if (gidx !== -1) currentPatientDetailPhotoGroups.splice(gidx, 1);
+          }
+          var cache = patientDetailFrontendCache[currentPatientDetailId];
+          if (cache && cache.secondary) cache.secondary.photo_groups = currentPatientDetailPhotoGroups;
+          applyPatientSecondarySection(currentPatientDetailTreatments, currentPatientDetailPhotoGroups);
+        } else {
+          clearPatientDetailFrontendCache(currentPatientDetailId);
+          openPatientDetail(currentPatientDetailId);
+        }
       })
       .withFailureHandler(function(err) {
         deletePatientPhotoInFlight = false;
@@ -2079,9 +2108,45 @@
           }
 
           closePatientPhotoUploadModal();
-          clearPatientDetailFrontendCache(currentPatientDetailId);
-          openPatientDetail(currentPatientDetailId);
           showToast('Foto pasien berhasil diupload', 'success');
+
+          var newPhoto = res.data;
+          if (newPhoto && newPhoto.treatment_id) {
+            newPhoto.delete_allowed = true;
+            var tid = String(newPhoto.treatment_id || '');
+            var ptype = String(newPhoto.photo_type || '').toLowerCase();
+            var grpIdx = (currentPatientDetailPhotoGroups || []).findIndex(function(g) {
+              return String(g.treatment_id || '') === tid;
+            });
+            if (grpIdx !== -1) {
+              var grp = currentPatientDetailPhotoGroups[grpIdx];
+              if (ptype === 'before') {
+                (grp.before || (grp.before = [])).push(newPhoto);
+              } else {
+                (grp.after || (grp.after = [])).push(newPhoto);
+              }
+            } else {
+              var trt = (currentPatientDetailTreatments || []).find(function(t) {
+                return String(t.treatment_id || '') === tid;
+              });
+              var newGrp = {
+                treatment_id:    tid,
+                visit_date:      trt ? (trt.treatment_date || '') : '',
+                visit_date_text: trt ? ('Tanggal: ' + (trt.treatment_date || '')) : '',
+                upload_allowed:  true,
+                delete_allowed:  true,
+                before: ptype === 'before' ? [newPhoto] : [],
+                after:  ptype === 'after'  ? [newPhoto] : []
+              };
+              (currentPatientDetailPhotoGroups || (currentPatientDetailPhotoGroups = [])).push(newGrp);
+            }
+            var cache = patientDetailFrontendCache[currentPatientDetailId];
+            if (cache && cache.secondary) cache.secondary.photo_groups = currentPatientDetailPhotoGroups;
+            applyPatientSecondarySection(currentPatientDetailTreatments, currentPatientDetailPhotoGroups);
+          } else {
+            clearPatientDetailFrontendCache(currentPatientDetailId);
+            openPatientDetail(currentPatientDetailId);
+          }
         })
         .withFailureHandler(function(err) {
           patientPhotoUploadInFlight = false;
@@ -2150,7 +2215,19 @@
         closeDeactivateModal();
         clearPatientDetailFrontendCache(targetPatientId);
 
-        loadPatients();
+        var pidx = (allPatients || []).findIndex(function(p) { return p.patient_id === targetPatientId; });
+        if (pidx !== -1) {
+          if (!showInactivePatients) {
+            allPatients.splice(pidx, 1);
+          } else {
+            allPatients[pidx].is_active = false;
+          }
+          var keyword = ((document.getElementById('patientSearchInput') || {}).value || '').trim().toLowerCase();
+          filteredPatients = keyword
+            ? (allPatients || []).filter(function(p) { return String(p._search_text || '').includes(keyword); })
+            : (allPatients || []).slice();
+          renderPatientsTable();
+        }
         showToast('Pasien berhasil dinonaktifkan', 'success');
       })
       .withFailureHandler(function(err) {

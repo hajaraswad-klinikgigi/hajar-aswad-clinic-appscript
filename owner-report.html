@@ -720,9 +720,14 @@ function ownerConfirmDoctorFee() {
         alert('Gagal menyimpan fee: ' + (res && res.message ? res.message : 'Error tidak diketahui'));
         return;
       }
-      delete ownerReportCache['daily:' + (ownerReportDate || ownerTodayYmd())];
       showToast('Fee dokter berhasil disimpan (' + res.data.expenses_created + ' entri pengeluaran dibuat).', 'success');
-      ownerLoadReport();
+      var expenses = (res.data && Array.isArray(res.data.expenses)) ? res.data.expenses : [];
+      if (expenses.length && ownerReportTab === 'daily' && ownerCurrentDailyData) {
+        expenses.forEach(function(exp) { ownerPatchExpenseLocally(exp, false); });
+      } else {
+        delete ownerReportCache['daily:' + (ownerReportDate || ownerTodayYmd())];
+        ownerLoadReport();
+      }
     })
     .withFailureHandler(function(err) {
       alert('Error: ' + (err && err.message ? err.message : String(err)));

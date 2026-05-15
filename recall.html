@@ -15,6 +15,32 @@
     patient_name: ''
   };
 
+  function buildRecallSearchText(row) {
+    return [
+      row.patient_name     || '',
+      row.phone            || '',
+      row.followup_status  || '',
+      row.program_status   || '',
+      row.install_date     || '',
+      row.next_due_date    || '',
+      row.last_control_date  || '',
+      row.last_contact_date  || '',
+      row.last_contact_note  || '',
+      row.notes            || '',
+      row.patient_id       || ''
+    ].join(' ').toLowerCase();
+  }
+
+  function recallUpdateLocalRow(updatedRow) {
+    if (!updatedRow) return;
+    updatedRow._search_text = buildRecallSearchText(updatedRow);
+    var idx = allRecallRows.findIndex(function(r) {
+      return r.ortho_recall_id === updatedRow.ortho_recall_id;
+    });
+    if (idx !== -1) allRecallRows[idx] = updatedRow;
+    applyRecallFilters(true);
+  }
+
   function showRecallPage() {
     setActiveMenu('menuRecall');
 
@@ -295,20 +321,7 @@
         }
 
         allRecallRows = (res.data || []).map(function(row) {
-          row._search_text = [
-            row.patient_name || '',
-            row.phone || '',
-            row.followup_status || '',
-            row.program_status || '',
-            row.install_date || '',
-            row.next_due_date || '',
-            row.last_control_date || '',
-            row.last_contact_date || '',
-            row.last_contact_note || '',
-            row.notes || '',
-            row.patient_id || ''
-          ].join(' ').toLowerCase();
-
+          row._search_text = buildRecallSearchText(row);
           return row;
         });
 
@@ -1103,7 +1116,7 @@ function handleRecallProgramActionSuccess(res) {
   }
 
   closeRecallProgramActionModal();
-  loadRecallList();
+  recallUpdateLocalRow(res.data);
   showToast(res.message || 'Program recall berhasil diproses', 'success');
 
   if (currentPatientDetailId) {
@@ -1163,7 +1176,7 @@ function handleRecallProgramActionFailure(err) {
         }
 
         closeRecallContactModal();
-        loadRecallList();
+        recallUpdateLocalRow(res.data);
         showToast('Follow up kontak berhasil disimpan', 'success');
       })
       .withFailureHandler(function(err) {

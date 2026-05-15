@@ -67,14 +67,13 @@ function deleteBillingInstallmentsByBillingId_(billingId, options) {
 
   if (repoIsSupabaseBackendMode_()) {
     try {
-      const existing = dbFindWhere_('BillingInstallments', function(row) {
-        return String(row.billing_id || '').trim() === normalizedBillingId;
-      });
-      existing.forEach(function(row) {
-        const id = String(row.installment_id || '').trim();
-        if (id) dbDeleteById_('BillingInstallments', 'installment_id', id);
-      });
-      return existing.length;
+      const targetTable = repoGetTargetTableForSheet_('BillingInstallments');
+      const result = supabaseDelete_(
+        targetTable,
+        { billing_id: 'eq.' + normalizedBillingId },
+        { return_rows: true }
+      );
+      return Array.isArray(result.rows) ? result.rows.length : 0;
     } catch (err) {
       return 0;
     }
@@ -244,9 +243,7 @@ function appendBillingInstallmentRowsBatch_(rows) {
 
   if (repoIsSupabaseBackendMode_()) {
     try {
-      list.forEach(function(row) {
-        dbInsert_('BillingInstallments', row);
-      });
+      dbBatchInsert_('BillingInstallments', list);
       return { success: true, message: 'Cicilan berhasil ditambahkan', appended_rows: list.length };
     } catch (err) {
       return { success: false, message: 'Gagal menyimpan cicilan: ' + (err && err.message ? err.message : String(err || '')) };
@@ -797,6 +794,7 @@ function recalculateBillingInstallmentPayments(billingId) {
 
   let updatedCount = 0;
   let skippedCount = 0;
+  const pendingPatches = []; // kumpulkan semua perubahan, kirim sekaligus di akhir
 
   rows.forEach(function(row) {
     const installmentId = String(row.installment_id || '').trim();
@@ -829,15 +827,7 @@ function recalculateBillingInstallmentPayments(billingId) {
     };
 
     if (shouldUpdate && installmentId) {
-      dbUpdateById_(
-        getBillingInstallmentSheetName_(),
-        'installment_id',
-        installmentId,
-        Object.assign({}, calculatedPatch, {
-          updated_at: now
-        })
-      );
-
+      pendingPatches.push({ installmentId: installmentId, patch: Object.assign({}, calculatedPatch, { updated_at: now }) });
       updatedCount++;
     } else {
       skippedCount++;
@@ -849,6 +839,24 @@ function recalculateBillingInstallmentPayments(billingId) {
       )
     );
   });
+
+  // Kirim semua update sekaligus
+  if (pendingPatches.length > 0) {
+    if (repoIsSupabaseBackendMode_()) {
+      const targetTable = repoGetTargetTableForSheet_('BillingInstallments');
+      supabaseBatchPatch_(pendingPatches.map(function(p) {
+        return {
+          table:   targetTable,
+          filters: { installment_id: 'eq.' + p.installmentId },
+          patch:   p.patch
+        };
+      }));
+    } else {
+      pendingPatches.forEach(function(p) {
+        dbUpdateById_(getBillingInstallmentSheetName_(), 'installment_id', p.installmentId, p.patch);
+      });
+    }
+  }
 
   return {
     success: true,

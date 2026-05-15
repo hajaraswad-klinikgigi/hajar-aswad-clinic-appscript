@@ -306,6 +306,7 @@ function confirmDoctorFeeToExpenses(payload) {
     if (!doctorFees.length) return { success: false, message: 'doctor_fees tidak boleh kosong.' };
 
     let created = 0;
+    const createdExpenses = [];
     doctorFees.forEach(function(df) {
       const dName = String(df.doctor_name || '').trim();
       const amt   = Number(df.fee_amount || 0);
@@ -314,7 +315,7 @@ function confirmDoctorFeeToExpenses(payload) {
       const expenseId = 'EXP-' + date.replace(/-/g, '') + '-FEE-' +
                         dName.replace(/\s+/g, '').toUpperCase().slice(0, 8);
 
-      dbInsert_('Expenses', {
+      const expenseRow = {
         expense_id:   expenseId,
         expense_date: date,
         category:     'doctor_fee',
@@ -323,12 +324,14 @@ function confirmDoctorFeeToExpenses(payload) {
         doctor_name:  dName,
         recorded_by:  auth.user.username,
         notes:        df.notes ? String(df.notes).trim() : null
-      }, DOCTOR_COMP_OPTIONS);
+      };
 
+      const inserted = dbInsert_('Expenses', expenseRow, DOCTOR_COMP_OPTIONS);
+      createdExpenses.push(inserted || expenseRow);
       created++;
     });
 
-    return { success: true, data: { expenses_created: created } };
+    return { success: true, data: { expenses_created: created, expenses: createdExpenses } };
   } catch (err) {
     return { success: false, message: 'Gagal simpan fee: ' + (err.message || err) };
   }

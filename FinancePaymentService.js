@@ -94,6 +94,21 @@ function getNextPayableBillingInstallment_(billingId) {
 function getBillingPaymentGuardData_(billingId) {
   const normalizedBillingId = String(billingId || '').trim();
 
+  // Supabase mode: fetch 3 tabel secara paralel (jauh lebih cepat dari sequential fresh context)
+  if (repoIsSupabaseBackendMode_()) {
+    const filter = { billing_id: 'eq.' + normalizedBillingId };
+    const results = supabaseSelectParallel_([
+      { table: repoGetTargetTableForSheet_('BillingItems'),       filters: filter },
+      { table: repoGetTargetTableForSheet_('BillingAdjustments'), filters: filter },
+      { table: repoGetTargetTableForSheet_('Payments'),           filters: filter }
+    ]);
+    const items       = results[0];
+    const adjustments = results[1];
+    const payments    = results[2];
+    const totals      = calculateBillingTotalsFromRows(items, adjustments, payments);
+    return { items: items, adjustments: adjustments, payments: payments, totals: totals };
+  }
+
   if (typeof calculateBillingTotalsFromFreshContext_ === 'function') {
     return calculateBillingTotalsFromFreshContext_(normalizedBillingId);
   }

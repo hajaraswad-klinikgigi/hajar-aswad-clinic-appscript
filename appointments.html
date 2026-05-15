@@ -1449,9 +1449,33 @@
 
         showToast(successMessage, 'success');
 
-        setTimeout(function() {
+        var saved = res.data;
+        if (saved) {
+          saved._search_text = [
+            saved.patient_name     || '',
+            saved.appointment_date || '',
+            saved.appointment_time || '',
+            saved.status           || '',
+            saved.appointment_id   || '',
+            saved.complaint        || ''
+          ].join(' ').toLowerCase();
+
+          if (isEdit) {
+            var aidx = (allAppointments || []).findIndex(function(a) {
+              return a.appointment_id === saved.appointment_id;
+            });
+            if (aidx !== -1) {
+              allAppointments[aidx] = saved;
+            } else {
+              allAppointments.unshift(saved);
+            }
+          } else {
+            allAppointments = [saved].concat(allAppointments || []);
+          }
+          applyAppointmentFilters(true);
+        } else {
           loadAppointments();
-        }, 100);
+        }
       })
       .withFailureHandler(function(err) {
         if (currentSubmitToken !== appointmentSubmitToken) return;
@@ -2003,7 +2027,16 @@
         }
 
         closeTreatmentModal();
-        loadAppointments();
+        var completedAptId = payload && payload.appointment_id;
+        if (completedAptId) {
+          var aidx = (allAppointments || []).findIndex(function(a) {
+            return a.appointment_id === completedAptId;
+          });
+          if (aidx !== -1) {
+            allAppointments[aidx].status = 'completed';
+            applyAppointmentFilters(true);
+          }
+        }
         showToast('Treatment berhasil disimpan', 'success');
       })
       .withFailureHandler(function(err) {

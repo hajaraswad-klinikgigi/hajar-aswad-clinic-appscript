@@ -638,12 +638,13 @@ function createTreatment(payload) {
 
     dbInsert_('Treatments', treatment);
 
-    normalizedItems.forEach(function(item) {
+    var itemRows = normalizedItems.map(function(item) {
       var itemRow = Object.assign({}, item);
       delete itemRow.is_ortho_install;
       delete itemRow.is_ortho_control;
-      dbInsert_('TreatmentItems', itemRow);
+      return itemRow;
     });
+    if (itemRows.length) dbBatchInsert_('TreatmentItems', itemRows);
 
     const medicalRecord = {
       record_id: generateNextMedicalRecordId(),
