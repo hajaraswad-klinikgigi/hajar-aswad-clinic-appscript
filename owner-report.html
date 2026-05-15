@@ -627,7 +627,111 @@ function ownerRenderDaily(data) {
           </tbody>
         </table></div>`}
     </div>
+
+    <div class="content-card">
+      <div class="owner-section-head"><div>
+        <div class="owner-section-title">Fee Dokter</div>
+        <div class="owner-section-subtitle">Kalkulasi otomatis berdasarkan treatment hari ini</div>
+      </div></div>
+      ${ownerRenderDoctorFeeSection(data.doctor_fee_draft)}
+    </div>
   `;
+}
+
+function ownerRenderDoctorFeeSection(feeDraft) {
+  if (!feeDraft) {
+    return '<div class="owner-empty">Data fee dokter tidak tersedia</div>';
+  }
+
+  if (feeDraft.error) {
+    return '<div class="owner-empty">Gagal memuat fee dokter: ' + escapeAppHtml(feeDraft.error) + '</div>';
+  }
+
+  if (feeDraft.already_confirmed) {
+    return '<div class="owner-empty" style="color:var(--color-success,#16a34a)">' +
+           'Fee dokter hari ini sudah dikonfirmasi dan tersimpan ke pengeluaran.</div>';
+  }
+
+  var rows = (feeDraft.doctors || []).map(function(d) {
+    if (d.skip_reason === 'fixed_salary') {
+      return '<tr><td>' + escapeAppHtml(d.doctor_name) + '</td>' +
+             '<td><span class="status-badge">Gaji Tetap</span></td>' +
+             '<td class="owner-muted">Input Manual</td></tr>';
+    }
+    if (d.warning) {
+      return '<tr><td>' + escapeAppHtml(d.doctor_name) + '</td>' +
+             '<td colspan="2"><span class="status-badge status-badge--cancelled">⚠ ' +
+             escapeAppHtml(d.warning) + '</span></td></tr>';
+    }
+    return '<tr><td>' + escapeAppHtml(d.doctor_name) + '</td>' +
+           '<td>' + d.treatment_count + ' pasien</td>' +
+           '<td>' + ownerFmtRp(d.fee_total) + '</td></tr>';
+  }).join('');
+
+  var warnings = (feeDraft.warnings || []).filter(function(w, i, arr) {
+    return arr.indexOf(w) === i;
+  });
+
+  return (warnings.length
+    ? '<div class="owner-empty" style="margin-bottom:8px">⚠ ' + escapeAppHtml(warnings.join('; ')) + '</div>'
+    : '') +
+    '<div class="table-wrapper"><table class="table">' +
+    '<thead><tr><th>Dokter</th><th>Pasien</th><th>Fee Otomatis</th></tr></thead>' +
+    '<tbody>' + (rows || '<tr><td colspan="3">Tidak ada treatment hari ini</td></tr>') + '</tbody>' +
+    '</table></div>' +
+    '<div class="owner-muted" style="margin-top:8px;font-size:0.8rem">Standby & uang makan input manual lewat form Pengeluaran.</div>' +
+    (feeDraft.total_auto_fee > 0
+      ? '<div style="margin-top:12px"><button class="btn btn-primary" onclick="ownerConfirmDoctorFee()">Konfirmasi & Simpan Fee ke Pengeluaran</button></div>'
+      : '');
+}
+
+function ownerConfirmDoctorFee() {
+  const draft = ownerCurrentDailyData && ownerCurrentDailyData.doctor_fee_draft;
+  if (!draft || !draft.doctors || !draft.doctors.length) {
+    alert('Tidak ada data fee untuk dikonfirmasi.');
+    return;
+  }
+
+  const toConfirm = draft.doctors.filter(function(d) {
+    return d.is_calculated && d.fee_total > 0;
+  });
+
+  if (!toConfirm.length) {
+    alert('Tidak ada fee yang bisa dikonfirmasi (semua 0 atau gaji tetap).');
+    return;
+  }
+
+  const lines = toConfirm.map(function(d) {
+    return d.doctor_name + ': ' + ownerFmtRp(d.fee_total);
+  }).join('\n');
+
+  if (!confirm('Simpan fee dokter berikut ke pengeluaran?\n\n' + lines + '\n\nTotal: ' + ownerFmtRp(draft.total_auto_fee))) {
+    return;
+  }
+
+  const doctorFees = toConfirm.map(function(d) {
+    return { doctor_name: d.doctor_name, fee_amount: d.fee_total };
+  });
+
+  const sessionToken = currentUser && currentUser.session_token;
+  google.script.run
+    .withSuccessHandler(function(res) {
+      if (!res || !res.success) {
+        alert('Gagal menyimpan fee: ' + (res && res.message ? res.message : 'Error tidak diketahui'));
+        return;
+      }
+      delete ownerReportCache['daily:' + (ownerReportDate || ownerTodayYmd())];
+      showToast('Fee dokter berhasil disimpan (' + res.data.expenses_created + ' entri pengeluaran dibuat).', 'success');
+      ownerLoadReport();
+    })
+    .withFailureHandler(function(err) {
+      alert('Error: ' + (err && err.message ? err.message : String(err)));
+    })
+    .confirmDoctorFeeToExpenses({
+      session_token: sessionToken,
+      date: draft.date,
+      doctor_fees: doctorFees
+    });
 }
 
 /* =========================================================
