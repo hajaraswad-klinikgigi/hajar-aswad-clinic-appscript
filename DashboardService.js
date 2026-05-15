@@ -499,22 +499,38 @@ function getDashboardOwnerSummary(period) {
   const startYmd = range.start;
   const endYmd = range.end;
 
-  const patientsRaw = getDashboardRowsByTable_(REPO_TABLES.PATIENTS || 'Patients');
-  const appointmentsRaw = getDashboardRowsByTable_(REPO_TABLES.APPOINTMENTS || 'Appointments');
-  const treatmentsRaw = getDashboardRowsByTable_(REPO_TABLES.TREATMENTS || 'Treatments');
-  const treatmentItemsRaw = getDashboardRowsByTable_(REPO_TABLES.TREATMENT_ITEMS || 'TreatmentItems');
+  let patientsRaw, appointmentsRaw, treatmentsRaw, treatmentItemsRaw, recallRaw;
 
-  if (!isDashboardUiReadSupabaseMode_()) {
+  if (isDashboardUiReadSupabaseMode_()) {
+    // Supabase: 5 tabel diambil paralel (jauh lebih cepat dari 5x sequential)
+    const parallel = supabaseSelectParallel_([
+      { table: repoGetTargetTableForSheet_(REPO_TABLES.PATIENTS),        options: { limit: 10000 } },
+      { table: repoGetTargetTableForSheet_(REPO_TABLES.APPOINTMENTS),    options: { limit: 10000 } },
+      { table: repoGetTargetTableForSheet_(REPO_TABLES.TREATMENTS),      options: { limit: 10000 } },
+      { table: repoGetTargetTableForSheet_(REPO_TABLES.TREATMENT_ITEMS), options: { limit: 10000 } },
+      { table: repoGetTargetTableForSheet_(REPO_TABLES.ORTHO_RECALL),    options: { limit: 10000 } }
+    ]);
+    patientsRaw       = parallel[0].map(function(r) { return Object.assign({}, r); });
+    appointmentsRaw   = parallel[1].map(function(r) { return Object.assign({}, r); });
+    treatmentsRaw     = parallel[2].map(function(r) { return Object.assign({}, r); });
+    treatmentItemsRaw = parallel[3].map(function(r) { return Object.assign({}, r); });
+    recallRaw         = parallel[4].map(function(r) { return Object.assign({}, r); });
+  } else {
+    patientsRaw       = getDashboardRowsByTable_(REPO_TABLES.PATIENTS || 'Patients');
+    appointmentsRaw   = getDashboardRowsByTable_(REPO_TABLES.APPOINTMENTS || 'Appointments');
+    treatmentsRaw     = getDashboardRowsByTable_(REPO_TABLES.TREATMENTS || 'Treatments');
+    treatmentItemsRaw = getDashboardRowsByTable_(REPO_TABLES.TREATMENT_ITEMS || 'TreatmentItems');
+
     try {
       refreshAllOrthoRecallStatuses();
     } catch (err) {
       // Dashboard tetap jalan walaupun refresh recall gagal.
     }
-  }
 
-  const recallRaw = (typeof OrthoRecallRepository !== 'undefined' && OrthoRecallRepository.getOrthoRecallRaw)
-    ? (OrthoRecallRepository.getOrthoRecallRaw(dashboardReadOptions) || [])
-    : getDashboardRowsByTable_(REPO_TABLES.ORTHO_RECALL || 'OrthoRecall');
+    recallRaw = (typeof OrthoRecallRepository !== 'undefined' && OrthoRecallRepository.getOrthoRecallRaw)
+      ? (OrthoRecallRepository.getOrthoRecallRaw(dashboardReadOptions) || [])
+      : getDashboardRowsByTable_(REPO_TABLES.ORTHO_RECALL || 'OrthoRecall');
+  }
 
   const activePatients = [];
   const newPatients = [];

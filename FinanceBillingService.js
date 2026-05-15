@@ -544,9 +544,7 @@ function createDraftBillingFromTreatment_(treatment, treatmentItems) {
     };
   });
 
-  billingItems.forEach(function(item) {
-    dbInsert_('BillingItems', item);
-  });
+  if (billingItems.length) dbBatchInsert_('BillingItems', billingItems);
 
   return {
     success: true,
