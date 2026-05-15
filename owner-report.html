@@ -628,6 +628,7 @@ function ownerRenderDaily(data) {
         </table></div>`}
     </div>
 
+    ${false /* Section Fee Dokter disembunyikan sementara — masih perlu penyesuaian, ubah ke true untuk aktifkan */ ? `
     <div class="content-card">
       <div class="owner-section-head"><div>
         <div class="owner-section-title">Fee Dokter</div>
@@ -635,6 +636,7 @@ function ownerRenderDaily(data) {
       </div></div>
       ${ownerRenderDoctorFeeSection(data.doctor_fee_draft)}
     </div>
+    ` : ''}
   `;
 }
 
