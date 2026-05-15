@@ -11,37 +11,29 @@
 
   .settings-tab-bar {
     display: flex;
-    gap: 6px;
-    flex-wrap: wrap;
-    border-bottom: 1px solid rgba(255,255,255,0.08);
-    padding-bottom: 0;
+    gap: 0;
+    border-bottom: 2px solid rgba(255,255,255,0.08);
+    margin-bottom: 4px;
   }
 
   .settings-tab-btn {
     padding: 9px 18px;
-    border-radius: 10px 10px 0 0;
-    border: 1px solid transparent;
-    border-bottom: none;
-    background: transparent;
-    color: #64748b;
+    border: none;
+    border-bottom: 3px solid transparent;
+    margin-bottom: -2px;
+    background: none;
+    color: #6b7280;
     font-size: 13px;
     font-weight: 600;
     cursor: pointer;
-    transition: color 0.15s, background 0.15s;
-    position: relative;
-    bottom: -1px;
+    transition: color .15s, border-color .15s;
   }
 
-  .settings-tab-btn:hover {
-    color: #e2e8f0;
-    background: rgba(255,255,255,0.04);
-  }
+  .settings-tab-btn:hover { color: #f1f5f9; }
 
   .settings-tab-btn.active {
-    color: #e2e8f0;
-    background: #1e2235;
-    border-color: rgba(255,255,255,0.08);
-    border-bottom-color: #1e2235;
+    color: #4f6ef7;
+    border-bottom-color: #4f6ef7;
   }
 
   .settings-section-card {

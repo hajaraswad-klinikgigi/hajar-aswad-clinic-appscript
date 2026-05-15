@@ -6,6 +6,8 @@ var settingsTab = 'clinic';
 var settingsDoctorRules = [];
 var settingsServices = [];
 var settingsUsers = [];
+var settingsTabLoaded = {};
+var settingsClinicData = null;
 
 /* =========================================================
    ENTRY POINT
@@ -33,7 +35,29 @@ function showSettingsPage() {
       '<div id="settingsTabContent"><div class="settings-empty">Memuat...</div></div>' +
     '</div>';
 
-  settingsSwitchTab('clinic');
+  if (settingsTabLoaded['clinic']) {
+    settingsSwitchTab('clinic');
+  } else {
+    settingsLoadAllData();
+  }
+}
+
+function settingsLoadAllData() {
+  google.script.run
+    .withSuccessHandler(function(res) {
+      if (!res || !res.success) { settingsRenderError(res && res.message); return; }
+      settingsClinicData    = res.data.clinic;
+      settingsDoctorRules   = res.data.doctors  || [];
+      settingsServices      = res.data.services || [];
+      settingsUsers         = res.data.users    || [];
+      settingsTabLoaded['clinic']  = true;
+      settingsTabLoaded['doctor']  = true;
+      settingsTabLoaded['service'] = true;
+      settingsTabLoaded['user']    = true;
+      settingsSwitchTab(settingsTab);
+    })
+    .withFailureHandler(function(err) { settingsRenderError(err && err.message); })
+    .getAllSettingsData({ session_token: getCurrentSessionToken() });
 }
 
 function settingsSwitchTab(tab) {
@@ -46,7 +70,14 @@ function settingsSwitchTab(tab) {
       b.classList.toggle('active', tabs[i] === tab);
     });
   }
-  settingsLoadTab(tab);
+  if (settingsTabLoaded[tab]) {
+    if (tab === 'clinic')       settingsRenderClinicTab(settingsClinicData);
+    else if (tab === 'doctor')  settingsRenderDoctorTab();
+    else if (tab === 'service') settingsRenderServiceTab();
+    else if (tab === 'user')    settingsRenderUserTab();
+  } else {
+    settingsLoadTab(tab);
+  }
 }
 
 function settingsLoadTab(tab) {
@@ -57,40 +88,45 @@ function settingsLoadTab(tab) {
   if (tab === 'clinic') {
     google.script.run
       .withSuccessHandler(function(res) {
-        if (!res || !res.success) { settingsRenderError(res && res.message); return; }
-        settingsRenderClinicTab(res.data);
+        if (!res || !res.success) { if (settingsTab === 'clinic') settingsRenderError(res && res.message); return; }
+        settingsClinicData = res.data;
+        settingsTabLoaded['clinic'] = true;
+        if (settingsTab === 'clinic') settingsRenderClinicTab(res.data);
       })
-      .withFailureHandler(function(err) { settingsRenderError(err && err.message); })
+      .withFailureHandler(function(err) { if (settingsTab === 'clinic') settingsRenderError(err && err.message); })
       .getClinicInfo({ session_token: token });
 
   } else if (tab === 'doctor') {
     google.script.run
       .withSuccessHandler(function(res) {
-        if (!res || !res.success) { settingsRenderError(res && res.message); return; }
+        if (!res || !res.success) { if (settingsTab === 'doctor') settingsRenderError(res && res.message); return; }
         settingsDoctorRules = res.data || [];
-        settingsRenderDoctorTab();
+        settingsTabLoaded['doctor'] = true;
+        if (settingsTab === 'doctor') settingsRenderDoctorTab();
       })
-      .withFailureHandler(function(err) { settingsRenderError(err && err.message); })
+      .withFailureHandler(function(err) { if (settingsTab === 'doctor') settingsRenderError(err && err.message); })
       .getDoctorCompensationRules({ session_token: token });
 
   } else if (tab === 'service') {
     google.script.run
       .withSuccessHandler(function(res) {
-        if (!res || !res.success) { settingsRenderError(res && res.message); return; }
+        if (!res || !res.success) { if (settingsTab === 'service') settingsRenderError(res && res.message); return; }
         settingsServices = res.data || [];
-        settingsRenderServiceTab();
+        settingsTabLoaded['service'] = true;
+        if (settingsTab === 'service') settingsRenderServiceTab();
       })
-      .withFailureHandler(function(err) { settingsRenderError(err && err.message); })
+      .withFailureHandler(function(err) { if (settingsTab === 'service') settingsRenderError(err && err.message); })
       .getServiceCatalogList({ session_token: token, include_inactive: true });
 
   } else if (tab === 'user') {
     google.script.run
       .withSuccessHandler(function(res) {
-        if (!res || !res.success) { settingsRenderError(res && res.message); return; }
+        if (!res || !res.success) { if (settingsTab === 'user') settingsRenderError(res && res.message); return; }
         settingsUsers = res.data || [];
-        settingsRenderUserTab();
+        settingsTabLoaded['user'] = true;
+        if (settingsTab === 'user') settingsRenderUserTab();
       })
-      .withFailureHandler(function(err) { settingsRenderError(err && err.message); })
+      .withFailureHandler(function(err) { if (settingsTab === 'user') settingsRenderError(err && err.message); })
       .getUserList({ session_token: token });
   }
 }
@@ -317,9 +353,15 @@ function settingsSubmitDoctor(e) {
     .withSuccessHandler(function(res) {
       if (btn) btn.disabled = false;
       if (!res || !res.success) { showToast(res && res.message || 'Gagal menyimpan', 'error'); return; }
+      if (isEdit) {
+        var idx = settingsDoctorRules.findIndex(function(r) { return r.doctor_name === doctorName; });
+        if (idx !== -1) settingsDoctorRules[idx] = res.data;
+      } else {
+        settingsDoctorRules.push(res.data);
+      }
       showToast('Data fee dokter berhasil disimpan', 'success');
       settingsCloseDoctorModal();
-      settingsLoadTab('doctor');
+      settingsRenderDoctorTab();
     })
     .withFailureHandler(function(err) {
       if (btn) btn.disabled = false;
@@ -333,8 +375,10 @@ function settingsDeactivateDoctor(doctorName) {
   google.script.run
     .withSuccessHandler(function(res) {
       if (!res || !res.success) { showToast(res && res.message || 'Gagal', 'error'); return; }
+      var idx = settingsDoctorRules.findIndex(function(r) { return r.doctor_name === doctorName; });
+      if (idx !== -1) settingsDoctorRules[idx].is_active = false;
       showToast('Dokter dinonaktifkan', 'success');
-      settingsLoadTab('doctor');
+      settingsRenderDoctorTab();
     })
     .withFailureHandler(function(err) { showToast('Error: ' + (err && err.message || err), 'error'); })
     .updateDoctorCompensationRule({ session_token: getCurrentSessionToken(), doctor_name: doctorName, is_active: false });
@@ -344,8 +388,10 @@ function settingsActivateDoctor(doctorName) {
   google.script.run
     .withSuccessHandler(function(res) {
       if (!res || !res.success) { showToast(res && res.message || 'Gagal', 'error'); return; }
+      var idx = settingsDoctorRules.findIndex(function(r) { return r.doctor_name === doctorName; });
+      if (idx !== -1) settingsDoctorRules[idx].is_active = true;
       showToast('Dokter diaktifkan', 'success');
-      settingsLoadTab('doctor');
+      settingsRenderDoctorTab();
     })
     .withFailureHandler(function(err) { showToast('Error: ' + (err && err.message || err), 'error'); })
     .updateDoctorCompensationRule({ session_token: getCurrentSessionToken(), doctor_name: doctorName, is_active: true });
@@ -486,9 +532,15 @@ function settingsSubmitService(e) {
     .withSuccessHandler(function(res) {
       if (btn) btn.disabled = false;
       if (!res || !res.success) { showToast(res && res.message || 'Gagal menyimpan', 'error'); return; }
+      if (isEdit) {
+        var idx = settingsServices.findIndex(function(s) { return s.service_id === serviceId; });
+        if (idx !== -1) settingsServices[idx] = res.data;
+      } else {
+        settingsServices.push(res.data);
+      }
       showToast('Layanan berhasil disimpan', 'success');
       settingsCloseServiceModal();
-      settingsLoadTab('service');
+      settingsRenderServiceTab();
     })
     .withFailureHandler(function(err) {
       if (btn) btn.disabled = false;
@@ -503,8 +555,10 @@ function settingsDeactivateService(serviceId) {
   google.script.run
     .withSuccessHandler(function(res) {
       if (!res || !res.success) { showToast(res && res.message || 'Gagal', 'error'); return; }
+      var idx = settingsServices.findIndex(function(s) { return s.service_id === serviceId; });
+      if (idx !== -1) settingsServices[idx].is_active = false;
       showToast('Layanan dinonaktifkan', 'success');
-      settingsLoadTab('service');
+      settingsRenderServiceTab();
     })
     .withFailureHandler(function(err) { showToast('Error: ' + (err && err.message || err), 'error'); })
     .deleteServiceCatalog({ session_token: getCurrentSessionToken(), service_id: serviceId });
@@ -514,8 +568,10 @@ function settingsActivateService(serviceId) {
   google.script.run
     .withSuccessHandler(function(res) {
       if (!res || !res.success) { showToast(res && res.message || 'Gagal', 'error'); return; }
+      var idx = settingsServices.findIndex(function(s) { return s.service_id === serviceId; });
+      if (idx !== -1) settingsServices[idx].is_active = true;
       showToast('Layanan diaktifkan', 'success');
-      settingsLoadTab('service');
+      settingsRenderServiceTab();
     })
     .withFailureHandler(function(err) { showToast('Error: ' + (err && err.message || err), 'error'); })
     .updateServiceCatalog({ session_token: getCurrentSessionToken(), service_id: serviceId, is_active: true });
@@ -608,13 +664,22 @@ function settingsSubmitUser(e) {
   e.preventDefault();
   var btn = document.getElementById('settingsUserSaveBtn');
   if (btn) btn.disabled = true;
+  var newFullName = document.getElementById('su_full_name').value.trim();
+  var newRole     = document.getElementById('su_role').value;
   google.script.run
     .withSuccessHandler(function(res) {
       if (btn) btn.disabled = false;
       if (!res || !res.success) { showToast(res && res.message || 'Gagal menyimpan', 'error'); return; }
+      settingsUsers.push({
+        user_id:   res.data.user_id,
+        username:  res.data.username,
+        full_name: newFullName,
+        role:      newRole,
+        is_active: true
+      });
       showToast('Pengguna berhasil ditambahkan', 'success');
       settingsCloseUserModal();
-      settingsLoadTab('user');
+      settingsRenderUserTab();
     })
     .withFailureHandler(function(err) {
       if (btn) btn.disabled = false;
@@ -624,8 +689,8 @@ function settingsSubmitUser(e) {
       session_token: getCurrentSessionToken(),
       username:      document.getElementById('su_username').value.trim(),
       password:      document.getElementById('su_password').value,
-      full_name:     document.getElementById('su_full_name').value.trim(),
-      role:          document.getElementById('su_role').value
+      full_name:     newFullName,
+      role:          newRole
     });
 }
 
@@ -634,8 +699,10 @@ function settingsDeactivateUser(userId, username) {
   google.script.run
     .withSuccessHandler(function(res) {
       if (!res || !res.success) { showToast(res && res.message || 'Gagal', 'error'); return; }
+      var idx = settingsUsers.findIndex(function(u) { return u.user_id === userId; });
+      if (idx !== -1) settingsUsers[idx].is_active = false;
       showToast('Pengguna dinonaktifkan', 'success');
-      settingsLoadTab('user');
+      settingsRenderUserTab();
     })
     .withFailureHandler(function(err) { showToast('Error: ' + (err && err.message || err), 'error'); })
     .deleteUser({ session_token: getCurrentSessionToken(), user_id: userId });
@@ -645,8 +712,10 @@ function settingsActivateUser(userId) {
   google.script.run
     .withSuccessHandler(function(res) {
       if (!res || !res.success) { showToast(res && res.message || 'Gagal', 'error'); return; }
+      var idx = settingsUsers.findIndex(function(u) { return u.user_id === userId; });
+      if (idx !== -1) settingsUsers[idx].is_active = true;
       showToast('Pengguna diaktifkan', 'success');
-      settingsLoadTab('user');
+      settingsRenderUserTab();
     })
     .withFailureHandler(function(err) { showToast('Error: ' + (err && err.message || err), 'error'); })
     .updateUser({ session_token: getCurrentSessionToken(), user_id: userId, is_active: true });

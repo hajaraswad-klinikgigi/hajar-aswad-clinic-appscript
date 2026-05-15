@@ -5,6 +5,50 @@
 
 const SETTINGS_OPTS = { backend_mode: 'supabase' };
 
+// ── BOOTSTRAP (semua data sekaligus, 1 round-trip) ──
+
+function getAllSettingsData(payload) {
+  try {
+    const auth = readAuthSession_(payload);
+    if (!auth.success) return auth;
+
+    const results = supabaseSelectParallel_([
+      { table: repoGetTargetTableForSheet_('ClinicInfo'),                options: { limit: 10  } },
+      { table: repoGetTargetTableForSheet_('DoctorCompensationRules'),   options: { limit: 100 } },
+      { table: repoGetTargetTableForSheet_('ServiceCatalog'),            options: { limit: 500 } },
+      { table: repoGetTargetTableForSheet_('Users'),                     options: { limit: 100 } }
+    ]);
+
+    const clinicRows = results[0];
+    const doctors    = results[1];
+    const services   = results[2];
+    const usersRaw   = results[3];
+
+    const users = usersRaw.map(function(u) {
+      return {
+        user_id:    u.user_id,
+        username:   u.username,
+        full_name:  u.full_name,
+        role:       u.role,
+        is_active:  u.is_active,
+        created_at: u.created_at
+      };
+    });
+
+    return {
+      success: true,
+      data: {
+        clinic:   clinicRows[0] || null,
+        doctors:  doctors,
+        services: services,
+        users:    users
+      }
+    };
+  } catch (err) {
+    return { success: false, message: err.message || err };
+  }
+}
+
 // ── CLINIC INFO ──
 
 function getClinicInfo(payload) {
