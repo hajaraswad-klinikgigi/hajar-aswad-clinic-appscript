@@ -193,21 +193,6 @@ function updateDoctorCompensationRule(payload) {
   }
 }
 
-function deleteDoctorCompensationRule(payload) {
-  try {
-    const auth = readAuthSession_(payload);
-    if (!auth.success) return auth;
-
-    const doctorName = String((payload && payload.doctor_name) || '').trim();
-    if (!doctorName) return { success: false, message: 'doctor_name wajib diisi.' };
-
-    dbDeleteById_('DoctorCompensationRules', 'doctor_name', doctorName, DOCTOR_COMP_OPTIONS);
-    return { success: true };
-  } catch (err) {
-    return { success: false, message: 'Gagal hapus: ' + (err.message || err) };
-  }
-}
-
 /* =========================================================
    KALKULASI FEE (CORE)
    ========================================================= */
