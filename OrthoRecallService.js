@@ -572,6 +572,9 @@ function upsertOrthoRecallFromControl(payload) {
 }
 
 function saveOrthoRecallContact(payload) {
+  const auth = readAuthSession_(payload);
+  if (!auth.success) return auth;
+
   const freezeCheck = repoCheckProductionMutationAllowed_({
     operation: 'SAVE_ORTHO_RECALL_CONTACT',
     module: 'OrthoRecallService',
@@ -656,6 +659,9 @@ function buildOrthoRecallProgramNote(existingNote, actionLabel, reason) {
 }
 
 function completeOrthoRecallProgram(payload) {
+  const auth = readAuthSession_(payload);
+  if (!auth.success) return auth;
+
   const freezeCheck = repoCheckProductionMutationAllowed_({
     operation: 'COMPLETE_ORTHO_RECALL_PROGRAM',
     module: 'OrthoRecallService',
@@ -737,6 +743,9 @@ function completeOrthoRecallProgram(payload) {
 }
 
 function cancelOrthoRecallProgram(payload) {
+  const auth = readAuthSession_(payload);
+  if (!auth.success) return auth;
+
   const freezeCheck = repoCheckProductionMutationAllowed_({
     operation: 'CANCEL_ORTHO_RECALL_PROGRAM',
     module: 'OrthoRecallService',

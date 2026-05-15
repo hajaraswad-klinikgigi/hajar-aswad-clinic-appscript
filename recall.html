@@ -1081,10 +1081,10 @@ function submitRecallProgramAction() {
     loadingText: type === 'complete' ? 'Completing...' : 'Cancelling...'
   });
 
-  const payload = {
+  const payload = attachAuthContext({
     ortho_recall_id: recallId,
     reason: reason
-  };
+  });
 
   if (type === 'complete') {
     google.script.run
@@ -1144,10 +1144,10 @@ function handleRecallProgramActionFailure(err) {
 
     clearRecallContactErrors();
 
-    const payload = {
+    const payload = attachAuthContext({
       ortho_recall_id: document.getElementById('recall_contact_id_hidden').value,
       last_contact_note: document.getElementById('recall_contact_note').value.trim()
-    };
+    });
 
     if (!payload.ortho_recall_id) {
       showToast('Recall ID tidak ditemukan', 'error');
