@@ -596,6 +596,13 @@ function saveOrthoRecallContact(payload) {
     };
   }
 
+  if (note.length > 500) {
+    return {
+      success: false,
+      message: 'Catatan kontak maksimal 500 karakter'
+    };
+  }
+
   const existing = findOrthoRecallById(
     orthoRecallId,
     getOrthoRecallServiceSpreadsheetWriteReadOptions_()
