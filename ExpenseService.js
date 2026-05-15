@@ -6,6 +6,7 @@
 const EXPENSE_OPTIONS = { backend_mode: 'supabase' };
 
 const VALID_EXPENSE_CATEGORIES = [
+  'doctor_fee',
   'doctor_salary',
   'doctor_meal',
   'doctor_standby',
