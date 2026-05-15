@@ -332,6 +332,8 @@ function validateTreatmentPayload(payload) {
     errors.treatment_date = 'Tanggal treatment wajib diisi';
   } else if (!isValidYmdDate(String(payload.treatment_date).trim())) {
     errors.treatment_date = 'Tanggal treatment tidak valid';
+  } else if (String(payload.treatment_date).trim() > formatTodayYmd()) {
+    errors.treatment_date = 'Tanggal treatment tidak boleh tanggal yang akan datang';
   }
 
   if (!payload.chief_complaint || !String(payload.chief_complaint).trim()) {
