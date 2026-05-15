@@ -183,16 +183,23 @@ function supabaseUpdate_(table, filters, patch) {
  *
  * @param {string} table
  * @param {object} filters - WAJIB ada, untuk menghindari delete massal
+ * @param {object} [options] - { return_rows: true } untuk mendapat array baris yang dihapus
+ * @returns {object} { success: true, rows?: Array } — rows hanya jika return_rows=true
  */
-function supabaseDelete_(table, filters) {
+function supabaseDelete_(table, filters, options) {
   if (!filters || Object.keys(filters).length === 0) {
     throw new Error('Supabase DELETE wajib menyertakan filters untuk menghindari delete massal');
   }
 
+  var opts = options || {};
+  var headers = opts.return_rows
+    ? buildSupabaseHeaders_({ 'Prefer': 'return=representation' })
+    : buildSupabaseHeaders_();
+
   var url = buildSupabaseUrl_(table, filters);
   var response = UrlFetchApp.fetch(url, {
     method: 'delete',
-    headers: buildSupabaseHeaders_(),
+    headers: headers,
     muteHttpExceptions: true
   });
 
@@ -202,7 +209,107 @@ function supabaseDelete_(table, filters) {
     throw new Error('Supabase DELETE failed for ' + table + ': HTTP ' + result.status_code + ' - ' + JSON.stringify(result.body));
   }
 
+  if (opts.return_rows) {
+    return { success: true, rows: Array.isArray(result.body) ? result.body : [] };
+  }
   return { success: true };
+}
+
+/**
+ * SELECT paralel dari beberapa tabel sekaligus menggunakan UrlFetchApp.fetchAll().
+ * Semua request dikirim bersamaan → total waktu = max(t1,t2,...,tn) bukan t1+t2+...+tn.
+ *
+ * @param {Array} requests - array of { table, filters, options }
+ * @returns {Array} array of row arrays, sesuai urutan input
+ *
+ * Contoh penggunaan:
+ *   var results = supabaseSelectParallel_([
+ *     { table: 'clinic_info', options: { limit: 10 } },
+ *     { table: 'doctor_compensation_rules', options: { limit: 100 } }
+ *   ]);
+ *   var clinicRows  = results[0];
+ *   var doctorRows  = results[1];
+ */
+function supabaseSelectParallel_(requests) {
+  var sharedHeaders = buildSupabaseHeaders_();
+
+  var fetchRequests = requests.map(function(req) {
+    var opts   = req.options || {};
+    var params = { select: opts.select || '*' };
+    if (opts.limit) params.limit = opts.limit;
+    if (opts.order) params.order = opts.order;
+
+    if (req.filters) {
+      Object.keys(req.filters).forEach(function(key) {
+        params[key] = req.filters[key];
+      });
+    }
+
+    return {
+      url:               buildSupabaseUrl_(req.table, params),
+      method:            'GET',
+      headers:           sharedHeaders,
+      muteHttpExceptions: true
+    };
+  });
+
+  var responses = UrlFetchApp.fetchAll(fetchRequests);
+
+  return responses.map(function(response, i) {
+    var result = parseSupabaseResponse_(response);
+    if (!result.success) {
+      throw new Error(
+        'Supabase parallel SELECT failed [' + requests[i].table + ']: ' +
+        'HTTP ' + result.status_code + ' — ' + JSON.stringify(result.body)
+      );
+    }
+    return Array.isArray(result.body) ? result.body : [];
+  });
+}
+
+/**
+ * PATCH paralel ke beberapa row sekaligus menggunakan UrlFetchApp.fetchAll().
+ * Setiap item dalam requests adalah satu PATCH operation dengan filter + data berbeda.
+ * Total waktu = max(t1,...,tn) bukan t1+...+tn.
+ *
+ * @param {Array} requests - array of { table, filters, patch }
+ *   filters: { installment_id: 'eq.XXX' }
+ *   patch:   object field yang akan di-update
+ *
+ * Contoh:
+ *   supabaseBatchPatch_([
+ *     { table: 'billing_installments', filters: { installment_id: 'eq.INS-001' }, patch: { status: 'paid', paid_amount: 500000 } },
+ *     { table: 'billing_installments', filters: { installment_id: 'eq.INS-002' }, patch: { status: 'partial', paid_amount: 250000 } }
+ *   ]);
+ */
+function supabaseBatchPatch_(requests) {
+  if (!requests || !requests.length) return [];
+
+  var sharedHeaders = buildSupabaseHeaders_({ 'Prefer': 'return=minimal' });
+
+  var fetchRequests = requests.map(function(req) {
+    return {
+      url:                buildSupabaseUrl_(req.table, req.filters || {}),
+      method:             'patch',
+      headers:            sharedHeaders,
+      payload:            JSON.stringify(req.patch || {}),
+      muteHttpExceptions: true
+    };
+  });
+
+  var responses = UrlFetchApp.fetchAll(fetchRequests);
+
+  responses.forEach(function(response, i) {
+    var status = response.getResponseCode();
+    if (status < 200 || status >= 300) {
+      throw new Error(
+        'Supabase batch PATCH failed [' + requests[i].table + ']: ' +
+        'HTTP ' + status + ' — ' + response.getContentText()
+      );
+    }
+  });
+
+  return responses;
 }
 
 /* =========================================================
