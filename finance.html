@@ -4131,6 +4131,8 @@ function openFinancePaymentModal() {
   financeSetInputValue('finance_payment_billing_id', billing.billing_id || '');
   financeSetInputValue('finance_payment_billing_number', billing.billing_number || '');
   financeSetInputValue('finance_payment_date', financeTodayYmd());
+  const _paymentDateInput = document.getElementById('finance_payment_date');
+  if (_paymentDateInput) _paymentDateInput.min = financeTodayYmd();
   financeSetInputValue('finance_payment_method', '');
   financeSetInputValue('finance_payment_reference_no', '');
   financeSetInputValue('finance_payment_notes', '');
@@ -4245,6 +4247,8 @@ function submitFinancePayment(e) {
 
   if (!payload.payment_date) {
     localErrors.payment_date = 'Tanggal pembayaran wajib diisi';
+  } else if (payload.payment_date < financeTodayYmd()) {
+    localErrors.payment_date = 'Tanggal pembayaran tidak boleh mundur dari hari ini';
   }
 
   if (!payload.payment_method) {
