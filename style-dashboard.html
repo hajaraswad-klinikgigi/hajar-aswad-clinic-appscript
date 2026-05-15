@@ -508,4 +508,48 @@
     border-radius: 10px;
     border-left: 2px solid rgba(255, 255, 255, 0.08);
   }
+
+  .dashboard-feedback-pagination {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    padding: 12px 0 4px;
+    border-top: 1px solid rgba(255, 255, 255, 0.06);
+    margin-top: 4px;
+  }
+
+  .dashboard-feedback-page-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    height: 30px;
+    padding: 0 12px;
+    border: 1px solid rgba(255, 255, 255, 0.10);
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.04);
+    color: #94a3b8;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s;
+  }
+
+  .dashboard-feedback-page-btn:hover:not(:disabled) {
+    background: rgba(255, 255, 255, 0.09);
+    color: #e2e8f0;
+  }
+
+  .dashboard-feedback-page-btn:disabled {
+    opacity: 0.35;
+    cursor: not-allowed;
+  }
+
+  .dashboard-feedback-page-info {
+    font-size: 12px;
+    font-weight: 600;
+    color: #64748b;
+    min-width: 50px;
+    text-align: center;
+  }
 </style>

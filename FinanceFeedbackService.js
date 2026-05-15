@@ -281,6 +281,7 @@ function normalizeBillingFeedbackForReport(row) {
     patient_id: String(row.patient_id || ''),
     patient_name: String(row.patient_name || ''),
     created_at: formatCellValue(row.created_at || ''),
+    created_ymd: financeExtractYmd_(row.created_at || ''),
     updated_at: formatCellValue(row.updated_at || '')
   };
 }
@@ -309,8 +310,9 @@ function buildBillingFeedbackSummaryForRange_(startYmd, endYmd, options) {
       financeIsDateBetweenYmd_(row.submitted_ymd, startYmd, endYmd);
   });
 
-  const pendingAll = allFeedbacks.filter(function(row) {
-    return row.feedback_status !== 'submitted';
+  const pendingInPeriod = allFeedbacks.filter(function(row) {
+    return row.feedback_status !== 'submitted' &&
+      financeIsDateBetweenYmd_(row.created_ymd, startYmd, endYmd);
   });
 
   let ratingSum = 0;
@@ -354,12 +356,11 @@ function buildBillingFeedbackSummaryForRange_(startYmd, endYmd, options) {
     .slice()
     .sort(function(a, b) {
       return String(b.submitted_at || '').localeCompare(String(a.submitted_at || ''));
-    })
-    .slice(0, 5);
+    });
 
   return {
     submitted_count: submittedCount,
-    pending_count: pendingAll.length,
+    pending_count: pendingInPeriod.length,
     average_rating: averageRating,
     satisfied_count: satisfiedCount,
     neutral_count: neutralCount,

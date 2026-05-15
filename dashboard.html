@@ -1,6 +1,8 @@
 <script>
   let dashboardPeriod = 'today';
   let dashboardCache = {};
+  let dashboardFeedbackPage = 1;
+  const DASHBOARD_FEEDBACK_PAGE_SIZE = 5;
 
   function formatDashboardRupiah(value) {
     const num = Number(value || 0);
@@ -192,6 +194,7 @@
 
   function changePeriod(el) {
     dashboardPeriod = el && el.value ? el.value : 'today';
+    dashboardFeedbackPage = 1;
     loadDashboard();
   }
 
@@ -423,6 +426,16 @@
     `;
   }
 
+  function setDashboardFeedbackPage(page) {
+    const cached = dashboardCache[dashboardPeriod];
+    if (!cached || !cached.data) return;
+
+    const total = ((cached.data.feedback_summary || {}).latest_feedbacks || []).length;
+    const totalPages = Math.max(1, Math.ceil(total / DASHBOARD_FEEDBACK_PAGE_SIZE));
+    dashboardFeedbackPage = Math.min(Math.max(1, page), totalPages);
+    renderDashboardFeedbackSection(cached.data.feedback_summary || null);
+  }
+
   function renderDashboardFeedbackSection(summary) {
     const el = document.getElementById('dashboardFeedbackSection');
     if (!el) return;
@@ -467,28 +480,51 @@
         <div class="dashboard-panel-divider"></div>
         <div class="dashboard-panel-subtitle">Feedback Terbaru</div>
 
-        ${latest.length
-          ? `<div class="dashboard-feedback-list">
-              ${latest.map(function(row) {
-                return `
-                  <div class="dashboard-feedback-item">
-                    <div class="dashboard-feedback-item-head">
-                      <span class="dashboard-feedback-item-name">${row.patient_name || '-'}</span>
-                      <span class="dashboard-feedback-item-meta">
-                        ${formatDashboardDateDmy(row.submitted_ymd || row.submitted_at || '')}
-                        &bull; Rating ${formatDashboardRating(row.rating || 0)}
-                        &bull; ${row.billing_id || '-'}
-                      </span>
-                    </div>
-                    ${row.comment
-                      ? `<div class="dashboard-feedback-item-comment">${row.comment}</div>`
-                      : ''}
-                  </div>
-                `;
-              }).join('')}
-            </div>`
-          : `<div class="pt-empty">Belum ada feedback pada periode ini.</div>`
-        }
+        ${(function() {
+          if (!latest.length) {
+            return '<div class="pt-empty">Belum ada feedback pada periode ini.</div>';
+          }
+
+          const totalPages = Math.ceil(latest.length / DASHBOARD_FEEDBACK_PAGE_SIZE);
+          const page = Math.min(dashboardFeedbackPage, totalPages);
+          const pageItems = latest.slice((page - 1) * DASHBOARD_FEEDBACK_PAGE_SIZE, page * DASHBOARD_FEEDBACK_PAGE_SIZE);
+
+          const listHtml = pageItems.map(function(row) {
+            return `
+              <div class="dashboard-feedback-item">
+                <div class="dashboard-feedback-item-head">
+                  <span class="dashboard-feedback-item-name">${row.patient_name || '-'}</span>
+                  <span class="dashboard-feedback-item-meta">
+                    ${formatDashboardDateDmy(row.submitted_ymd || row.submitted_at || '')}
+                    &bull; Rating ${formatDashboardRating(row.rating || 0)}
+                    &bull; ${row.billing_id || '-'}
+                  </span>
+                </div>
+                ${row.comment
+                  ? `<div class="dashboard-feedback-item-comment">${row.comment}</div>`
+                  : ''}
+              </div>
+            `;
+          }).join('');
+
+          const paginationHtml = totalPages > 1 ? `
+            <div class="dashboard-feedback-pagination">
+              <button
+                class="dashboard-feedback-page-btn"
+                onclick="setDashboardFeedbackPage(${page - 1})"
+                ${page <= 1 ? 'disabled' : ''}
+              >&lsaquo; Sebelumnya</button>
+              <span class="dashboard-feedback-page-info">${page} / ${totalPages}</span>
+              <button
+                class="dashboard-feedback-page-btn"
+                onclick="setDashboardFeedbackPage(${page + 1})"
+                ${page >= totalPages ? 'disabled' : ''}
+              >Berikutnya &rsaquo;</button>
+            </div>
+          ` : '';
+
+          return `<div class="dashboard-feedback-list">${listHtml}</div>${paginationHtml}`;
+        })()}
       </div>
     `;
   }
