@@ -855,15 +855,15 @@
           </td>  
   
           <td>
-            <div class="appointment-patient-name">${row.patient_name || ''}</div>
-            <div class="finance-invoice-sub">${row.patient_id || ''}</div>
+            <div class="appointment-patient-name">${escapeAppHtml(row.patient_name || '')}</div>
+            <div class="finance-invoice-sub">${escapeAppHtml(row.patient_id || '')}</div>
           </td>
-  
-          <td>${formatAppointmentDateDisplay(row.appointment_date)}</td>  
-  
-          <td>  
-            <span class="appointment-complaint-text">${row.complaint || ''}</span>  
-          </td>  
+
+          <td>${formatAppointmentDateDisplay(row.appointment_date)}</td>
+
+          <td>
+            <span class="appointment-complaint-text">${escapeAppHtml(row.complaint || '')}</span>
+          </td>
   
           <td>${statusBadge}</td>  
   
@@ -1609,7 +1609,7 @@
         if (select) {
           select.innerHTML = '<option value="">Pilih dokter</option>' +
             window.treatmentDoctors.map(function(d) {
-              return `<option value="${d.user_id}">${d.full_name || d.username}</option>`;
+              return `<option value="${escapeAppHtml(d.user_id)}">${escapeAppHtml(d.full_name || d.username)}</option>`;
             }).join('');
 
           select.disabled = false;
@@ -1890,11 +1890,11 @@
       const unitPrice = service ? Number(service.default_price || 0) : 0;  
       const subtotal = qty * unitPrice;  
   
-      const optionsHtml = '<option value="">Pilih tindakan</option>' +  
-        services.map(function(s) {  
-          const selected = String(item.service_id || '') === String(s.service_id || '') ? 'selected' : '';  
-          return `<option value="${s.service_id}" ${selected}>${s.service_name}</option>`;  
-        }).join('');  
+      const optionsHtml = '<option value="">Pilih tindakan</option>' +
+        services.map(function(s) {
+          const selected = String(item.service_id || '') === String(s.service_id || '') ? 'selected' : '';
+          return `<option value="${escapeAppHtml(s.service_id)}" ${selected}>${escapeAppHtml(s.service_name)}</option>`;
+        }).join('');
   
       return `  
         <tr>  
@@ -2112,10 +2112,10 @@
             '${String(item.phone || '').replace(/'/g, "\\'")}'  
           )"  
         >  
-          <div class="patient-search-name">${item.patient_name || ''}</div>  
-          <div class="patient-search-meta">  
-            ${item.patient_code || ''}${item.phone ? ' • ' + item.phone : ''}  
-          </div>  
+          <div class="patient-search-name">${escapeAppHtml(item.patient_name || '')}</div>
+          <div class="patient-search-meta">
+            ${escapeAppHtml(item.patient_code || '')}${item.phone ? ' • ' + escapeAppHtml(item.phone) : ''}
+          </div>
           <div style="margin-top:6px;">  
             ${getPatientAvailabilityBadge(!!item.has_open_appointment)}  
           </div>  

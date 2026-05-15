@@ -675,10 +675,10 @@
       const recallNotes = String(row.notes || '').trim() || '-';
 
       return `
-        <tr id="recall-row-${row.ortho_recall_id}" class="recall-main-row">
+        <tr id="recall-row-${escapeRecallHtml(row.ortho_recall_id)}" class="recall-main-row">
           <td>
-            <span class="recall-patient-name">${row.patient_name || '-'}</span>
-            <span class="recall-patient-subid">${row.patient_id || '-'}</span>
+            <span class="recall-patient-name">${escapeRecallHtml(row.patient_name || '-')}</span>
+            <span class="recall-patient-subid">${escapeRecallHtml(row.patient_id || '-')}</span>
           </td>
 
           <td>${formatRecallDate(row.install_date || '')}</td>
@@ -794,12 +794,12 @@
               <div class="recall-expand-grid">
                 <div class="recall-expand-item">
                   <div class="pt-detail-label">Patient ID</div>
-                  <div class="pt-detail-value">${row.patient_id || '-'}</div>
+                  <div class="pt-detail-value">${escapeRecallHtml(row.patient_id || '-')}</div>
                 </div>
 
                 <div class="recall-expand-item">
                   <div class="pt-detail-label">Phone</div>
-                  <div class="pt-detail-value">${row.phone || '-'}</div>
+                  <div class="pt-detail-value">${escapeRecallHtml(row.phone || '-')}</div>
                 </div>
 
                 <div class="recall-expand-item">

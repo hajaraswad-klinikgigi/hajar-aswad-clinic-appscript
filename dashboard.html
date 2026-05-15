@@ -388,7 +388,7 @@
             return `
               <tr>
                 <td class="col-num">${idx + 1}</td>
-                <td>${row.name || '-'}</td>
+                <td>${escapeAppHtml(row.name || '-')}</td>
                 <td class="col-right col-muted">${Number(row.qty || 0)}</td>
                 <td class="col-right col-value">${formatDashboardRupiah(row.total || 0)}</td>
               </tr>
@@ -418,7 +418,7 @@
           return `
             <div class="dashboard-appt-item">
               <span class="dashboard-appt-num">${idx + 1}</span>
-              <span class="dashboard-appt-name">${row.patient_name || '-'}</span>
+              <span class="dashboard-appt-name">${escapeAppHtml(row.patient_name || '-')}</span>
             </div>
           `;
         }).join('')}
@@ -493,15 +493,15 @@
             return `
               <div class="dashboard-feedback-item">
                 <div class="dashboard-feedback-item-head">
-                  <span class="dashboard-feedback-item-name">${row.patient_name || '-'}</span>
+                  <span class="dashboard-feedback-item-name">${escapeAppHtml(row.patient_name || '-')}</span>
                   <span class="dashboard-feedback-item-meta">
                     ${formatDashboardDateDmy(row.submitted_ymd || row.submitted_at || '')}
                     &bull; Rating ${formatDashboardRating(row.rating || 0)}
-                    &bull; ${row.billing_id || '-'}
+                    &bull; ${escapeAppHtml(row.billing_id || '-')}
                   </span>
                 </div>
                 ${row.comment
-                  ? `<div class="dashboard-feedback-item-comment">${row.comment}</div>`
+                  ? `<div class="dashboard-feedback-item-comment">${escapeAppHtml(row.comment)}</div>`
                   : ''}
               </div>
             `;
