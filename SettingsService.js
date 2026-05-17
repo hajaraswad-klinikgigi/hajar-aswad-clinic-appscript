@@ -218,9 +218,12 @@ function syncAppUserRoles_(userId, roles, clinicId) {
 
   Object.keys(targetRoles).forEach(function(role) {
     if (!existingRoles[role]) {
+      // owner & super_admin → clinic_id NULL (global scope, cross-clinic).
+      // Role lain → per-clinic. Sinkron dengan migration 009.
+      const rowClinicId = isGlobalScopeRole_(role) ? null : targetClinic;
       supabaseInsert_(targetTable, {
         user_id: normalizedUserId,
-        clinic_id: targetClinic,
+        clinic_id: rowClinicId,
         role: role
       });
     }
@@ -250,9 +253,11 @@ function getUserList(payload) {
         user_id:    u.user_id,
         username:   u.username,
         full_name:  u.full_name,
+        email:      u.email || null,
         role:       u.role,
         roles:      rolesByUser[uid] || [],
         is_active:  u.is_active,
+        totp_enabled: !!String(u.totp_secret || '').trim(),
         created_at: u.created_at
       };
     });
@@ -271,25 +276,38 @@ function addUser(payload) {
     }
 
     const username = String((payload && payload.username) || '').trim();
-    const password = String((payload && payload.password) || '').trim();
     const fullName = String((payload && payload.full_name) || '').trim();
+    const email    = String((payload && payload.email) || '').trim().toLowerCase();
     const roles    = normalizeRolesPayload_(payload && payload.roles);
 
     if (!username) return { success: false, message: 'Username wajib diisi.' };
-    if (!password) return { success: false, message: 'Password wajib diisi.' };
     if (!fullName) return { success: false, message: 'Nama lengkap wajib diisi.' };
+    if (!email)    return { success: false, message: 'Email wajib diisi (dipakai untuk login).' };
     if (!roles.length) return { success: false, message: 'Minimal pilih 1 role.' };
+
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      return { success: false, message: 'Format email tidak valid.' };
+    }
+    const allUsers = dbFindAll_('Users', SETTINGS_OPTS);
+    const dupEmail = allUsers.find(function(u) {
+      return String(u.email || '').trim().toLowerCase() === email;
+    });
+    if (dupEmail) return { success: false, message: 'Email sudah dipakai pengguna lain.' };
 
     const existing = dbFindById_('Users', 'username', username, SETTINGS_OPTS);
     if (existing) return { success: false, message: 'Username sudah dipakai.' };
 
     const userId = generateSafeId('USR');
     const legacyRole = deriveLegacyRoleFromRoles_(roles);
+    // TOTP-only: password tidak dipakai untuk auth. Isi random UUID supaya kolom
+    // NOT NULL legacy terpenuhi, dan loginUser() lama otomatis menolak (hash mismatch).
+    const randomLegacyPassword = Utilities.getUuid() + Utilities.getUuid();
     const row = {
       user_id:       userId,
       username:      username,
-      password_hash: password,
+      password_hash: randomLegacyPassword,
       full_name:     fullName,
+      email:         email,
       role:          legacyRole,
       is_active:     true
     };
@@ -297,7 +315,7 @@ function addUser(payload) {
     const inserted = dbInsert_('Users', row, SETTINGS_OPTS);
     syncAppUserRoles_(userId, roles, auth.user.clinic_id);
 
-    return { success: true, data: { user_id: inserted.user_id, username: inserted.username, roles: roles } };
+    return { success: true, data: { user_id: inserted.user_id, username: inserted.username, email: inserted.email || null, roles: roles } };
   } catch (err) {
     return { success: false, message: err.message || err };
   }
@@ -317,6 +335,23 @@ function updateUser(payload) {
     const patch = {};
     if (payload.full_name !== undefined) patch.full_name = payload.full_name;
     if (payload.is_active !== undefined) patch.is_active = payload.is_active;
+
+    if (payload.email !== undefined) {
+      const newEmail = String(payload.email || '').trim().toLowerCase();
+      if (!newEmail) {
+        return { success: false, message: 'Email wajib diisi (dipakai untuk login).' };
+      }
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(newEmail)) {
+        return { success: false, message: 'Format email tidak valid.' };
+      }
+      const allUsers = dbFindAll_('Users', SETTINGS_OPTS);
+      const dupEmail = allUsers.find(function(u) {
+        return String(u.email || '').trim().toLowerCase() === newEmail &&
+               String(u.user_id || '').trim() !== userId;
+      });
+      if (dupEmail) return { success: false, message: 'Email sudah dipakai pengguna lain.' };
+      patch.email = newEmail;
+    }
 
     let rolesToSync = null;
     if (payload.roles !== undefined) {
@@ -343,4 +378,211 @@ function updateUser(payload) {
 
 function deleteUser(payload) {
   return updateUser(Object.assign({}, payload, { is_active: false, roles: undefined }));
+}
+
+// =========================================================
+// Phase 2b — Setup / Reset / Disable TOTP per user (Settings)
+// =========================================================
+
+/**
+ * Generate TOTP secret baru untuk user (atau regenerate kalau sudah ada).
+ * Return otpauth URI + secret base32 supaya frontend tampil QR code.
+ *
+ * WAJIB owner / super_admin.
+ */
+function generateTotpForUser(payload) {
+  try {
+    const auth = readAuthSession_(payload);
+    if (!auth.success) return auth;
+    if (!userIsFullyPrivileged_(auth.user)) {
+      return { success: false, message: 'Hanya owner atau super admin yang bisa setup Authenticator.' };
+    }
+
+    const userId = String((payload && payload.user_id) || '').trim();
+    if (!userId) return { success: false, message: 'user_id wajib diisi.' };
+
+    const user = dbFindById_('Users', 'user_id', userId, SETTINGS_OPTS);
+    if (!user) return { success: false, message: 'User tidak ditemukan.' };
+
+    const email = String(user.email || '').trim();
+    if (!email) {
+      return {
+        success: false,
+        message: 'User belum punya email. Isi email lewat Edit Pengguna dulu sebelum setup Authenticator.'
+      };
+    }
+
+    const secret = generateTotpSecret_();
+    const nowIso = new Date().toISOString();
+
+    dbUpdateById_('Users', 'user_id', userId, {
+      totp_secret: secret,
+      totp_enabled_at: nowIso,
+      updated_at: nowIso
+    }, SETTINGS_OPTS);
+
+    const otpauthUri = buildOtpAuthUri_(secret, email);
+
+    return {
+      success: true,
+      data: {
+        user_id: userId,
+        email: email,
+        full_name: String(user.full_name || '').trim(),
+        secret: secret,
+        otpauth_uri: otpauthUri,
+        enabled_at: nowIso
+      }
+    };
+  } catch (err) {
+    return { success: false, message: err.message || err };
+  }
+}
+
+/**
+ * Reset TOTP secret (hapus secret lama, generate baru).
+ * Sama persis dengan generateTotpForUser — tinggal alias supaya
+ * call site lebih jelas semantik.
+ */
+function resetTotpForUser(payload) {
+  return generateTotpForUser(payload);
+}
+
+function sendTotpSetupEmail(payload) {
+  try {
+    const auth = readAuthSession_(payload);
+    if (!auth.success) return auth;
+    if (!userIsFullyPrivileged_(auth.user)) {
+      return { success: false, message: 'Hanya owner atau super admin yang bisa kirim setup link.' };
+    }
+    const userId = String((payload && payload.user_id) || '').trim();
+    if (!userId) return { success: false, message: 'user_id wajib diisi.' };
+    const user = dbFindById_('Users', 'user_id', userId, SETTINGS_OPTS);
+    if (!user) return { success: false, message: 'User tidak ditemukan.' };
+    if (!user.email) return { success: false, message: 'User belum punya email. Isi email dulu via Edit Pengguna.' };
+
+    const secret = generateTotpSecret_();
+    const nowIso = new Date().toISOString();
+    const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+    const token = Utilities.getUuid().replace(/-/g, '') + Utilities.getUuid().replace(/-/g, '');
+
+    dbUpdateById_('Users', 'user_id', userId, {
+      totp_secret: secret,
+      totp_enabled_at: nowIso,
+      updated_at: nowIso
+    }, SETTINGS_OPTS);
+
+    dbInsert_('TotpSetupTokens', {
+      token: token,
+      user_id: userId,
+      expires_at: expiresAt,
+      created_by: String(auth.user.user_id || '')
+    }, SETTINGS_OPTS);
+
+    const webAppUrl = ScriptApp.getService().getUrl();
+    const setupUrl = webAppUrl + '?totp_setup_token=' + encodeURIComponent(token);
+    const fullName = String(user.full_name || '').trim() || user.email;
+
+    const htmlBody =
+      '<div style="font-family:Arial,sans-serif;max-width:560px;margin:0 auto;color:#1a2035">' +
+        '<h2>Halo ' + escapeAppHtml(fullName) + ',</h2>' +
+        '<p>Admin klinik baru saja generate setup Google Authenticator untuk akun Anda di sistem Klinik Hajar Aswad.</p>' +
+        '<p><strong>Sebelum mulai, install app <a href="https://play.google.com/store/apps/details?id=com.google.android.apps.authenticator2">Google Authenticator</a> di HP Anda (gratis).</strong></p>' +
+        '<p>Setelah app terpasang, klik tombol di bawah untuk buka halaman setup berisi QR code:</p>' +
+        '<p style="text-align:center;margin:24px 0">' +
+          '<a href="' + setupUrl + '" style="display:inline-block;padding:14px 28px;background:#4f6ef7;color:#fff;text-decoration:none;border-radius:10px;font-weight:700">Buka Halaman Setup</a>' +
+        '</p>' +
+        '<p style="font-size:13px;color:#64748b">Atau copy link ini ke browser:<br><code style="font-size:11px;background:#f1f5f9;padding:4px 8px;border-radius:4px;word-break:break-all">' + setupUrl + '</code></p>' +
+        '<div style="background:#fef3c7;border-left:4px solid #f59e0b;padding:12px 16px;margin:20px 0;border-radius:8px;font-size:13px;color:#78350f">' +
+          '&#9888; Link ini <strong>sekali pakai</strong> dan akan kadaluwarsa dalam 24 jam. ' +
+          'Jangan teruskan email ini ke siapa pun.' +
+        '</div>' +
+      '</div>';
+
+    MailApp.sendEmail({
+      to: user.email,
+      subject: '[Klinik Hajar Aswad] Setup Google Authenticator Anda',
+      htmlBody: htmlBody
+    });
+
+    return {
+      success: true,
+      message: 'Email setup terkirim ke ' + user.email,
+      data: { email: user.email, full_name: fullName, expires_at: expiresAt }
+    };
+  } catch (err) {
+    return { success: false, message: err.message || err };
+  }
+}
+
+function getTotpSetupByToken(token) {
+  try {
+    const cleanToken = String(token || '').trim();
+    if (!cleanToken) return { success: false, message: 'Token tidak valid.' };
+    const tokenRow = dbFindById_('TotpSetupTokens', 'token', cleanToken, SETTINGS_OPTS);
+    if (!tokenRow) return { success: false, message: 'Link tidak valid atau sudah kadaluwarsa.' };
+    if (tokenRow.used_at) return { success: false, message: 'Link sudah pernah dipakai. Hubungi admin klinik untuk generate ulang.' };
+    const expiresAt = new Date(tokenRow.expires_at);
+    if (isNaN(expiresAt.getTime()) || expiresAt.getTime() < Date.now()) {
+      return { success: false, message: 'Link sudah kadaluwarsa. Hubungi admin klinik untuk generate ulang.' };
+    }
+    const user = dbFindById_('Users', 'user_id', tokenRow.user_id, SETTINGS_OPTS);
+    if (!user || !user.totp_secret) return { success: false, message: 'Data user tidak ditemukan.' };
+    const isActive = String(user.is_active || '').trim().toLowerCase() !== 'false';
+    if (!isActive) return { success: false, message: 'Akun tidak aktif.' };
+    return {
+      success: true,
+      data: {
+        full_name: String(user.full_name || '').trim() || user.email,
+        email: user.email,
+        secret: user.totp_secret,
+        otpauth_uri: buildOtpAuthUri_(user.totp_secret, user.email)
+      }
+    };
+  } catch (err) {
+    return { success: false, message: err.message || err };
+  }
+}
+
+function markTotpSetupTokenUsed(token) {
+  try {
+    const cleanToken = String(token || '').trim();
+    if (!cleanToken) return { success: false, message: 'Token tidak valid.' };
+    const tokenRow = dbFindById_('TotpSetupTokens', 'token', cleanToken, SETTINGS_OPTS);
+    if (!tokenRow) return { success: false, message: 'Token tidak ditemukan.' };
+    if (tokenRow.used_at) return { success: true, message: 'Token sudah ditandai pakai.' };
+    dbUpdateById_('TotpSetupTokens', 'token', cleanToken, {
+      used_at: new Date().toISOString()
+    }, SETTINGS_OPTS);
+    return { success: true, message: 'Setup selesai. Anda bisa login sekarang.' };
+  } catch (err) {
+    return { success: false, message: err.message || err };
+  }
+}
+
+/**
+ * Disable TOTP untuk user (set null). User tidak bisa login sampai
+ * di-setup ulang. Berguna kalau staff resign.
+ */
+function disableTotpForUser(payload) {
+  try {
+    const auth = readAuthSession_(payload);
+    if (!auth.success) return auth;
+    if (!userIsFullyPrivileged_(auth.user)) {
+      return { success: false, message: 'Hanya owner atau super admin yang bisa disable Authenticator.' };
+    }
+
+    const userId = String((payload && payload.user_id) || '').trim();
+    if (!userId) return { success: false, message: 'user_id wajib diisi.' };
+
+    dbUpdateById_('Users', 'user_id', userId, {
+      totp_secret: null,
+      totp_enabled_at: null,
+      updated_at: new Date().toISOString()
+    }, SETTINGS_OPTS);
+
+    return { success: true, message: 'Authenticator dinonaktifkan.' };
+  } catch (err) {
+    return { success: false, message: err.message || err };
+  }
 }

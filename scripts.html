@@ -72,30 +72,111 @@
     document.body.classList.remove('sidebar-open');
   }
 
+  // =========================================================
+  // Phase 2b — Login TOTP (Google Authenticator)
+  // =========================================================
+  // Lihat PHASE_2B_AUTH_DISCUSSION_2026_05_17.md.
+  //
+  // Login flow:
+  //   1. User input email + 6 digit dari Google Authenticator
+  //   2. Submit → google.script.run.loginWithTotp(email, code)
+  //   3. Backend verify TOTP via HMAC-SHA1 (RFC 6238)
+  //   4. Sukses → set currentUser + show dashboard
+  //   5. Setelah login, kalau role staff (admin_*) → enable auto-logout 10min
+
   function submitLogin(e) {
-    e.preventDefault();
+    if (e && e.preventDefault) e.preventDefault();
+    var email = String(document.getElementById('loginEmail').value || '').trim().toLowerCase();
+    var code  = String(document.getElementById('loginTotpCode').value || '').replace(/\D/g, '');
 
-    const username = document.getElementById('username').value.trim();
-    const password = document.getElementById('password').value.trim();
+    if (!email || !code) {
+      setLoadingState('Email dan kode wajib diisi.');
+      return;
+    }
+    if (code.length !== 6) {
+      setLoadingState('Kode harus 6 digit.');
+      return;
+    }
 
-    setLoadingState('Login...');
+    var btn = document.getElementById('loginSubmitBtn');
+    if (btn) { btn.disabled = true; btn.textContent = 'Memproses...'; }
+    setLoadingState('Memverifikasi kode Authenticator...');
 
     google.script.run
       .withSuccessHandler(function(res) {
-        if (!res.success) {
-          setLoadingState(res.message || 'Login gagal');
+        if (btn) { btn.disabled = false; btn.textContent = 'Login'; }
+        if (!res || !res.success) {
+          setLoadingState((res && res.message) || 'Login gagal');
+          // Clear field code supaya user input kode baru (TOTP refresh 30 detik).
+          var codeEl = document.getElementById('loginTotpCode');
+          if (codeEl) codeEl.value = '';
           return;
         }
-
         clearLoadingState();
         currentUser = res.data;
         showDashboard(res.data);
         showDashboardPage();
+        maybeStartInactivityWatch_();
       })
       .withFailureHandler(function(err) {
+        if (btn) { btn.disabled = false; btn.textContent = 'Login'; }
         setLoadingState('Error: ' + (err && err.message ? err.message : err));
       })
-      .loginUser(username, password);
+      .loginWithTotp(email, code);
+  }
+
+  // =========================================================
+  // Auto-logout role-based (Lapis 3)
+  // =========================================================
+  // Aktif HANYA untuk staff (role admin_appointment / admin_finance
+  // tanpa role full-privileged). Owner / super_admin / doctor tidak
+  // di-auto-logout (login persisten sampai manual logout / tutup tab).
+  //
+  // Konfigurasi: 10 menit timeout, warning di menit 9.
+  var INACTIVITY_TIMEOUT_MS = 10 * 60 * 1000;
+  var INACTIVITY_WARNING_MS =  9 * 60 * 1000;
+  var inactivityTimer_ = null;
+  var inactivityWarningTimer_ = null;
+
+  function shouldEnableAutoLogout_(user) {
+    var roles = (user && Array.isArray(user.roles)) ? user.roles : [];
+    if (!roles.length) return false;
+    // Kalau punya role full-privileged → tidak auto-logout.
+    if (roles.indexOf('owner') !== -1) return false;
+    if (roles.indexOf('super_admin') !== -1) return false;
+    if (roles.indexOf('doctor') !== -1) return false;
+    // Sisanya = admin_appointment / admin_finance saja → auto-logout aktif.
+    return true;
+  }
+
+  function maybeStartInactivityWatch_() {
+    if (!shouldEnableAutoLogout_(currentUser)) return;
+    ['mousemove', 'mousedown', 'keydown', 'touchstart', 'scroll'].forEach(function(ev) {
+      document.addEventListener(ev, resetInactivityTimer_, { passive: true });
+    });
+    resetInactivityTimer_();
+  }
+
+  function resetInactivityTimer_() {
+    if (inactivityTimer_)        clearTimeout(inactivityTimer_);
+    if (inactivityWarningTimer_) clearTimeout(inactivityWarningTimer_);
+
+    inactivityWarningTimer_ = setTimeout(function() {
+      if (!currentUser) return;
+      try {
+        showToast && showToast(
+          'Anda akan otomatis logout dalam 1 menit karena tidak aktif. ' +
+          'Gerakkan mouse atau klik halaman untuk lanjut.',
+          'warning'
+        );
+      } catch (e) {}
+    }, INACTIVITY_WARNING_MS);
+
+    inactivityTimer_ = setTimeout(function() {
+      if (!currentUser) return;
+      try { showToast && showToast('Anda otomatis di-logout karena tidak aktif 10 menit.', 'info'); } catch (e) {}
+      logoutLocal();
+    }, INACTIVITY_TIMEOUT_MS);
   }
 
   function showDashboard(user) {
@@ -106,6 +187,7 @@
 
     const fullName = String((user && user.full_name) || '').trim();
     const role = String((user && user.role) || '').toLowerCase();
+    const roles = Array.isArray(user && user.roles) ? user.roles : [];
 
     const welcome = fullName || 'Pengguna';
 
@@ -113,10 +195,27 @@
 
     const subtitleEl = document.getElementById('topbarSubtitle');
     if (subtitleEl) {
-      subtitleEl.innerText = 'Selamat datang kembali';
+      // Tampil email sebagai subtitle supaya user awareness siapa yg login.
+      var email = String((user && user.email) || (user && user.username) || '').trim();
+      subtitleEl.innerText = email || 'Selamat datang kembali';
     }
 
-    document.getElementById('roleText').innerText = role || '-';
+    // Set avatar initial (max 2 huruf dari nama).
+    var avatarEl = document.getElementById('topbarIdentityAvatar');
+    if (avatarEl) {
+      var initials = String(fullName || welcome)
+        .replace(/^(dr|drg|drs|ir|s\.h|s\.e|s\.tr\.keb)\.?\s+/i, '') // strip gelar depan
+        .split(/[\s.,]+/)
+        .filter(Boolean)
+        .slice(0, 2)
+        .map(function(s) { return s.charAt(0).toUpperCase(); })
+        .join('') || '?';
+      avatarEl.textContent = initials;
+    }
+
+    // Role badge: tampil role utama (kalau ada roles[], pakai yang pertama).
+    var roleDisplay = roles.length ? roles[0] : (role || '-');
+    document.getElementById('roleText').innerText = roleDisplay;
   }
 
   function getCurrentUserRole() {
@@ -163,14 +262,23 @@
     pendingDeactivatePatientId = null;
     pendingDeactivatePatientName = '';
 
+    if (inactivityTimer_)        { clearTimeout(inactivityTimer_);        inactivityTimer_ = null; }
+    if (inactivityWarningTimer_) { clearTimeout(inactivityWarningTimer_); inactivityWarningTimer_ = null; }
+
     closeSidebar();
 
     document.getElementById('dashboardView').style.display = 'none';
     document.getElementById('loginView').style.display = 'flex';
-    document.getElementById('message').innerText = '';
-    document.getElementById('username').value = '';
-    document.getElementById('password').value = '';
-    document.getElementById('contentArea').innerHTML = '';
+    var msgEl = document.getElementById('message');
+    if (msgEl) msgEl.innerText = '';
+    var contentEl = document.getElementById('contentArea');
+    if (contentEl) contentEl.innerHTML = '';
+
+    // Reset form login supaya user input fresh.
+    var emailEl = document.getElementById('loginEmail');
+    var codeEl  = document.getElementById('loginTotpCode');
+    if (emailEl) emailEl.value = '';
+    if (codeEl)  codeEl.value  = '';
   }
 
   function showToast(message, type) {

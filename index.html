@@ -22,7 +22,7 @@
       <div class="login-card">
 
         <div style="text-align:center; margin-bottom:16px;">
-          <img 
+          <img
             src="https://i.imgur.com/vCJBBJY.png"
             class="login-logo"
             alt="Logo Klinik"
@@ -33,11 +33,22 @@
           Dental Clinic
         </p>
 
-        <form onsubmit="submitLogin(event)">
-          <input type="text" id="username" placeholder="Username">
-          <input type="password" id="password" placeholder="Password">
-          <button type="submit" class="btn btn-primary">Login</button>
+        <form onsubmit="submitLogin(event)" autocomplete="off">
+          <label style="font-size:11px;color:#94a3b8;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:6px;display:block">Email</label>
+          <input type="email" id="loginEmail" placeholder="email@gmail.com" autocomplete="username" required>
+
+          <label style="font-size:11px;color:#94a3b8;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:6px;margin-top:8px;display:block">Kode Authenticator</label>
+          <input type="text" id="loginTotpCode" placeholder="6 digit" inputmode="numeric" pattern="[0-9]*" maxlength="6" autocomplete="one-time-code" required style="letter-spacing:0.3em;font-size:18px;text-align:center;font-weight:700">
+          <p style="color:#64748b;font-size:11px;margin:-6px 0 14px;text-align:center;line-height:1.5">
+            Buka app <strong>Google Authenticator</strong> di HP Anda, lalu masukkan 6 digit kode yang muncul.
+          </p>
+
+          <button type="submit" class="btn btn-primary" style="width:100%" id="loginSubmitBtn">Login</button>
         </form>
+
+        <p style="text-align:center;color:#64748b;font-size:11px;margin-top:18px;line-height:1.5">
+          Belum di-setup Authenticator? Hubungi admin klinik untuk setup akun Anda.
+        </p>
 
         <div id="message" class="message"></div>
       </div>
@@ -117,9 +128,12 @@
             <div class="topbar-left">
               <button type="button" class="mobile-menu-btn" onclick="toggleSidebar()">☰</button>
 
-              <div class="topbar-user-block">
-                <div id="welcomeText" class="topbar-title">Nama User</div>
-                <div id="topbarSubtitle" class="topbar-subtitle">Selamat datang kembali</div>
+              <div id="topbarIdentity" class="topbar-identity">
+                <div id="topbarIdentityAvatar" class="topbar-identity-avatar">?</div>
+                <div class="topbar-user-block">
+                  <div id="welcomeText" class="topbar-title">Nama User</div>
+                  <div id="topbarSubtitle" class="topbar-subtitle">Selamat datang kembali</div>
+                </div>
               </div>
             </div>
 

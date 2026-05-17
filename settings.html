@@ -188,6 +188,8 @@ function settingsSubmitClinic(e) {
     .withSuccessHandler(function(res) {
       if (btn) btn.disabled = false;
       if (!res || !res.success) { showToast(res && res.message || 'Gagal menyimpan', 'error'); return; }
+      // Sinkron state local supaya saat owner pindah tab lalu balik, form tampil data terbaru.
+      if (res.data) settingsClinicData = res.data;
       showToast('Info klinik berhasil disimpan', 'success');
     })
     .withFailureHandler(function(err) {
@@ -912,6 +914,22 @@ var SETTINGS_ICON_SVG = {
     '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' +
       '<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>' +
       '<polyline points="9 12 11 14 15 10"></polyline>' +
+    '</svg>',
+  smartphone:
+    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' +
+      '<rect x="5" y="2" width="14" height="20" rx="2" ry="2"></rect>' +
+      '<line x1="12" y1="18" x2="12" y2="18"></line>' +
+    '</svg>',
+  refresh:
+    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' +
+      '<polyline points="23 4 23 10 17 10"></polyline>' +
+      '<polyline points="1 20 1 14 7 14"></polyline>' +
+      '<path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>' +
+    '</svg>',
+  envelope:
+    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' +
+      '<path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path>' +
+      '<polyline points="22,6 12,13 2,6"></polyline>' +
     '</svg>'
 };
 
@@ -986,18 +1004,37 @@ function settingsRenderUserTab() {
   if (!el) return;
 
   var rows = settingsUsers.map(function(u) {
-    var activeBadge = u.is_active !== false
+    var emailDisplay = u.email
+      ? '<span style="word-break:break-all">' + escapeAppHtml(u.email) + '</span>'
+      : '<span class="settings-empty" style="font-style:italic;font-size:11.5px">belum ada</span>';
+    var totpBadge = u.totp_enabled
       ? '<span class="settings-badge settings-badge-active">Aktif</span>'
-      : '<span class="settings-badge settings-badge-inactive">Nonaktif</span>';
+      : '<span class="settings-badge settings-badge-inactive">Belum</span>';
+    var inactiveTag = u.is_active === false
+      ? ' <span class="settings-badge settings-badge-inactive" style="margin-left:6px;font-size:10px">Nonaktif</span>'
+      : '';
     var rolesJsArg = JSON.stringify(u.roles || []).replace(/"/g, '&quot;');
+    var emailJsArg = "'" + escapeAppHtml(u.email || '') + "'";
+    var fullNameJsArg = "'" + escapeAppHtml(u.full_name || u.username || '') + "'";
+    var totpBtn = u.totp_enabled
+      ? settingsIconBtn_('refresh', 'refresh', 'Reset Authenticator (HP staff baru)',
+          "settingsOpenTotpModal('" + escapeAppHtml(u.user_id) + "'," + fullNameJsArg + ',true)')
+      : settingsIconBtn_('edit', 'smartphone', 'Setup Authenticator (tampil QR)',
+          "settingsOpenTotpModal('" + escapeAppHtml(u.user_id) + "'," + fullNameJsArg + ',false)');
+    var emailSetupBtn = u.email
+      ? settingsIconBtn_('detail', 'envelope', 'Kirim link setup ke email staff',
+          "settingsSendTotpSetupEmail('" + escapeAppHtml(u.user_id) + "'," + fullNameJsArg + ')')
+      : '';
     return '<tr>' +
-      '<td>' + escapeAppHtml(u.username||'') + '</td>' +
-      '<td>' + escapeAppHtml(u.full_name||'') + '</td>' +
-      '<td>' + settingsFormatRolesChips_(u.roles) + '</td>' +
-      '<td>' + activeBadge + '</td>' +
+      '<td style="min-width:180px">' + escapeAppHtml(u.full_name||'') + inactiveTag + '</td>' +
+      '<td style="min-width:200px;max-width:260px">' + emailDisplay + '</td>' +
+      '<td style="min-width:180px">' + settingsFormatRolesChips_(u.roles) + '</td>' +
+      '<td style="white-space:nowrap;text-align:center">' + totpBadge + '</td>' +
       '<td><div class="settings-row-actions">' +
-        settingsIconBtn_('edit', 'shield', 'Edit role pengguna',
-          "settingsOpenEditRolesModal('" + escapeAppHtml(u.user_id) + "','" + escapeAppHtml(u.username) + "'," + rolesJsArg + ')') +
+        settingsIconBtn_('edit', 'shield', 'Edit pengguna',
+          "settingsOpenEditRolesModal('" + escapeAppHtml(u.user_id) + "','" + escapeAppHtml(u.username) + "'," + rolesJsArg + ',' + emailJsArg + ')') +
+        totpBtn +
+        emailSetupBtn +
         (u.is_active !== false
           ? settingsIconBtn_('deactivate', 'power', 'Nonaktifkan pengguna',
               "settingsDeactivateUser('" + escapeAppHtml(u.user_id) + "','" + escapeAppHtml(u.username) + "')")
@@ -1013,14 +1050,15 @@ function settingsRenderUserTab() {
         '<div class="settings-table-title">Pengguna</div>' +
         '<button class="btn btn-primary" style="padding:7px 14px;font-size:13px" onclick="settingsOpenUserModal()">+ Tambah Pengguna</button>' +
       '</div>' +
-      '<div class="table-wrapper"><table class="table">' +
-        '<thead><tr><th>Username</th><th>Nama Lengkap</th><th>Roles</th><th>Status</th><th></th></tr></thead>' +
+      '<div class="table-wrapper"><table class="table" style="table-layout:auto">' +
+        '<thead><tr><th style="min-width:180px">Nama Lengkap</th><th style="min-width:200px">Email Google</th><th style="min-width:180px">Roles</th><th style="text-align:center">Authenticator</th><th></th></tr></thead>' +
         '<tbody>' + (rows || '<tr><td colspan="5" class="settings-empty">Belum ada data</td></tr>') + '</tbody>' +
       '</table></div>' +
     '</div>' +
     settingsUserModalHtml() +
     settingsEditRolesModalHtml() +
-    settingsRoleInfoModalHtml();
+    settingsRoleInfoModalHtml() +
+    settingsTotpModalHtml();
 }
 
 function settingsRoleInfoButtonHtml_() {
@@ -1073,6 +1111,148 @@ function settingsCloseRoleInfoModal() {
   if (overlay) overlay.classList.remove('open');
 }
 
+// =========================================================
+// Modal Setup Authenticator (Phase 2b TOTP)
+// =========================================================
+function settingsTotpModalHtml() {
+  return '<div class="settings-modal-overlay" id="settingsTotpModalOverlay">' +
+    '<div class="settings-modal-box settings-modal-box--wide">' +
+      '<div class="settings-modal-head">' +
+        '<h3 class="settings-modal-title" id="settingsTotpModalTitle">Setup Authenticator</h3>' +
+        '<button type="button" class="detail-close-btn" onclick="settingsCloseTotpModal()">&#x2715;</button>' +
+      '</div>' +
+      '<div class="settings-modal-body" id="settingsTotpModalBody">' +
+        '<div class="settings-empty" style="padding:20px;text-align:center">Memuat...</div>' +
+      '</div>' +
+      '<div class="settings-modal-footer">' +
+        '<button type="button" class="btn btn-secondary" onclick="settingsCloseTotpModal()">Tutup</button>' +
+      '</div>' +
+    '</div>' +
+  '</div>';
+}
+
+function settingsOpenTotpModal(userId, fullName, isReset) {
+  var overlay = document.getElementById('settingsTotpModalOverlay');
+  if (!overlay) return;
+  var titleEl = document.getElementById('settingsTotpModalTitle');
+  if (titleEl) titleEl.textContent = (isReset ? 'Reset Authenticator' : 'Setup Authenticator') +
+    ' untuk ' + (fullName || 'Pengguna');
+  var bodyEl = document.getElementById('settingsTotpModalBody');
+  if (bodyEl) bodyEl.innerHTML = '<div class="settings-empty" style="padding:20px;text-align:center">Memuat QR code...</div>';
+  overlay.classList.add('open');
+
+  // Konfirmasi kalau reset (akan invalidate Authenticator lama di HP staff)
+  var doRequest = function() {
+    google.script.run
+      .withSuccessHandler(function(res) {
+        if (!res || !res.success) {
+          if (bodyEl) bodyEl.innerHTML =
+            '<div style="padding:14px;border-radius:10px;background:rgba(252,165,165,0.08);border:1px solid rgba(252,165,165,0.30);color:#fca5a5;font-size:13px">' +
+            escapeAppHtml((res && res.message) || 'Gagal generate Authenticator.') + '</div>';
+          return;
+        }
+        // Update cache local supaya badge Authenticator langsung "Aktif" saat modal close.
+        var idx = settingsUsers.findIndex(function(u) { return u.user_id === userId; });
+        if (idx !== -1) settingsUsers[idx].totp_enabled = true;
+        settingsRenderTotpModalContent_(res.data, isReset);
+      })
+      .withFailureHandler(function(err) {
+        if (bodyEl) bodyEl.innerHTML =
+          '<div style="padding:14px;border-radius:10px;background:rgba(252,165,165,0.08);border:1px solid rgba(252,165,165,0.30);color:#fca5a5;font-size:13px">' +
+          'Error: ' + escapeAppHtml((err && err.message) || String(err)) + '</div>';
+      })
+      .generateTotpForUser({
+        session_token: getCurrentSessionToken(),
+        user_id: userId
+      });
+  };
+
+  if (isReset) {
+    showAppConfirm({
+      title: 'Reset Authenticator',
+      message: 'Authenticator lama di HP staff ini AKAN BERHENTI BERFUNGSI. ' +
+        'Staff harus scan QR baru di HP mereka untuk bisa login lagi.\n\nLanjutkan?',
+      confirmText: 'Reset', cancelText: 'Batal', danger: true
+    }).then(function(ok) {
+      if (!ok) { settingsCloseTotpModal(); return; }
+      doRequest();
+    });
+  } else {
+    doRequest();
+  }
+}
+
+function settingsCloseTotpModal() {
+  var overlay = document.getElementById('settingsTotpModalOverlay');
+  if (overlay) overlay.classList.remove('open');
+  // Refresh tabel supaya badge "Authenticator: Aktif/Belum" update.
+  if (settingsTab === 'user') settingsRenderUserTab();
+}
+
+function settingsRenderTotpModalContent_(data, isReset) {
+  var bodyEl = document.getElementById('settingsTotpModalBody');
+  if (!bodyEl) return;
+
+  // QR code via API publik gratis (no auth, no rate limit ketat).
+  var qrUrl = 'https://api.qrserver.com/v1/create-qr-code/?size=240x240&margin=8&data=' +
+    encodeURIComponent(data.otpauth_uri || '');
+
+  bodyEl.innerHTML =
+    '<div style="display:grid;grid-template-columns:240px 1fr;gap:20px;align-items:start">' +
+      '<div style="background:#fff;border-radius:14px;padding:8px;display:flex;align-items:center;justify-content:center">' +
+        '<img src="' + qrUrl + '" alt="QR Code" style="width:224px;height:224px;display:block">' +
+      '</div>' +
+      '<div style="font-size:13px;color:#cbd5e1;line-height:1.6">' +
+        '<div style="font-weight:700;color:#f1f5f9;margin-bottom:8px">' +
+          (isReset ? 'Reset berhasil. Scan QR baru:' : 'Cara setup:') +
+        '</div>' +
+        '<ol style="padding-left:18px;margin:0 0 12px">' +
+          '<li>Download app <strong>Google Authenticator</strong> dari Play Store / App Store di HP staff (gratis).</li>' +
+          '<li>Buka app → tombol <strong>+</strong> → pilih <strong>Pindai kode QR</strong>.</li>' +
+          '<li>Arahkan kamera ke kode QR di sebelah kiri.</li>' +
+          '<li>Selesai. App akan generate 6 digit kode yang berubah tiap 30 detik.</li>' +
+        '</ol>' +
+        '<div style="font-size:12px;color:#94a3b8;margin-top:14px;padding:10px;background:rgba(255,255,255,0.03);border-radius:8px">' +
+          '<strong>Tidak bisa scan QR?</strong> Masukkan kode manual di app Authenticator:<br>' +
+          '<span style="display:inline-block;margin-top:6px;font-family:monospace;font-size:13px;color:#7dd3fc;background:rgba(56,189,248,0.10);padding:6px 10px;border-radius:6px;letter-spacing:0.1em;word-break:break-all">' +
+            escapeAppHtml(data.secret || '') +
+          '</span>' +
+        '</div>' +
+        '<div style="font-size:11.5px;color:#fdba74;margin-top:12px;padding:10px;background:rgba(253,186,116,0.08);border-left:3px solid #fdba74;border-radius:6px;line-height:1.5">' +
+          '⚠ QR code ini cuma tampil sekali. Setelah modal ditutup, secret tidak bisa dilihat lagi. ' +
+          'Pastikan staff sudah berhasil scan sebelum tutup modal.' +
+        '</div>' +
+      '</div>' +
+    '</div>';
+}
+
+function settingsSendTotpSetupEmail(userId, fullName) {
+  showAppConfirm({
+    title: 'Kirim Setup Authenticator ke Email',
+    message: 'Email berisi link sekali pakai akan dikirim ke ' + (fullName || 'staff') +
+      '. Link expire 24 jam.\n\nLanjutkan?',
+    confirmText: 'Kirim Email', cancelText: 'Batal'
+  }).then(function(ok) {
+    if (!ok) return;
+    showToast('Mengirim email setup...', 'info');
+    google.script.run
+      .withSuccessHandler(function(res) {
+        if (!res || !res.success) {
+          showToast((res && res.message) || 'Gagal kirim email', 'error');
+          return;
+        }
+        showToast('Email setup terkirim ke ' + (res.data && res.data.email || 'staff'), 'success');
+      })
+      .withFailureHandler(function(err) {
+        showToast('Error: ' + (err && err.message ? err.message : err), 'error');
+      })
+      .sendTotpSetupEmail({
+        session_token: getCurrentSessionToken(),
+        user_id: userId
+      });
+  });
+}
+
 function settingsRoleCheckboxesHtml_(idPrefix, preselected) {
   var pre = Array.isArray(preselected) ? preselected : [];
   return '<div class="settings-roles-grid">' +
@@ -1104,15 +1284,18 @@ function settingsUserModalHtml() {
         '<form id="settingsUserForm" onsubmit="settingsSubmitUser(event)">' +
           '<label>Username</label>' +
           '<input type="text" id="su_username" required autocomplete="off">' +
-          '<label>Password</label>' +
-          '<input type="password" id="su_password" required autocomplete="new-password">' +
           '<label>Nama Lengkap</label>' +
           '<input type="text" id="su_full_name" required>' +
+          '<label>Email <span style="color:#94a3b8;font-weight:400;font-size:11px">(dipakai untuk login)</span></label>' +
+          '<input type="email" id="su_email" required autocomplete="off" placeholder="contoh@gmail.com">' +
           '<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:10px">' +
             '<label style="margin:0">Roles (pilih 1 atau lebih)</label>' +
             settingsRoleInfoButtonHtml_() +
           '</div>' +
           settingsRoleCheckboxesHtml_('su', []) +
+          '<div style="margin-top:14px;padding:10px 12px;background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;font-size:12px;color:#1e40af;line-height:1.5">' +
+            '<strong>Setelah simpan:</strong> klik tombol <em>Setup Authenticator</em> di baris pengguna untuk aktifkan login (TOTP).' +
+          '</div>' +
         '</form>' +
       '</div>' +
       '<div class="settings-modal-footer">' +
@@ -1127,7 +1310,7 @@ function settingsEditRolesModalHtml() {
   return '<div class="settings-modal-overlay" id="settingsEditRolesModalOverlay">' +
     '<div class="settings-modal-box">' +
       '<div class="settings-modal-head">' +
-        '<h3 class="settings-modal-title">Edit Role Pengguna</h3>' +
+        '<h3 class="settings-modal-title">Edit Pengguna</h3>' +
         '<button type="button" class="detail-close-btn" onclick="settingsCloseEditRolesModal()">&#x2715;</button>' +
       '</div>' +
       '<div class="settings-modal-body">' +
@@ -1135,6 +1318,8 @@ function settingsEditRolesModalHtml() {
           '<input type="hidden" id="er_user_id">' +
           '<label>Pengguna</label>' +
           '<input type="text" id="er_username" readonly>' +
+          '<label>Email <span style="color:#94a3b8;font-weight:400;font-size:11px">(dipakai untuk login)</span></label>' +
+          '<input type="email" id="er_email" required autocomplete="off" placeholder="contoh@gmail.com">' +
           '<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:10px">' +
             '<label style="margin:0">Roles (pilih 1 atau lebih)</label>' +
             settingsRoleInfoButtonHtml_() +
@@ -1164,11 +1349,12 @@ function settingsCloseUserModal() {
   if (overlay) overlay.classList.remove('open');
 }
 
-function settingsOpenEditRolesModal(userId, username, currentRoles) {
+function settingsOpenEditRolesModal(userId, username, currentRoles, currentEmail) {
   var overlay = document.getElementById('settingsEditRolesModalOverlay');
   if (!overlay) return;
   document.getElementById('er_user_id').value = userId || '';
   document.getElementById('er_username').value = username || '';
+  document.getElementById('er_email').value = currentEmail || '';
   document.getElementById('er_roles_container').innerHTML =
     settingsRoleCheckboxesHtml_('er', currentRoles || []);
   overlay.classList.add('open');
@@ -1191,6 +1377,7 @@ function settingsSubmitUser(e) {
     loadingText: 'Menyimpan...'
   });
   var newFullName = document.getElementById('su_full_name').value.trim();
+  var newEmail = document.getElementById('su_email').value.trim().toLowerCase();
   google.script.run
     .withSuccessHandler(function(res) {
       setModalProcessingState('settingsUserModalOverlay', false, {
@@ -1202,6 +1389,7 @@ function settingsSubmitUser(e) {
         user_id:   res.data.user_id,
         username:  res.data.username,
         full_name: newFullName,
+        email:     res.data.email || newEmail || null,
         role:      '',
         roles:     res.data.roles || roles,
         is_active: true
@@ -1220,8 +1408,8 @@ function settingsSubmitUser(e) {
     .addUser({
       session_token: getCurrentSessionToken(),
       username:      document.getElementById('su_username').value.trim(),
-      password:      document.getElementById('su_password').value,
       full_name:     newFullName,
+      email:         newEmail,
       roles:         roles
     });
 }
@@ -1229,6 +1417,7 @@ function settingsSubmitUser(e) {
 function settingsSubmitEditRoles(e) {
   e.preventDefault();
   var userId = document.getElementById('er_user_id').value;
+  var newEmail = document.getElementById('er_email').value.trim().toLowerCase();
   var roles = settingsCollectCheckedRoles_('er');
   if (!roles.length) {
     showToast('Pilih minimal 1 role', 'error');
@@ -1246,8 +1435,11 @@ function settingsSubmitEditRoles(e) {
       });
       if (!res || !res.success) { showToast(res && res.message || 'Gagal menyimpan', 'error'); return; }
       var idx = settingsUsers.findIndex(function(u) { return u.user_id === userId; });
-      if (idx !== -1) settingsUsers[idx].roles = roles.slice();
-      showToast('Role pengguna diperbarui', 'success');
+      if (idx !== -1) {
+        settingsUsers[idx].roles = roles.slice();
+        settingsUsers[idx].email = newEmail || null;
+      }
+      showToast('Pengguna diperbarui', 'success');
       settingsCloseEditRolesModal();
       settingsRenderUserTab();
     })
@@ -1261,6 +1453,7 @@ function settingsSubmitEditRoles(e) {
     .updateUser({
       session_token: getCurrentSessionToken(),
       user_id:       userId,
+      email:         newEmail,
       roles:         roles
     });
 }

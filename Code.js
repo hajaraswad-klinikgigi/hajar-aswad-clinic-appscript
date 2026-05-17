@@ -26,6 +26,17 @@ function doGet(e) {
       .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
   }
 
+  const totpSetupToken = String(params.totp_setup_token || '').trim();
+  if (totpSetupToken) {
+    const template = HtmlService.createTemplateFromFile('totp-setup');
+    template.totpSetupToken = totpSetupToken;
+    return template
+      .evaluate()
+      .setTitle('Setup Authenticator | Hajar Aswad Dental Clinic')
+      .addMetaTag('viewport', 'width=device-width, initial-scale=1, viewport-fit=cover')
+      .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+  }
+
   const template = HtmlService.createTemplateFromFile('index');
 
   return template

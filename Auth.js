@@ -29,6 +29,15 @@ const APP_ROLES_VALID = Object.freeze([
 // Owner & super_admin selalu lulus role check apapun
 const APP_ROLES_FULLY_PRIVILEGED = Object.freeze(['owner', 'super_admin']);
 
+// Owner & super_admin scope = global (cross-clinic). Saat insert ke
+// app_user_roles, clinic_id di-set NULL supaya tidak perlu duplicate
+// row per klinik. Role lain selalu per-clinic.
+const APP_ROLES_GLOBAL_SCOPE = Object.freeze(['owner', 'super_admin']);
+
+function isGlobalScopeRole_(role) {
+  return APP_ROLES_GLOBAL_SCOPE.indexOf(normalizeAppRole_(role)) !== -1;
+}
+
 function normalizeAppRole_(role) {
   return String(role || '').trim().toLowerCase();
 }
@@ -100,6 +109,7 @@ function buildSafeAuthUser_(user, opts) {
     user_id: String((user && user.user_id) || '').trim(),
     full_name: String((user && user.full_name) || '').trim(),
     username: String((user && user.username) || '').trim(),
+    email: String((user && user.email) || '').trim().toLowerCase(),
     role: normalizeAppRole_((user && user.role) || ''),
     clinic_id: String((user && user.clinic_id) || '').trim(),
     roles: rolesArr
@@ -393,5 +403,212 @@ function seedUsersFromList() {
   return {
     success: false,
     message: 'Seed user sudah dinonaktifkan demi keamanan aplikasi. Jalankan seed manual hanya dari editor Apps Script bila benar-benar diperlukan.'
+  };
+}
+
+// =========================================================
+// Phase 2b — Login via TOTP (Google Authenticator)
+// =========================================================
+// Pendekatan: setiap user punya `totp_secret` (base32) di app_users.
+// User scan QR code (otpauth:// URI) ke Google Authenticator app
+// di HP. Saat login, input email + 6 digit code dari Authenticator
+// (refresh tiap 30 detik). Server verify pakai HMAC-SHA1 RFC 6238.
+//
+// Lihat PHASE_2B_AUTH_DISCUSSION_2026_05_17.md untuk rasionale
+// kenapa pilih TOTP (Google Sign-In tidak feasible di Apps Script
+// iframe).
+
+var TOTP_ISSUER = 'Hajar Aswad Dental Clinic';
+var TOTP_PERIOD_SEC = 30;
+var TOTP_DIGITS = 6;
+var TOTP_DRIFT_STEPS = 1; // tolerate ±1 time step (±30 detik clock skew)
+var TOTP_BASE32_ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
+
+/**
+ * Generate base32 secret 20-byte (160 bit) — standard untuk TOTP.
+ * Sumber entropy: Utilities.getUuid() × 2 = 32 hex byte (cryptographically secure).
+ */
+function generateTotpSecret_() {
+  var hex = Utilities.getUuid().replace(/-/g, '') + Utilities.getUuid().replace(/-/g, '');
+  // 64 hex chars = 32 bytes. Ambil 20 byte pertama untuk SHA-1 standard.
+  var bytes = [];
+  for (var i = 0; i < 20; i++) {
+    bytes.push(parseInt(hex.substr(i * 2, 2), 16));
+  }
+  return base32Encode_(bytes);
+}
+
+/**
+ * Base32 encode (RFC 4648 alphabet A-Z2-7, no padding).
+ */
+function base32Encode_(bytes) {
+  var out = '';
+  var buffer = 0;
+  var bits = 0;
+  for (var i = 0; i < bytes.length; i++) {
+    buffer = (buffer << 8) | (bytes[i] & 0xFF);
+    bits += 8;
+    while (bits >= 5) {
+      bits -= 5;
+      out += TOTP_BASE32_ALPHABET.charAt((buffer >> bits) & 0x1F);
+    }
+  }
+  if (bits > 0) {
+    out += TOTP_BASE32_ALPHABET.charAt((buffer << (5 - bits)) & 0x1F);
+  }
+  return out;
+}
+
+/**
+ * Base32 decode (RFC 4648). Return byte array.
+ */
+function base32Decode_(s) {
+  var clean = String(s || '').toUpperCase().replace(/[^A-Z2-7]/g, '');
+  var bytes = [];
+  var buffer = 0;
+  var bits = 0;
+  for (var i = 0; i < clean.length; i++) {
+    var idx = TOTP_BASE32_ALPHABET.indexOf(clean.charAt(i));
+    if (idx < 0) continue;
+    buffer = (buffer << 5) | idx;
+    bits += 5;
+    if (bits >= 8) {
+      bits -= 8;
+      bytes.push((buffer >> bits) & 0xFF);
+    }
+  }
+  return bytes;
+}
+
+/**
+ * Compute TOTP code dari secret (base32) + counter.
+ * Return string 6 digit (zero-padded).
+ */
+function computeTotpCode_(secretBase32, counter) {
+  var keyBytes = base32Decode_(secretBase32);
+  // Counter ke 8-byte big-endian.
+  var counterBytes = [0, 0, 0, 0, 0, 0, 0, 0];
+  for (var i = 7; i >= 0; i--) {
+    counterBytes[i] = counter & 0xFF;
+    counter = Math.floor(counter / 256);
+  }
+  // Convert byte arrays ke Byte[] yang dipakai Utilities API (signed -128..127).
+  var keyBlob = keyBytes.map(function(b) { return b > 127 ? b - 256 : b; });
+  var counterBlob = counterBytes.map(function(b) { return b > 127 ? b - 256 : b; });
+  var hmac = Utilities.computeHmacSignature(
+    Utilities.MacAlgorithm.HMAC_SHA_1,
+    counterBlob,
+    keyBlob
+  );
+  // hmac adalah Byte[] (signed). Convert ke unsigned.
+  var h = hmac.map(function(b) { return b < 0 ? b + 256 : b; });
+  // Dynamic truncation (RFC 4226 / 6238).
+  var offset = h[19] & 0x0F;
+  var binary = ((h[offset] & 0x7F) << 24)
+             | ((h[offset + 1] & 0xFF) << 16)
+             | ((h[offset + 2] & 0xFF) << 8)
+             |  (h[offset + 3] & 0xFF);
+  var modulus = Math.pow(10, TOTP_DIGITS);
+  var code = binary % modulus;
+  var s = String(code);
+  while (s.length < TOTP_DIGITS) s = '0' + s;
+  return s;
+}
+
+/**
+ * Verify TOTP code dengan tolerance ±TOTP_DRIFT_STEPS time steps.
+ */
+function verifyTotpCode_(secretBase32, code) {
+  if (!secretBase32 || !code) return false;
+  var clean = String(code).replace(/\D/g, '');
+  if (clean.length !== TOTP_DIGITS) return false;
+  var now = Math.floor(Date.now() / 1000);
+  var baseCounter = Math.floor(now / TOTP_PERIOD_SEC);
+  for (var i = -TOTP_DRIFT_STEPS; i <= TOTP_DRIFT_STEPS; i++) {
+    try {
+      if (computeTotpCode_(secretBase32, baseCounter + i) === clean) return true;
+    } catch (e) {
+      // continue
+    }
+  }
+  return false;
+}
+
+/**
+ * Build otpauth:// URI untuk QR code Authenticator app.
+ * Format: otpauth://totp/Issuer:account?secret=BASE32&issuer=Issuer&...
+ */
+function buildOtpAuthUri_(secretBase32, accountLabel) {
+  var label = String(accountLabel || 'user').trim();
+  var issuer = TOTP_ISSUER;
+  return 'otpauth://totp/' +
+    encodeURIComponent(issuer) + ':' + encodeURIComponent(label) +
+    '?secret=' + encodeURIComponent(secretBase32) +
+    '&issuer=' + encodeURIComponent(issuer) +
+    '&algorithm=SHA1' +
+    '&digits=' + TOTP_DIGITS +
+    '&period=' + TOTP_PERIOD_SEC;
+}
+/**
+ * Login dengan email + 6 digit TOTP code.
+ * Identifier: email (case-insensitive). Lookup di app_users.
+ */
+function loginWithTotp(email, code) {
+  const cleanEmail = String(email || '').trim().toLowerCase();
+  const cleanCode  = String(code || '').replace(/\D/g, '');
+
+  if (!cleanEmail || !cleanCode) {
+    return { success: false, message: 'Email dan kode wajib diisi.' };
+  }
+  if (cleanCode.length !== TOTP_DIGITS) {
+    return { success: false, message: 'Kode harus 6 digit.' };
+  }
+
+  const users = getUsersRaw_();
+  const user = users.find(function(row) {
+    return String(row.email || '').trim().toLowerCase() === cleanEmail;
+  });
+
+  if (!user) {
+    return { success: false, message: 'Email atau kode salah.' };
+  }
+
+  const isActive = String(user.is_active || '').trim().toLowerCase() !== 'false';
+  if (!isActive) {
+    return { success: false, message: 'Akun tidak aktif. Hubungi admin klinik.' };
+  }
+
+  const secret = String(user.totp_secret || '').trim();
+  if (!secret) {
+    return {
+      success: false,
+      message: 'Akun belum di-setup Authenticator. Hubungi admin klinik untuk setup.'
+    };
+  }
+
+  if (!verifyTotpCode_(secret, cleanCode)) {
+    return { success: false, message: 'Email atau kode salah.' };
+  }
+
+  const roles = getAppUserRolesByUserId_(user.user_id);
+  const legacyRole = String(user.role || '').trim().toLowerCase();
+  const hasModernRole = Array.isArray(roles) && roles.length > 0;
+  const hasLegacyAccess = legacyRole === 'admin' || legacyRole === 'owner';
+  if (!hasModernRole && !hasLegacyAccess) {
+    return { success: false, message: 'Akun ini belum diberi role. Hubungi admin klinik.' };
+  }
+
+  const session = createAuthSession_(user);
+
+  return {
+    success: true,
+    message: 'Login berhasil',
+    data: Object.assign(
+      buildSafeAuthUser_(user, { roles: roles }),
+      {
+        session_token: session.session_token,
+        session_expires_at: session.expires_at
+      }
+    )
   };
 }
