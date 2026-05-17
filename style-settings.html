@@ -104,6 +104,7 @@
   .settings-badge-fixed   { background: rgba(249,115,22,.15);  color: #fdba74; }
   .settings-badge-material { background: rgba(168,85,247,.15); color: #d8b4fe; }
   .settings-badge-lab      { background: rgba(20,184,166,.15); color: #5eead4; }
+  .settings-badge-role     { background: rgba(56,189,248,.12); color: #7dd3fc; text-transform: none; letter-spacing: 0; font-weight: 600; }
 
   .settings-hint {
     color: #64748b;
@@ -118,8 +119,10 @@
     display: none;
     position: fixed;
     inset: 0;
-    background: rgba(0,0,0,0.65);
-    z-index: 200;
+    background: rgba(5, 8, 20, 0.70);
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+    z-index: 1100;
     align-items: center;
     justify-content: center;
     padding: 16px;
@@ -127,6 +130,10 @@
 
   .settings-modal-overlay.open {
     display: flex;
+  }
+
+  .settings-modal-overlay--nested {
+    z-index: 1200;
   }
 
   .settings-modal-box {
@@ -182,5 +189,121 @@
     .settings-form-grid .full-width {
       grid-column: 1;
     }
+  }
+
+  /* Grid checkbox role di modal Tambah/Edit Pengguna */
+  .settings-roles-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 4px;
+    margin-top: 4px;
+    margin-bottom: 4px;
+  }
+  .settings-role-option {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin: 0;
+    padding: 8px 12px;
+    border-radius: 10px;
+    border: 1px solid rgba(255,255,255,0.06);
+    background: rgba(255,255,255,0.02);
+    cursor: pointer;
+    transition: background 0.15s, border-color 0.15s;
+    /* Override global label rules */
+    text-transform: none;
+    letter-spacing: 0;
+    font-size: 13px;
+    font-weight: 500;
+    color: #e2e8f0;
+  }
+  .settings-role-option:hover {
+    background: rgba(56,189,248,0.08);
+    border-color: rgba(56,189,248,0.25);
+  }
+  .settings-role-option input[type="checkbox"] {
+    /* Override global input { width:100% } */
+    width: 16px;
+    height: 16px;
+    margin: 0;
+    flex-shrink: 0;
+    accent-color: #38bdf8;
+    cursor: pointer;
+  }
+  .settings-role-option-label {
+    flex: 1;
+    line-height: 1.3;
+  }
+
+  /* Tombol info kecil di header label role */
+  .settings-role-info-btn {
+    background: transparent;
+    border: 1px solid rgba(56, 189, 248, 0.35);
+    color: #7dd3fc;
+    padding: 3px 9px;
+    border-radius: 999px;
+    font-size: 11px;
+    line-height: 1.4;
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s;
+  }
+  .settings-role-info-btn:hover {
+    background: rgba(56, 189, 248, 0.12);
+    color: #bae6fd;
+  }
+
+  /* Tabel di modal info role */
+  .settings-role-info-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+  }
+  .settings-role-info-table th,
+  .settings-role-info-table td {
+    padding: 9px 10px;
+    text-align: left;
+    border-bottom: 1px solid rgba(255,255,255,0.06);
+    vertical-align: top;
+  }
+  .settings-role-info-table th {
+    color: #94a3b8;
+    font-weight: 600;
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    background: rgba(255,255,255,0.02);
+  }
+  .settings-role-info-table .settings-role-info-name {
+    font-weight: 600;
+    color: #e2e8f0;
+    white-space: nowrap;
+  }
+  .settings-role-info-status {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 999px;
+    font-size: 11px;
+    font-weight: 600;
+    white-space: nowrap;
+  }
+  .settings-role-info-status--active {
+    background: rgba(34,197,94,0.15);
+    color: #4ade80;
+    border: 1px solid rgba(34,197,94,0.35);
+  }
+  .settings-role-info-status--soon {
+    background: rgba(234,179,8,0.15);
+    color: #fde047;
+    border: 1px solid rgba(234,179,8,0.35);
+  }
+  .settings-role-info-note {
+    margin: 0 0 14px;
+    padding: 10px 12px;
+    background: rgba(56,189,248,0.08);
+    border-left: 3px solid #38bdf8;
+    border-radius: 6px;
+    font-size: 12.5px;
+    color: #cbd5e1;
+    line-height: 1.5;
   }
 </style>

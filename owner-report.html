@@ -245,17 +245,19 @@ function executeDeleteExpense() {
   const expenseId = ownerPendingDeleteExpenseId;
   if (!expenseId) return;
 
-  const confirmBtn  = document.getElementById('confirmDeleteExpenseSubmitBtn');
-  const cancelBtn   = document.querySelector('#confirmDeleteExpenseModal .btn-secondary');
-  if (confirmBtn) { confirmBtn.disabled = true; confirmBtn.textContent = 'Menghapus...'; }
-  if (cancelBtn)  cancelBtn.disabled = true;
+  setModalProcessingState('confirmDeleteExpenseModal', true, {
+    primaryButtonId: 'confirmDeleteExpenseSubmitBtn',
+    loadingText: 'Menghapus...'
+  });
 
   const sessionToken = currentUser && currentUser.session_token;
 
   google.script.run
     .withSuccessHandler(function(res) {
-      if (confirmBtn) { confirmBtn.disabled = false; confirmBtn.textContent = 'Hapus'; }
-      if (cancelBtn)  cancelBtn.disabled = false;
+      setModalProcessingState('confirmDeleteExpenseModal', false, {
+        primaryButtonId: 'confirmDeleteExpenseSubmitBtn',
+        idleText: 'Hapus'
+      });
       if (!res || !res.success) {
         showToast('Gagal menghapus: ' + (res && res.message || 'Terjadi kesalahan'), 'error');
         closeDeleteExpenseModal();
@@ -292,8 +294,10 @@ function executeDeleteExpense() {
       }
     })
     .withFailureHandler(function(err) {
-      if (confirmBtn) { confirmBtn.disabled = false; confirmBtn.textContent = 'Hapus'; }
-      if (cancelBtn)  cancelBtn.disabled = false;
+      setModalProcessingState('confirmDeleteExpenseModal', false, {
+        primaryButtonId: 'confirmDeleteExpenseSubmitBtn',
+        idleText: 'Hapus'
+      });
       const msg = err && err.message ? err.message : String(err);
       showToast('Error: ' + msg, 'error');
       closeDeleteExpenseModal();
@@ -825,38 +829,43 @@ function ownerConfirmDoctorFee() {
     return d.doctor_name + ': ' + ownerFmtRp(d.fee_total);
   }).join('\n');
 
-  if (!confirm('Simpan fee dokter berikut ke pengeluaran?\n\n' + lines + '\n\nTotal: ' + ownerFmtRp(draft.total_auto_fee))) {
-    return;
-  }
+  showAppConfirm({
+    title:       'Simpan Fee Dokter ke Pengeluaran',
+    message:     'Simpan fee dokter berikut ke pengeluaran?\n\n' + lines + '\n\nTotal: ' + ownerFmtRp(draft.total_auto_fee),
+    confirmText: 'Ya, Simpan',
+    cancelText:  'Batal'
+  }).then(function(ok) {
+    if (!ok) return;
 
-  const doctorFees = toConfirm.map(function(d) {
-    return { doctor_name: d.doctor_name, fee_amount: d.fee_total };
-  });
-
-  const sessionToken = currentUser && currentUser.session_token;
-  google.script.run
-    .withSuccessHandler(function(res) {
-      if (!res || !res.success) {
-        alert('Gagal menyimpan fee: ' + (res && res.message ? res.message : 'Error tidak diketahui'));
-        return;
-      }
-      showToast('Fee dokter berhasil disimpan (' + res.data.expenses_created + ' entri pengeluaran dibuat).', 'success');
-      var expenses = (res.data && Array.isArray(res.data.expenses)) ? res.data.expenses : [];
-      if (expenses.length && ownerReportTab === 'daily' && ownerCurrentDailyData) {
-        expenses.forEach(function(exp) { ownerPatchExpenseLocally(exp, false); });
-      } else {
-        delete ownerReportCache['daily:' + (ownerReportDate || ownerTodayYmd())];
-        ownerLoadReport();
-      }
-    })
-    .withFailureHandler(function(err) {
-      alert('Error: ' + (err && err.message ? err.message : String(err)));
-    })
-    .confirmDoctorFeeToExpenses({
-      session_token: sessionToken,
-      date: draft.date,
-      doctor_fees: doctorFees
+    const doctorFees = toConfirm.map(function(d) {
+      return { doctor_name: d.doctor_name, fee_amount: d.fee_total };
     });
+
+    const sessionToken = currentUser && currentUser.session_token;
+    google.script.run
+      .withSuccessHandler(function(res) {
+        if (!res || !res.success) {
+          alert('Gagal menyimpan fee: ' + (res && res.message ? res.message : 'Error tidak diketahui'));
+          return;
+        }
+        showToast('Fee dokter berhasil disimpan (' + res.data.expenses_created + ' entri pengeluaran dibuat).', 'success');
+        var expenses = (res.data && Array.isArray(res.data.expenses)) ? res.data.expenses : [];
+        if (expenses.length && ownerReportTab === 'daily' && ownerCurrentDailyData) {
+          expenses.forEach(function(exp) { ownerPatchExpenseLocally(exp, false); });
+        } else {
+          delete ownerReportCache['daily:' + (ownerReportDate || ownerTodayYmd())];
+          ownerLoadReport();
+        }
+      })
+      .withFailureHandler(function(err) {
+        alert('Error: ' + (err && err.message ? err.message : String(err)));
+      })
+      .confirmDoctorFeeToExpenses({
+        session_token: sessionToken,
+        date: draft.date,
+        doctor_fees: doctorFees
+      });
+  });
 }
 
 /* =========================================================

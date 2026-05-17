@@ -234,13 +234,13 @@ function settingsRenderDoctorTab() {
       '<td style="font-size:12px;color:#94a3b8">' + detail + '</td>' +
       '<td>' + activeBadge + '</td>' +
       '<td><div class="settings-row-actions">' +
-        '<button class="btn btn-secondary" style="padding:5px 12px;font-size:12px" ' +
-          'onclick="settingsOpenDoctorModal(\'' + escapeAppHtml(r.doctor_name) + '\')">Edit</button>' +
+        settingsIconBtn_('edit', 'edit', 'Edit aturan fee',
+          "settingsOpenDoctorModal('" + escapeAppHtml(r.doctor_name) + "')") +
         (r.is_active !== false
-          ? '<button class="btn btn-danger" style="padding:5px 12px;font-size:12px" ' +
-              'onclick="settingsDeactivateDoctor(\'' + escapeAppHtml(r.doctor_name) + '\')">Nonaktifkan</button>'
-          : '<button class="btn btn-secondary" style="padding:5px 12px;font-size:12px" ' +
-              'onclick="settingsActivateDoctor(\'' + escapeAppHtml(r.doctor_name) + '\')">Aktifkan</button>') +
+          ? settingsIconBtn_('deactivate', 'power', 'Nonaktifkan',
+              "settingsDeactivateDoctor('" + escapeAppHtml(r.doctor_name) + "')")
+          : settingsIconBtn_('activate', 'checkCircle', 'Aktifkan',
+              "settingsActivateDoctor('" + escapeAppHtml(r.doctor_name) + "')")) +
       '</div></td>' +
     '</tr>';
   }).join('');
@@ -354,10 +354,10 @@ function settingsRenderDeductionTable() {
         '<td style="font-size:12px;color:#64748b">' + settingsDeductionLabelType(d.deduction_type) + '</td>' +
         '<td>' + settingsDeductionLabelValue(d) + '</td>' +
         '<td><div class="settings-row-actions">' +
-          '<button class="btn btn-secondary" style="padding:4px 10px;font-size:11px" ' +
-            'onclick="settingsOpenDeductionModal(' + d.id + ')">Edit</button>' +
-          '<button class="btn btn-danger" style="padding:4px 10px;font-size:11px" ' +
-            'onclick="settingsDeleteDeduction(' + d.id + ')">Hapus</button>' +
+          settingsIconBtn_('edit', 'edit', 'Edit potongan',
+            'settingsOpenDeductionModal(' + d.id + ')') +
+          settingsIconBtn_('danger', 'trash', 'Hapus potongan',
+            'settingsDeleteDeduction(' + d.id + ')') +
         '</div></td>' +
       '</tr>';
     }).join('');
@@ -466,8 +466,10 @@ function settingsCloseDeductionModal() {
 
 function settingsSubmitDeduction(e) {
   e.preventDefault();
-  var btn = document.getElementById('settingsDeductionSaveBtn');
-  if (btn) btn.disabled = true;
+  setModalProcessingState('settingsDeductionModalOverlay', true, {
+    primaryButtonId: 'settingsDeductionSaveBtn',
+    loadingText: 'Menyimpan...'
+  });
 
   var id = document.getElementById('sdd_id').value;
   var type = document.getElementById('sdd_deduction_type').value;
@@ -493,7 +495,10 @@ function settingsSubmitDeduction(e) {
   var fn = isEdit ? 'updateDoctorMaterialDeduction' : 'addDoctorMaterialDeduction';
   google.script.run
     .withSuccessHandler(function(res) {
-      if (btn) btn.disabled = false;
+      setModalProcessingState('settingsDeductionModalOverlay', false, {
+        primaryButtonId: 'settingsDeductionSaveBtn',
+        idleText: 'Simpan'
+      });
       if (!res || !res.success) { showToast(res && res.message || 'Gagal menyimpan', 'error'); return; }
       if (isEdit) {
         var idx = settingsDeductions.findIndex(function(x) { return x.id === res.data.id; });
@@ -506,7 +511,10 @@ function settingsSubmitDeduction(e) {
       settingsRenderDeductionTable();
     })
     .withFailureHandler(function(err) {
-      if (btn) btn.disabled = false;
+      setModalProcessingState('settingsDeductionModalOverlay', false, {
+        primaryButtonId: 'settingsDeductionSaveBtn',
+        idleText: 'Simpan'
+      });
       showToast('Error: ' + (err && err.message || err), 'error');
     })
     [fn](payload);
@@ -588,8 +596,10 @@ function settingsDoctorFeeTypeChange() {
 
 function settingsSubmitDoctor(e) {
   e.preventDefault();
-  var btn = document.getElementById('settingsDoctorSaveBtn');
-  if (btn) btn.disabled = true;
+  setModalProcessingState('settingsDoctorModalOverlay', true, {
+    primaryButtonId: 'settingsDoctorSaveBtn',
+    loadingText: 'Menyimpan...'
+  });
 
   var doctorName = document.getElementById('sd_doctor_name').value.trim();
   var isEdit = document.getElementById('sd_doctor_name').readOnly;
@@ -610,7 +620,10 @@ function settingsSubmitDoctor(e) {
   var fn = isEdit ? 'updateDoctorCompensationRule' : 'addDoctorCompensationRule';
   google.script.run
     .withSuccessHandler(function(res) {
-      if (btn) btn.disabled = false;
+      setModalProcessingState('settingsDoctorModalOverlay', false, {
+        primaryButtonId: 'settingsDoctorSaveBtn',
+        idleText: 'Simpan'
+      });
       if (!res || !res.success) { showToast(res && res.message || 'Gagal menyimpan', 'error'); return; }
       if (isEdit) {
         var idx = settingsDoctorRules.findIndex(function(r) { return r.doctor_name === doctorName; });
@@ -628,24 +641,35 @@ function settingsSubmitDoctor(e) {
       }
     })
     .withFailureHandler(function(err) {
-      if (btn) btn.disabled = false;
+      setModalProcessingState('settingsDoctorModalOverlay', false, {
+        primaryButtonId: 'settingsDoctorSaveBtn',
+        idleText: 'Simpan'
+      });
       showToast('Error: ' + (err && err.message || err), 'error');
     })
     [fn](payload);
 }
 
 function settingsDeactivateDoctor(doctorName) {
-  if (!confirm('Nonaktifkan aturan fee untuk ' + doctorName + '?')) return;
-  google.script.run
-    .withSuccessHandler(function(res) {
-      if (!res || !res.success) { showToast(res && res.message || 'Gagal', 'error'); return; }
-      var idx = settingsDoctorRules.findIndex(function(r) { return r.doctor_name === doctorName; });
-      if (idx !== -1) settingsDoctorRules[idx].is_active = false;
-      showToast('Dokter dinonaktifkan', 'success');
-      settingsRenderDoctorTab();
-    })
-    .withFailureHandler(function(err) { showToast('Error: ' + (err && err.message || err), 'error'); })
-    .updateDoctorCompensationRule({ session_token: getCurrentSessionToken(), doctor_name: doctorName, is_active: false });
+  showAppConfirm({
+    title:       'Nonaktifkan Aturan Fee',
+    message:     'Nonaktifkan aturan fee untuk ' + doctorName + '?',
+    confirmText: 'Nonaktifkan',
+    cancelText:  'Batal',
+    danger:      true
+  }).then(function(ok) {
+    if (!ok) return;
+    google.script.run
+      .withSuccessHandler(function(res) {
+        if (!res || !res.success) { showToast(res && res.message || 'Gagal', 'error'); return; }
+        var idx = settingsDoctorRules.findIndex(function(r) { return r.doctor_name === doctorName; });
+        if (idx !== -1) settingsDoctorRules[idx].is_active = false;
+        showToast('Dokter dinonaktifkan', 'success');
+        settingsRenderDoctorTab();
+      })
+      .withFailureHandler(function(err) { showToast('Error: ' + (err && err.message || err), 'error'); })
+      .updateDoctorCompensationRule({ session_token: getCurrentSessionToken(), doctor_name: doctorName, is_active: false });
+  });
 }
 
 function settingsActivateDoctor(doctorName) {
@@ -683,13 +707,13 @@ function settingsRenderServiceTab() {
       '<td>' + (flags || '-') + '</td>' +
       '<td>' + activeBadge + '</td>' +
       '<td><div class="settings-row-actions">' +
-        '<button class="btn btn-secondary" style="padding:5px 12px;font-size:12px" ' +
-          'onclick="settingsOpenServiceModal(\'' + escapeAppHtml(s.service_id) + '\')">Edit</button>' +
+        settingsIconBtn_('edit', 'edit', 'Edit layanan',
+          "settingsOpenServiceModal('" + escapeAppHtml(s.service_id) + "')") +
         (s.is_active !== false
-          ? '<button class="btn btn-danger" style="padding:5px 12px;font-size:12px" ' +
-              'onclick="settingsDeactivateService(\'' + escapeAppHtml(s.service_id) + '\')">Nonaktifkan</button>'
-          : '<button class="btn btn-secondary" style="padding:5px 12px;font-size:12px" ' +
-              'onclick="settingsActivateService(\'' + escapeAppHtml(s.service_id) + '\')">Aktifkan</button>') +
+          ? settingsIconBtn_('deactivate', 'power', 'Nonaktifkan',
+              "settingsDeactivateService('" + escapeAppHtml(s.service_id) + "')")
+          : settingsIconBtn_('activate', 'checkCircle', 'Aktifkan',
+              "settingsActivateService('" + escapeAppHtml(s.service_id) + "')")) +
       '</div></td>' +
     '</tr>';
   }).join('');
@@ -774,8 +798,10 @@ function settingsCloseServiceModal() {
 
 function settingsSubmitService(e) {
   e.preventDefault();
-  var btn = document.getElementById('settingsServiceSaveBtn');
-  if (btn) btn.disabled = true;
+  setModalProcessingState('settingsServiceModalOverlay', true, {
+    primaryButtonId: 'settingsServiceSaveBtn',
+    loadingText: 'Menyimpan...'
+  });
 
   var form = document.getElementById('settingsServiceForm');
   var serviceId = form && form.dataset.serviceId;
@@ -794,7 +820,10 @@ function settingsSubmitService(e) {
   var fn = isEdit ? 'updateServiceCatalog' : 'addServiceCatalog';
   google.script.run
     .withSuccessHandler(function(res) {
-      if (btn) btn.disabled = false;
+      setModalProcessingState('settingsServiceModalOverlay', false, {
+        primaryButtonId: 'settingsServiceSaveBtn',
+        idleText: 'Simpan'
+      });
       if (!res || !res.success) { showToast(res && res.message || 'Gagal menyimpan', 'error'); return; }
       if (isEdit) {
         var idx = settingsServices.findIndex(function(s) { return s.service_id === serviceId; });
@@ -807,7 +836,10 @@ function settingsSubmitService(e) {
       settingsRenderServiceTab();
     })
     .withFailureHandler(function(err) {
-      if (btn) btn.disabled = false;
+      setModalProcessingState('settingsServiceModalOverlay', false, {
+        primaryButtonId: 'settingsServiceSaveBtn',
+        idleText: 'Simpan'
+      });
       showToast('Error: ' + (err && err.message || err), 'error');
     })
     [fn](payload);
@@ -815,17 +847,26 @@ function settingsSubmitService(e) {
 
 function settingsDeactivateService(serviceId) {
   var svc = settingsServices.find(function(s) { return s.service_id === serviceId; });
-  if (!confirm('Nonaktifkan layanan "' + (svc && svc.service_name || serviceId) + '"?\n\nLayanan tidak akan muncul saat input treatment baru, tapi data lama tetap aman.')) return;
-  google.script.run
-    .withSuccessHandler(function(res) {
-      if (!res || !res.success) { showToast(res && res.message || 'Gagal', 'error'); return; }
-      var idx = settingsServices.findIndex(function(s) { return s.service_id === serviceId; });
-      if (idx !== -1) settingsServices[idx].is_active = false;
-      showToast('Layanan dinonaktifkan', 'success');
-      settingsRenderServiceTab();
-    })
-    .withFailureHandler(function(err) { showToast('Error: ' + (err && err.message || err), 'error'); })
-    .deleteServiceCatalog({ session_token: getCurrentSessionToken(), service_id: serviceId });
+  var serviceName = (svc && svc.service_name) || serviceId;
+  showAppConfirm({
+    title:       'Nonaktifkan Layanan',
+    message:     'Nonaktifkan layanan "' + serviceName + '"? Layanan tidak akan muncul saat input treatment baru, tapi data lama tetap aman.',
+    confirmText: 'Nonaktifkan',
+    cancelText:  'Batal',
+    danger:      true
+  }).then(function(ok) {
+    if (!ok) return;
+    google.script.run
+      .withSuccessHandler(function(res) {
+        if (!res || !res.success) { showToast(res && res.message || 'Gagal', 'error'); return; }
+        var idx = settingsServices.findIndex(function(s) { return s.service_id === serviceId; });
+        if (idx !== -1) settingsServices[idx].is_active = false;
+        showToast('Layanan dinonaktifkan', 'success');
+        settingsRenderServiceTab();
+      })
+      .withFailureHandler(function(err) { showToast('Error: ' + (err && err.message || err), 'error'); })
+      .deleteServiceCatalog({ session_token: getCurrentSessionToken(), service_id: serviceId });
+  });
 }
 
 function settingsActivateService(serviceId) {
@@ -844,6 +885,102 @@ function settingsActivateService(serviceId) {
 /* =========================================================
    TAB 4 — MANAJEMEN USER
    ========================================================= */
+var SETTINGS_ICON_SVG = {
+  edit:
+    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">' +
+      '<path d="M12 20h9"></path>' +
+      '<path d="M16.5 3.5a2.12 2.12 0 1 1 3 3L7 19l-4 1 1-4 12.5-12.5z"></path>' +
+    '</svg>',
+  trash:
+    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">' +
+      '<polyline points="3 6 5 6 21 6"></polyline>' +
+      '<path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"></path>' +
+      '<path d="M10 11v6"></path><path d="M14 11v6"></path>' +
+      '<path d="M9 6V4h6v2"></path>' +
+    '</svg>',
+  power:
+    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' +
+      '<path d="M18.36 6.64a9 9 0 1 1-12.73 0"></path>' +
+      '<line x1="12" y1="2" x2="12" y2="12"></line>' +
+    '</svg>',
+  checkCircle:
+    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' +
+      '<path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>' +
+      '<polyline points="22 4 12 14.01 9 11.01"></polyline>' +
+    '</svg>',
+  shield:
+    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' +
+      '<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>' +
+      '<polyline points="9 12 11 14 15 10"></polyline>' +
+    '</svg>'
+};
+
+function settingsIconBtn_(variant, icon, title, onclickAttr) {
+  return '<button type="button" class="icon-btn ' + variant + '" ' +
+    'title="' + escapeAppHtml(title) + '" aria-label="' + escapeAppHtml(title) + '" ' +
+    'onclick="' + onclickAttr + '">' +
+    SETTINGS_ICON_SVG[icon] +
+    '</button>';
+}
+
+var SETTINGS_ROLE_OPTIONS = [
+  { key: 'owner',             label: 'Owner' },
+  { key: 'super_admin',       label: 'Super Admin' },
+  { key: 'admin_appointment', label: 'Admin Appointment' },
+  { key: 'admin_finance',     label: 'Admin Finance' },
+  { key: 'doctor',            label: 'Doctor' }
+];
+
+var SETTINGS_ROLE_INFO = [
+  {
+    key: 'owner',
+    label: 'Owner',
+    persona: 'Pemilik klinik',
+    scope: 'Akses penuh ke semua modul. Bisa kelola pengguna, konfirmasi Fee Dokter ke pengeluaran, lihat semua laporan.',
+    status: 'active',
+    statusLabel: 'Aktif sekarang'
+  },
+  {
+    key: 'super_admin',
+    label: 'Super Admin',
+    persona: 'Manajer yang sangat dipercaya',
+    scope: 'Identik dengan Owner (akses penuh). Digunakan kalau ingin mendelegasikan kontrol penuh tanpa memberi label "owner".',
+    status: 'active',
+    statusLabel: 'Aktif sekarang'
+  },
+  {
+    key: 'admin_appointment',
+    label: 'Admin Appointment',
+    persona: 'Resepsionis / front office',
+    scope: 'Target: kelola Pasien, Appointment, dan Treatment. Tidak boleh akses Finance sensitif, kelola pengguna, atau konfirmasi Fee Dokter.',
+    status: 'soon',
+    statusLabel: 'Sebagian — masih setara admin lama'
+  },
+  {
+    key: 'admin_finance',
+    label: 'Admin Finance',
+    persona: 'Staff keuangan',
+    scope: 'Target: kelola Billing, Pembayaran, Pengeluaran, dan Setting Layanan & Tarif. Lihat Owner Report. Tidak boleh kelola pengguna atau konfirmasi Fee Dokter.',
+    status: 'soon',
+    statusLabel: 'Sebagian — masih setara admin lama'
+  },
+  {
+    key: 'doctor',
+    label: 'Doctor',
+    persona: 'Dokter klinik',
+    scope: 'Target: akses Treatment untuk pasien yang dia tangani, lihat fee miliknya sendiri di Owner Report. Login dokter belum dibuka di fase ini.',
+    status: 'soon',
+    statusLabel: 'Belum bisa login (Phase 2b)'
+  }
+];
+
+function settingsFormatRolesChips_(roles) {
+  if (!Array.isArray(roles) || !roles.length) return '<span class="settings-empty" style="font-style:italic">belum ada role</span>';
+  return roles.map(function(r) {
+    return '<span class="settings-badge settings-badge-role" style="margin-right:4px">' + escapeAppHtml(r) + '</span>';
+  }).join('');
+}
+
 function settingsRenderUserTab() {
   var el = document.getElementById('settingsTabContent');
   if (!el) return;
@@ -852,17 +989,20 @@ function settingsRenderUserTab() {
     var activeBadge = u.is_active !== false
       ? '<span class="settings-badge settings-badge-active">Aktif</span>'
       : '<span class="settings-badge settings-badge-inactive">Nonaktif</span>';
+    var rolesJsArg = JSON.stringify(u.roles || []).replace(/"/g, '&quot;');
     return '<tr>' +
       '<td>' + escapeAppHtml(u.username||'') + '</td>' +
       '<td>' + escapeAppHtml(u.full_name||'') + '</td>' +
-      '<td>' + escapeAppHtml(u.role||'') + '</td>' +
+      '<td>' + settingsFormatRolesChips_(u.roles) + '</td>' +
       '<td>' + activeBadge + '</td>' +
       '<td><div class="settings-row-actions">' +
+        settingsIconBtn_('edit', 'shield', 'Edit role pengguna',
+          "settingsOpenEditRolesModal('" + escapeAppHtml(u.user_id) + "','" + escapeAppHtml(u.username) + "'," + rolesJsArg + ')') +
         (u.is_active !== false
-          ? '<button class="btn btn-danger" style="padding:5px 12px;font-size:12px" ' +
-              'onclick="settingsDeactivateUser(\'' + escapeAppHtml(u.user_id) + '\',\'' + escapeAppHtml(u.username) + '\')">Nonaktifkan</button>'
-          : '<button class="btn btn-secondary" style="padding:5px 12px;font-size:12px" ' +
-              'onclick="settingsActivateUser(\'' + escapeAppHtml(u.user_id) + '\')">Aktifkan</button>') +
+          ? settingsIconBtn_('deactivate', 'power', 'Nonaktifkan pengguna',
+              "settingsDeactivateUser('" + escapeAppHtml(u.user_id) + "','" + escapeAppHtml(u.username) + "')")
+          : settingsIconBtn_('activate', 'checkCircle', 'Aktifkan pengguna',
+              "settingsActivateUser('" + escapeAppHtml(u.user_id) + "')")) +
       '</div></td>' +
     '</tr>';
   }).join('');
@@ -874,11 +1014,83 @@ function settingsRenderUserTab() {
         '<button class="btn btn-primary" style="padding:7px 14px;font-size:13px" onclick="settingsOpenUserModal()">+ Tambah Pengguna</button>' +
       '</div>' +
       '<div class="table-wrapper"><table class="table">' +
-        '<thead><tr><th>Username</th><th>Nama Lengkap</th><th>Role</th><th>Status</th><th></th></tr></thead>' +
+        '<thead><tr><th>Username</th><th>Nama Lengkap</th><th>Roles</th><th>Status</th><th></th></tr></thead>' +
         '<tbody>' + (rows || '<tr><td colspan="5" class="settings-empty">Belum ada data</td></tr>') + '</tbody>' +
       '</table></div>' +
     '</div>' +
-    settingsUserModalHtml();
+    settingsUserModalHtml() +
+    settingsEditRolesModalHtml() +
+    settingsRoleInfoModalHtml();
+}
+
+function settingsRoleInfoButtonHtml_() {
+  return '<button type="button" class="settings-role-info-btn" onclick="settingsOpenRoleInfoModal()">&#8505; Tentang Role</button>';
+}
+
+function settingsRoleInfoModalHtml() {
+  var rows = SETTINGS_ROLE_INFO.map(function(r) {
+    var statusClass = r.status === 'active'
+      ? 'settings-role-info-status--active'
+      : 'settings-role-info-status--soon';
+    return '<tr>' +
+      '<td class="settings-role-info-name">' + escapeAppHtml(r.label) + '<div style="font-weight:400;color:#94a3b8;font-size:11.5px;margin-top:2px">' + escapeAppHtml(r.persona) + '</div></td>' +
+      '<td>' + escapeAppHtml(r.scope) + '</td>' +
+      '<td><span class="settings-role-info-status ' + statusClass + '">' + escapeAppHtml(r.statusLabel) + '</span></td>' +
+    '</tr>';
+  }).join('');
+
+  return '<div class="settings-modal-overlay settings-modal-overlay--nested" id="settingsRoleInfoModalOverlay">' +
+    '<div class="settings-modal-box settings-modal-box--wide">' +
+      '<div class="settings-modal-head">' +
+        '<h3 class="settings-modal-title">Tentang Role di Klinik</h3>' +
+        '<button type="button" class="detail-close-btn" onclick="settingsCloseRoleInfoModal()">&#x2715;</button>' +
+      '</div>' +
+      '<div class="settings-modal-body">' +
+        '<p class="settings-role-info-note">' +
+          'Satu pengguna bisa memiliki lebih dari satu role (rangkap). ' +
+          'Owner dan Super Admin punya akses identik &mdash; gunakan Super Admin untuk delegasi. ' +
+          'Status &ldquo;Sebagian&rdquo; berarti pemisahan wewenang detail akan diaktifkan bertahap di fase berikutnya.' +
+        '</p>' +
+        '<table class="settings-role-info-table">' +
+          '<thead><tr><th style="width:160px">Role</th><th>Cakupan &amp; batas wewenang</th><th style="width:170px">Status</th></tr></thead>' +
+          '<tbody>' + rows + '</tbody>' +
+        '</table>' +
+      '</div>' +
+      '<div class="settings-modal-footer">' +
+        '<button type="button" class="btn btn-secondary" onclick="settingsCloseRoleInfoModal()">Tutup</button>' +
+      '</div>' +
+    '</div>' +
+  '</div>';
+}
+
+function settingsOpenRoleInfoModal() {
+  var overlay = document.getElementById('settingsRoleInfoModalOverlay');
+  if (overlay) overlay.classList.add('open');
+}
+
+function settingsCloseRoleInfoModal() {
+  var overlay = document.getElementById('settingsRoleInfoModalOverlay');
+  if (overlay) overlay.classList.remove('open');
+}
+
+function settingsRoleCheckboxesHtml_(idPrefix, preselected) {
+  var pre = Array.isArray(preselected) ? preselected : [];
+  return '<div class="settings-roles-grid">' +
+    SETTINGS_ROLE_OPTIONS.map(function(opt) {
+      var checked = pre.indexOf(opt.key) !== -1 ? ' checked' : '';
+      return '<label class="settings-role-option">' +
+        '<input type="checkbox" class="' + idPrefix + '_role_chk" value="' + opt.key + '"' + checked + '>' +
+        '<span class="settings-role-option-label">' + escapeAppHtml(opt.label) + '</span>' +
+        '</label>';
+    }).join('') +
+  '</div>';
+}
+
+function settingsCollectCheckedRoles_(idPrefix) {
+  var nodes = document.querySelectorAll('.' + idPrefix + '_role_chk:checked');
+  var roles = [];
+  nodes.forEach(function(n) { if (n.value) roles.push(String(n.value)); });
+  return roles;
 }
 
 function settingsUserModalHtml() {
@@ -896,12 +1108,11 @@ function settingsUserModalHtml() {
           '<input type="password" id="su_password" required autocomplete="new-password">' +
           '<label>Nama Lengkap</label>' +
           '<input type="text" id="su_full_name" required>' +
-          '<label>Role</label>' +
-          '<select id="su_role">' +
-            '<option value="admin">Admin</option>' +
-            '<option value="dokter">Dokter</option>' +
-            '<option value="owner">Owner</option>' +
-          '</select>' +
+          '<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:10px">' +
+            '<label style="margin:0">Roles (pilih 1 atau lebih)</label>' +
+            settingsRoleInfoButtonHtml_() +
+          '</div>' +
+          settingsRoleCheckboxesHtml_('su', []) +
         '</form>' +
       '</div>' +
       '<div class="settings-modal-footer">' +
@@ -912,10 +1123,39 @@ function settingsUserModalHtml() {
   '</div>';
 }
 
+function settingsEditRolesModalHtml() {
+  return '<div class="settings-modal-overlay" id="settingsEditRolesModalOverlay">' +
+    '<div class="settings-modal-box">' +
+      '<div class="settings-modal-head">' +
+        '<h3 class="settings-modal-title">Edit Role Pengguna</h3>' +
+        '<button type="button" class="detail-close-btn" onclick="settingsCloseEditRolesModal()">&#x2715;</button>' +
+      '</div>' +
+      '<div class="settings-modal-body">' +
+        '<form id="settingsEditRolesForm" onsubmit="settingsSubmitEditRoles(event)">' +
+          '<input type="hidden" id="er_user_id">' +
+          '<label>Pengguna</label>' +
+          '<input type="text" id="er_username" readonly>' +
+          '<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:10px">' +
+            '<label style="margin:0">Roles (pilih 1 atau lebih)</label>' +
+            settingsRoleInfoButtonHtml_() +
+          '</div>' +
+          '<div id="er_roles_container"></div>' +
+        '</form>' +
+      '</div>' +
+      '<div class="settings-modal-footer">' +
+        '<button type="button" class="btn btn-secondary" onclick="settingsCloseEditRolesModal()">Batal</button>' +
+        '<button type="submit" form="settingsEditRolesForm" class="btn btn-primary" id="settingsEditRolesSaveBtn">Simpan</button>' +
+      '</div>' +
+    '</div>' +
+  '</div>';
+}
+
 function settingsOpenUserModal() {
   var overlay = document.getElementById('settingsUserModalOverlay');
   if (!overlay) return;
   document.getElementById('settingsUserForm').reset();
+  var checks = document.querySelectorAll('.su_role_chk');
+  checks.forEach(function(c) { c.checked = false; });
   overlay.classList.add('open');
 }
 
@@ -924,21 +1164,46 @@ function settingsCloseUserModal() {
   if (overlay) overlay.classList.remove('open');
 }
 
+function settingsOpenEditRolesModal(userId, username, currentRoles) {
+  var overlay = document.getElementById('settingsEditRolesModalOverlay');
+  if (!overlay) return;
+  document.getElementById('er_user_id').value = userId || '';
+  document.getElementById('er_username').value = username || '';
+  document.getElementById('er_roles_container').innerHTML =
+    settingsRoleCheckboxesHtml_('er', currentRoles || []);
+  overlay.classList.add('open');
+}
+
+function settingsCloseEditRolesModal() {
+  var overlay = document.getElementById('settingsEditRolesModalOverlay');
+  if (overlay) overlay.classList.remove('open');
+}
+
 function settingsSubmitUser(e) {
   e.preventDefault();
-  var btn = document.getElementById('settingsUserSaveBtn');
-  if (btn) btn.disabled = true;
+  var roles = settingsCollectCheckedRoles_('su');
+  if (!roles.length) {
+    showToast('Pilih minimal 1 role', 'error');
+    return;
+  }
+  setModalProcessingState('settingsUserModalOverlay', true, {
+    primaryButtonId: 'settingsUserSaveBtn',
+    loadingText: 'Menyimpan...'
+  });
   var newFullName = document.getElementById('su_full_name').value.trim();
-  var newRole     = document.getElementById('su_role').value;
   google.script.run
     .withSuccessHandler(function(res) {
-      if (btn) btn.disabled = false;
+      setModalProcessingState('settingsUserModalOverlay', false, {
+        primaryButtonId: 'settingsUserSaveBtn',
+        idleText: 'Simpan'
+      });
       if (!res || !res.success) { showToast(res && res.message || 'Gagal menyimpan', 'error'); return; }
       settingsUsers.push({
         user_id:   res.data.user_id,
         username:  res.data.username,
         full_name: newFullName,
-        role:      newRole,
+        role:      '',
+        roles:     res.data.roles || roles,
         is_active: true
       });
       showToast('Pengguna berhasil ditambahkan', 'success');
@@ -946,7 +1211,10 @@ function settingsSubmitUser(e) {
       settingsRenderUserTab();
     })
     .withFailureHandler(function(err) {
-      if (btn) btn.disabled = false;
+      setModalProcessingState('settingsUserModalOverlay', false, {
+        primaryButtonId: 'settingsUserSaveBtn',
+        idleText: 'Simpan'
+      });
       showToast('Error: ' + (err && err.message || err), 'error');
     })
     .addUser({
@@ -954,22 +1222,69 @@ function settingsSubmitUser(e) {
       username:      document.getElementById('su_username').value.trim(),
       password:      document.getElementById('su_password').value,
       full_name:     newFullName,
-      role:          newRole
+      roles:         roles
+    });
+}
+
+function settingsSubmitEditRoles(e) {
+  e.preventDefault();
+  var userId = document.getElementById('er_user_id').value;
+  var roles = settingsCollectCheckedRoles_('er');
+  if (!roles.length) {
+    showToast('Pilih minimal 1 role', 'error');
+    return;
+  }
+  setModalProcessingState('settingsEditRolesModalOverlay', true, {
+    primaryButtonId: 'settingsEditRolesSaveBtn',
+    loadingText: 'Menyimpan...'
+  });
+  google.script.run
+    .withSuccessHandler(function(res) {
+      setModalProcessingState('settingsEditRolesModalOverlay', false, {
+        primaryButtonId: 'settingsEditRolesSaveBtn',
+        idleText: 'Simpan'
+      });
+      if (!res || !res.success) { showToast(res && res.message || 'Gagal menyimpan', 'error'); return; }
+      var idx = settingsUsers.findIndex(function(u) { return u.user_id === userId; });
+      if (idx !== -1) settingsUsers[idx].roles = roles.slice();
+      showToast('Role pengguna diperbarui', 'success');
+      settingsCloseEditRolesModal();
+      settingsRenderUserTab();
+    })
+    .withFailureHandler(function(err) {
+      setModalProcessingState('settingsEditRolesModalOverlay', false, {
+        primaryButtonId: 'settingsEditRolesSaveBtn',
+        idleText: 'Simpan'
+      });
+      showToast('Error: ' + (err && err.message || err), 'error');
+    })
+    .updateUser({
+      session_token: getCurrentSessionToken(),
+      user_id:       userId,
+      roles:         roles
     });
 }
 
 function settingsDeactivateUser(userId, username) {
-  if (!confirm('Nonaktifkan pengguna "' + username + '"?')) return;
-  google.script.run
-    .withSuccessHandler(function(res) {
-      if (!res || !res.success) { showToast(res && res.message || 'Gagal', 'error'); return; }
-      var idx = settingsUsers.findIndex(function(u) { return u.user_id === userId; });
-      if (idx !== -1) settingsUsers[idx].is_active = false;
-      showToast('Pengguna dinonaktifkan', 'success');
-      settingsRenderUserTab();
-    })
-    .withFailureHandler(function(err) { showToast('Error: ' + (err && err.message || err), 'error'); })
-    .deleteUser({ session_token: getCurrentSessionToken(), user_id: userId });
+  showAppConfirm({
+    title:       'Nonaktifkan Pengguna',
+    message:     'Nonaktifkan pengguna "' + username + '"?',
+    confirmText: 'Nonaktifkan',
+    cancelText:  'Batal',
+    danger:      true
+  }).then(function(ok) {
+    if (!ok) return;
+    google.script.run
+      .withSuccessHandler(function(res) {
+        if (!res || !res.success) { showToast(res && res.message || 'Gagal', 'error'); return; }
+        var idx = settingsUsers.findIndex(function(u) { return u.user_id === userId; });
+        if (idx !== -1) settingsUsers[idx].is_active = false;
+        showToast('Pengguna dinonaktifkan', 'success');
+        settingsRenderUserTab();
+      })
+      .withFailureHandler(function(err) { showToast('Error: ' + (err && err.message || err), 'error'); })
+      .deleteUser({ session_token: getCurrentSessionToken(), user_id: userId });
+  });
 }
 
 function settingsActivateUser(userId) {

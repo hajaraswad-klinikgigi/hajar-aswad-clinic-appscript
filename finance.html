@@ -7108,10 +7108,23 @@ function setEditExpenseAlert(msg, type) {
 }
 
 function expenseSetLoading_(submitId, cancelId, loading, submitIdleText) {
-  const btn    = document.getElementById(submitId);
-  const cancel = document.getElementById(cancelId);
-  if (btn)    { btn.disabled = loading;    if (loading) btn.textContent = 'Menyimpan...'; else if (submitIdleText) btn.textContent = submitIdleText; }
-  if (cancel) cancel.disabled = loading;
+  // Tentukan modal id dari konteks (2 modal expense yang dipakai).
+  const btn = document.getElementById(submitId);
+  if (!btn) return;
+  const modal = btn.closest('.owner-modal-overlay');
+  const modalId = modal && modal.id;
+  if (!modalId || typeof setModalProcessingState !== 'function') {
+    // Fallback minimal: disable btn + cancel saja.
+    const cancel = document.getElementById(cancelId);
+    if (btn) { btn.disabled = loading; if (loading) btn.textContent = 'Menyimpan...'; else if (submitIdleText) btn.textContent = submitIdleText; }
+    if (cancel) cancel.disabled = loading;
+    return;
+  }
+  setModalProcessingState(modalId, loading, {
+    primaryButtonId: submitId,
+    loadingText: 'Menyimpan...',
+    idleText: submitIdleText
+  });
 }
 
 function submitEditExpense() {
