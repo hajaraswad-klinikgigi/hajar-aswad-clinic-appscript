@@ -46,7 +46,10 @@ function backupAllTablesToDrive() {
     REPO_TABLES.CLINIC_INFO
   ];
 
-  // Fetch semua tabel paralel (jauh lebih cepat dari sequential)
+  // Fetch semua tabel paralel (jauh lebih cepat dari sequential).
+  // Note: backup SENGAJA tidak di-scope per clinic_id — supaya
+  // dump lengkap (semua klinik kalau multi-klinik). Pakai
+  // supabase*_ langsung untuk bypass auto-scope DataAccess.js.
   const requests = sheetNames.map(function(sheetName) {
     return {
       table:   repoGetTargetTableForSheet_(sheetName),

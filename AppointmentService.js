@@ -886,7 +886,10 @@ function autoUpdateOverdueScheduledAppointments(options) {
       // SET status = 'cancelled', updated_at = now
       supabaseUpdate_(
         targetTable,
-        { status: 'eq.scheduled', appointment_date: 'lt.' + today },
+        Object.assign(
+          { status: 'eq.scheduled', appointment_date: 'lt.' + today },
+          clinicScopeFilter_(options && options.payload)
+        ),
         { status: 'cancelled', updated_at: nowIso() }
       );
       clearAppointmentsListCache();

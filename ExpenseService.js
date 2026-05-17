@@ -28,7 +28,11 @@ const DOCTOR_RELATED_CATEGORIES = [
 
 function generateExpenseId_(date) {
   const ymd = String(date || '').replace(/-/g, '');
-  const existing = supabaseSelect_('expenses', { expense_date: 'eq.' + date }, { select: 'expense_id' });
+  const existing = supabaseSelect_(
+    'expenses',
+    Object.assign({ expense_date: 'eq.' + date }, clinicScopeFilter_(null)),
+    { select: 'expense_id' }
+  );
   const seq = String(existing.length + 1).padStart(3, '0');
   return 'EXP-' + ymd + '-' + seq;
 }

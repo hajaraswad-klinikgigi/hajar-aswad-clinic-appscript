@@ -23,6 +23,42 @@ function dbIsSupabaseMode_(options) {
 }
 
 /* =========================================================
+   CLINIC SCOPE — internal helpers
+   Auto-scope semua query Supabase by clinic_id supaya data
+   antar-klinik terisolasi. Pakai ClinicScope.js untuk resolve
+   clinic_id aktif.
+   ========================================================= */
+
+/**
+ * Bangun filter PostgREST untuk scope clinic_id sebuah tabel.
+ * Return {} kalau tabel di-exempt (mis. tabel `clinics` sendiri)
+ * atau kalau caller pass options.skip_clinic_scope=true.
+ */
+function dbBuildClinicScopeFilters_(targetTable, options) {
+  if (!clinicScopeAppliesToTable_(targetTable)) return {};
+
+  var clinicId = clinicScopeResolveId_(options);
+  if (!clinicId) return {};
+
+  return { clinic_id: 'eq.' + clinicId };
+}
+
+/**
+ * Inject clinic_id ke data INSERT (in-place).
+ * Tidak overwrite kalau caller sudah set explicit (mis. data
+ * migration tool yang sengaja set clinic_id berbeda).
+ */
+function dbApplyClinicScopeToInsertData_(targetTable, data, options) {
+  if (!clinicScopeAppliesToTable_(targetTable)) return;
+  if (data && data.clinic_id) return;
+
+  var clinicId = clinicScopeResolveId_(options);
+  if (!clinicId) return;
+
+  data.clinic_id = clinicId;
+}
+
+/* =========================================================
    READ HELPERS
    ========================================================= */
 
@@ -34,7 +70,8 @@ function dbFindAll_(tableName, options) {
 
   if (dbIsSupabaseMode_(options)) {
     var targetTable = repoGetTargetTableForSheet_(normalizedTable);
-    var rows = supabaseSelect_(targetTable, null, {
+    var filters = dbBuildClinicScopeFilters_(targetTable, options);
+    var rows = supabaseSelect_(targetTable, filters, {
       limit: options && options.limit ? options.limit : 10000
     });
     return rows.map(function(row) { return Object.assign({}, row); });
@@ -59,7 +96,7 @@ function dbFindById_(tableName, idFieldName, idValue, options) {
 
   if (dbIsSupabaseMode_(options)) {
     var targetTable = repoGetTargetTableForSheet_(normalizedTable);
-    var filters = {};
+    var filters = dbBuildClinicScopeFilters_(targetTable, options);
     filters[keyField] = 'eq.' + normalizedId;
     var rows = supabaseSelect_(targetTable, filters, { limit: 1 });
     return rows.length ? Object.assign({}, rows[0]) : null;
@@ -127,6 +164,7 @@ function dbInsert_(tableName, obj, options) {
 
   if (dbIsSupabaseMode_(options)) {
     var targetTable = repoGetTargetTableForSheet_(normalizedTable);
+    dbApplyClinicScopeToInsertData_(targetTable, data, options);
     return supabaseInsert_(targetTable, data);
   }
 
@@ -145,7 +183,7 @@ function dbUpdateById_(tableName, idFieldName, idValue, patch, options) {
 
   if (dbIsSupabaseMode_(options)) {
     var targetTable = repoGetTargetTableForSheet_(normalizedTable);
-    var filters = {};
+    var filters = dbBuildClinicScopeFilters_(targetTable, options);
     filters[keyField] = 'eq.' + normalizedId;
     return supabaseUpdate_(targetTable, filters, data);
   }
@@ -164,7 +202,7 @@ function dbDeleteById_(tableName, idFieldName, idValue, options) {
 
   if (dbIsSupabaseMode_(options)) {
     var targetTable = repoGetTargetTableForSheet_(normalizedTable);
-    var filters = {};
+    var filters = dbBuildClinicScopeFilters_(targetTable, options);
     filters[keyField] = 'eq.' + normalizedId;
     return supabaseDelete_(targetTable, filters);
   }
@@ -181,8 +219,13 @@ function dbBatchInsert_(tableName, objects, options) {
   if (dbIsSupabaseMode_(options)) {
     var normalizedTable = repoNormalizeTableName_(tableName);
     var targetTable = repoGetTargetTableForSheet_(normalizedTable);
-    supabaseInsert_(targetTable, rows);
-    return { success: true, inserted_count: rows.length };
+    var scopedRows = rows.map(function(row) {
+      var copy = Object.assign({}, row);
+      dbApplyClinicScopeToInsertData_(targetTable, copy, options);
+      return copy;
+    });
+    supabaseInsert_(targetTable, scopedRows);
+    return { success: true, inserted_count: scopedRows.length };
   }
 
   // Spreadsheet mode - insert satu per satu

@@ -70,7 +70,10 @@ function deleteBillingInstallmentsByBillingId_(billingId, options) {
       const targetTable = repoGetTargetTableForSheet_('BillingInstallments');
       const result = supabaseDelete_(
         targetTable,
-        { billing_id: 'eq.' + normalizedBillingId },
+        Object.assign(
+          { billing_id: 'eq.' + normalizedBillingId },
+          clinicScopeFilter_(opts.payload)
+        ),
         { return_rows: true }
       );
       return Array.isArray(result.rows) ? result.rows.length : 0;
@@ -844,10 +847,14 @@ function recalculateBillingInstallmentPayments(billingId) {
   if (pendingPatches.length > 0) {
     if (repoIsSupabaseBackendMode_()) {
       const targetTable = repoGetTargetTableForSheet_('BillingInstallments');
+      const clinicFilter = clinicScopeFilter_(null);
       supabaseBatchPatch_(pendingPatches.map(function(p) {
         return {
           table:   targetTable,
-          filters: { installment_id: 'eq.' + p.installmentId },
+          filters: Object.assign(
+            { installment_id: 'eq.' + p.installmentId },
+            clinicFilter
+          ),
           patch:   p.patch
         };
       }));
