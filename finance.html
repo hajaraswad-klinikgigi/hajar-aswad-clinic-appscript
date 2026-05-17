@@ -7011,7 +7011,7 @@ function loadExpenseDoctors(selectId, selectedName) {
     expenseDoctorCache = doctors;
     select.innerHTML = '<option value="">-- Pilih Dokter --</option>' +
       doctors.map(function(d) {
-        const name = d.full_name || d.username || '';
+        const name = d.doctor_name || d.full_name || '';
         return '<option value="' + escapeAppHtml(name) + '"' +
           (name === selectedName ? ' selected' : '') + '>' +
           escapeAppHtml(name) + '</option>';

@@ -1556,7 +1556,7 @@
       const locked = !!isLoading;
 
       const fieldIds = [
-        'treatment_doctor_user_id',
+        'treatment_doctor_name',
         'treatment_date',
         'treatment_chief_complaint',
         'treatment_diagnosis',
@@ -1575,7 +1575,7 @@
         patientDisplay.value = 'Memuat data treatment...';
       }
 
-      const doctorSelect = document.getElementById('treatment_doctor_user_id');
+      const doctorSelect = document.getElementById('treatment_doctor_name');
       if (doctorSelect) {
         if (locked) {
           doctorSelect.innerHTML = '<option value="">Memuat dokter...</option>';
@@ -1617,11 +1617,12 @@
       window.treatmentMasterCache.doctors = window.treatmentDoctors;
       window.treatmentMasterCache.services = window.treatmentServices;
 
-      const select = document.getElementById('treatment_doctor_user_id');
+      const select = document.getElementById('treatment_doctor_name');
         if (select) {
           select.innerHTML = '<option value="">Pilih dokter</option>' +
             window.treatmentDoctors.map(function(d) {
-              return `<option value="${escapeAppHtml(d.user_id)}">${escapeAppHtml(d.full_name || d.username)}</option>`;
+              const name = d.doctor_name || d.full_name || '';
+              return `<option value="${escapeAppHtml(name)}">${escapeAppHtml(name)}</option>`;
             }).join('');
 
           select.disabled = false;
@@ -1726,44 +1727,27 @@
     }
   }
   
-  function handleTreatmentDoctorChange() {  
-    const select = document.getElementById('treatment_doctor_user_id');  
-    const doctorId = select ? String(select.value || '') : '';  
-  
-    const doctor = (window.treatmentDoctors || []).find(function(d) {  
-      return String(d.user_id || '') === doctorId;  
-    });  
-  
-    const hiddenName = document.getElementById('treatment_doctor_name');  
-    if (hiddenName) {  
-      hiddenName.value = doctor  
-        ? String(doctor.full_name || doctor.username || '')  
-        : '';  
-    }  
-  }  
-  
-  function resetTreatmentForm() {  
-    const ids = [  
-      'treatment_appointment_id',  
-      'treatment_patient_id',  
-      'treatment_patient_name',  
-      'treatment_patient_name_display',  
-      'treatment_doctor_name',  
-      'treatment_date',  
-      'treatment_chief_complaint',  
-      'treatment_diagnosis',  
-      'treatment_notes'  
-    ];  
-  
-    ids.forEach(function(id) {  
-      const el = document.getElementById(id);  
-      if (el) el.value = '';  
-    });  
-  
-    const doctorSelect = document.getElementById('treatment_doctor_user_id');  
-    if (doctorSelect) {  
-      doctorSelect.innerHTML = '<option value="">Pilih dokter</option>';  
-    }  
+  function resetTreatmentForm() {
+    const ids = [
+      'treatment_appointment_id',
+      'treatment_patient_id',
+      'treatment_patient_name',
+      'treatment_patient_name_display',
+      'treatment_date',
+      'treatment_chief_complaint',
+      'treatment_diagnosis',
+      'treatment_notes'
+    ];
+
+    ids.forEach(function(id) {
+      const el = document.getElementById(id);
+      if (el) el.value = '';
+    });
+
+    const doctorSelect = document.getElementById('treatment_doctor_name');
+    if (doctorSelect) {
+      doctorSelect.innerHTML = '<option value="">Pilih dokter</option>';
+    }
   
     const tbody = document.getElementById('treatmentItemsBody');  
     if (tbody) {  
@@ -1796,8 +1780,8 @@
       appointment_id: document.getElementById('treatment_appointment_id').value,  
       patient_id: document.getElementById('treatment_patient_id').value,  
       patient_name: document.getElementById('treatment_patient_name').value,  
-      doctor_user_id: document.getElementById('treatment_doctor_user_id').value,  
-      doctor_name: document.getElementById('treatment_doctor_name').value,  
+      doctor_name: document.getElementById('treatment_doctor_name').value,
+
       treatment_date: document.getElementById('treatment_date').value,  
       chief_complaint: document.getElementById('treatment_chief_complaint').value.trim(),  
       diagnosis: document.getElementById('treatment_diagnosis').value.trim(),  
@@ -1953,16 +1937,16 @@
     }  
   }  
   
-  function clearTreatmentErrors() {  
-    const ids = [  
-      'treatment_patient_name',  
-      'treatment_doctor_user_id',  
-      'treatment_date',  
-      'treatment_chief_complaint',  
-      'treatment_diagnosis',  
-      'treatment_notes',  
-      'treatment_items'  
-    ];  
+  function clearTreatmentErrors() {
+    const ids = [
+      'treatment_patient_name',
+      'treatment_doctor_name',
+      'treatment_date',
+      'treatment_chief_complaint',
+      'treatment_diagnosis',
+      'treatment_notes',
+      'treatment_items'
+    ];
   
     ids.forEach(function(id) {  
       const el = document.getElementById('error_' + id);  
@@ -1973,10 +1957,11 @@
   function applyTreatmentErrors(errors) {  
     if (!errors) return;  
   
-    if (errors.doctor_user_id) {  
-      const el = document.getElementById('error_treatment_doctor_user_id');  
-      if (el) el.textContent = errors.doctor_user_id;  
-    }  
+    if (errors.doctor_name) {
+      const el = document.getElementById('error_treatment_doctor_name');
+      if (el) el.textContent = errors.doctor_name;
+    }
+
   
     if (errors.treatment_date) {  
       const el = document.getElementById('error_treatment_date');  

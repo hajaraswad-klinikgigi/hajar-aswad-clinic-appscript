@@ -165,34 +165,25 @@ function getTreatmentByAppointmentId(appointmentId, options) {
 
 function getActiveDoctors(options) {
   const opts = getTreatmentServiceUiReadOptions_(options);
-  let users = [];
+  let rules = [];
 
   if (
     isTreatmentRepositoryBridgeAvailable_() &&
     typeof TreatmentRepository.listActiveDoctors === 'function'
   ) {
-    users = TreatmentRepository.listActiveDoctors(opts) || [];
+    rules = TreatmentRepository.listActiveDoctors(opts) || [];
   } else if (typeof dbFindAll_ === 'function') {
-    users = (dbFindAll_(REPO_TABLES.USERS || 'Users', opts) || []).filter(function(row) {
-      const role = String(row.role || '').trim().toLowerCase();
-      const isActive = String(row.is_active || '').trim().toLowerCase() !== 'false';
-
-      return role === 'dokter' && isActive;
-    });
-  } else {
-    users = (getRowsAsObjects('Users') || []).filter(function(row) {
-      const role = String(row.role || '').trim().toLowerCase();
-      const isActive = String(row.is_active || '').trim().toLowerCase() !== 'false';
-
-      return role === 'dokter' && isActive;
-    });
+    rules = (dbFindAll_(REPO_TABLES.DOCTOR_COMPENSATION_RULES || 'DoctorCompensationRules', opts) || [])
+      .filter(function(row) {
+        return String(row.is_active || '').trim().toLowerCase() !== 'false';
+      });
   }
 
-  const doctors = users.map(function(row) {
+  const doctors = rules.map(function(row) {
+    const name = String(row.doctor_name || '').trim();
     return {
-      user_id: String(row.user_id || '').trim(),
-      username: String(row.username || '').trim(),
-      full_name: String(row.full_name || '').trim()
+      doctor_name: name,
+      full_name: name
     };
   });
 
@@ -202,28 +193,32 @@ function getActiveDoctors(options) {
   };
 }
 
-function findActiveDoctorById(userId, options) {
-  const normalizedUserId = String(userId || '').trim();
+function findActiveDoctorByName(name, options) {
+  const normalizedName = String(name || '').trim();
   const opts = getTreatmentServiceUiReadOptions_(options);
 
-  if (!normalizedUserId) return null;
+  if (!normalizedName) return null;
 
   if (
     isTreatmentRepositoryBridgeAvailable_() &&
-    typeof TreatmentRepository.findActiveDoctorById === 'function'
+    typeof TreatmentRepository.findActiveDoctorByName === 'function'
   ) {
-    return TreatmentRepository.findActiveDoctorById(normalizedUserId, opts) || null;
+    return TreatmentRepository.findActiveDoctorByName(normalizedName, opts) || null;
   }
 
-  const users = typeof dbFindAll_ === 'function'
-    ? dbFindAll_(REPO_TABLES.USERS || 'Users', opts)
-    : (getRowsAsObjects('Users') || []);
+  if (typeof dbFindById_ === 'function') {
+    const rule = dbFindById_(
+      REPO_TABLES.DOCTOR_COMPENSATION_RULES || 'DoctorCompensationRules',
+      'doctor_name',
+      normalizedName,
+      opts
+    );
+    if (rule && String(rule.is_active || '').trim().toLowerCase() !== 'false') {
+      return rule;
+    }
+  }
 
-  return users.find(function(row) {
-    return String(row.user_id || '').trim() === normalizedUserId &&
-      String(row.role || '').trim().toLowerCase() === 'dokter' &&
-      String(row.is_active || '').trim().toLowerCase() !== 'false';
-  }) || null;
+  return null;
 }
 
 function getTreatmentServiceActiveServices_(options) {
@@ -320,12 +315,8 @@ function validateTreatmentPayload(payload) {
     errors.patient_name = 'Nama pasien tidak ditemukan';
   }
 
-  if (!payload.doctor_user_id || !String(payload.doctor_user_id).trim()) {
-    errors.doctor_user_id = 'Dokter wajib dipilih';
-  }
-
   if (!payload.doctor_name || !String(payload.doctor_name).trim()) {
-    errors.doctor_name = 'Nama dokter wajib diisi';
+    errors.doctor_name = 'Dokter wajib dipilih';
   }
 
   if (!payload.treatment_date || !String(payload.treatment_date).trim()) {
@@ -525,7 +516,7 @@ function createTreatment(payload) {
       };
     }
 
-    const doctor = findActiveDoctorById(payload.doctor_user_id, writeReadOptions);
+    const doctor = findActiveDoctorByName(payload.doctor_name, writeReadOptions);
     if (!doctor) {
       return {
         success: false,
@@ -1109,7 +1100,6 @@ function testTreatmentFreezeGuardLog() {
       appointment_id: '',
       patient_id: '',
       patient_name: '',
-      doctor_user_id: '',
       doctor_name: '',
       treatment_date: '',
       chief_complaint: '',
@@ -1144,7 +1134,6 @@ function testTreatmentFreezeGuardLog() {
       appointment_id: 'APT-0001',
       patient_id: 'PAT-0001',
       patient_name: 'SHOULD NOT WRITE',
-      doctor_user_id: 'USR-DR01',
       doctor_name: 'SHOULD NOT WRITE',
       treatment_date: '2027-01-01',
       chief_complaint: 'SHOULD NOT WRITE',

@@ -125,22 +125,27 @@ const TreatmentRepository = Object.freeze({
   },
 
   listActiveDoctors: function(options) {
-  return this.getUsersRaw(options).filter(function(row) {
-    return isTreatmentRepositoryDoctorRole_(row.role) &&
-      isTreatmentRepositoryActiveUser_(row);
-  });
-},
+    return (dbFindAll_(
+      REPO_TABLES.DOCTOR_COMPENSATION_RULES,
+      options
+    ) || []).filter(function(row) {
+      return isTreatmentRepositoryActiveUser_(row);
+    });
+  },
 
-  findActiveDoctorById: function(userId, options) {
-    const normalizedUserId = normalizeTreatmentRepositoryKeyValue_(userId);
+  findActiveDoctorByName: function(name, options) {
+    const normalizedName = normalizeTreatmentRepositoryKeyValue_(name);
 
-    if (!normalizedUserId) return null;
+    if (!normalizedName) return null;
 
-    return this.getUsersRaw(options).find(function(row) {
-      return String(row.user_id || '').trim() === normalizedUserId &&
-        isTreatmentRepositoryDoctorRole_(row.role) &&
-        isTreatmentRepositoryActiveUser_(row);
-    }) || null;
+    const rule = dbFindById_(
+      REPO_TABLES.DOCTOR_COMPENSATION_RULES,
+      'doctor_name',
+      normalizedName,
+      options
+    );
+
+    return (rule && isTreatmentRepositoryActiveUser_(rule)) ? rule : null;
   },
 
   findServiceById: function(serviceId, options) {
@@ -412,13 +417,6 @@ const TreatmentRepository = Object.freeze({
     return findTreatmentRepositoryUserByIdFromContext_(ctx, userId);
   },
 
-  listActiveDoctorsFromContext: function(ctx) {
-    return listTreatmentRepositoryActiveDoctorsFromContext_(ctx);
-  },
-
-  findActiveDoctorByIdFromContext: function(ctx, userId) {
-    return findTreatmentRepositoryActiveDoctorByIdFromContext_(ctx, userId);
-  }
 });
 
 /* =========================================================
@@ -427,11 +425,6 @@ const TreatmentRepository = Object.freeze({
 
 function normalizeTreatmentRepositoryKeyValue_(value) {
   return String(value || '').trim();
-}
-
-function isTreatmentRepositoryDoctorRole_(role) {
-  const normalizedRole = String(role || '').trim().toLowerCase();
-  return normalizedRole === 'dokter' || normalizedRole === 'doctor';
 }
 
 function isTreatmentRepositoryActiveUser_(row) {
@@ -656,26 +649,6 @@ function findTreatmentRepositoryUserByIdFromContext_(ctx, userId) {
   }) || null;
 }
 
-function listTreatmentRepositoryActiveDoctorsFromContext_(ctx) {
-  return getTreatmentRepositoryRawContextRows_(
-    ctx,
-    TREATMENT_REPOSITORY_CONTEXT_KEYS.USERS
-  ).filter(function(row) {
-    return isTreatmentRepositoryDoctorRole_(row.role) &&
-      isTreatmentRepositoryActiveUser_(row);
-  });
-}
-
-function findTreatmentRepositoryActiveDoctorByIdFromContext_(ctx, userId) {
-  const normalizedUserId = normalizeTreatmentRepositoryKeyValue_(userId);
-
-  if (!normalizedUserId) return null;
-
-  return listTreatmentRepositoryActiveDoctorsFromContext_(ctx).find(function(row) {
-    return String(row.user_id || '').trim() === normalizedUserId;
-  }) || null;
-}
-
 function findTreatmentRepositoryServiceByIdFromContext_(ctx, serviceId) {
   const normalizedServiceId = normalizeTreatmentRepositoryKeyValue_(serviceId);
 
@@ -770,7 +743,7 @@ function testTreatmentRepositorySupabaseReadLog() {
     const treatmentId = firstTreatment ? String(firstTreatment.treatment_id || '').trim() : '';
     const appointmentId = firstTreatment ? String(firstTreatment.appointment_id || '').trim() : '';
     const patientId = firstTreatment ? String(firstTreatment.patient_id || '').trim() : '';
-    const doctorUserId = firstTreatment ? String(firstTreatment.doctor_user_id || '').trim() : '';
+    const doctorName = firstTreatment ? String(firstTreatment.doctor_name || '').trim() : '';
 
     addCheck('SUPABASE_TREATMENT_SAMPLE_AVAILABLE', !!treatmentId, {
       treatment_count: datasets.treatments.length,
@@ -787,11 +760,8 @@ function testTreatmentRepositorySupabaseReadLog() {
       const patient = patientId
         ? TreatmentRepository.findPatientById(patientId, supabaseOptions)
         : null;
-      const doctor = doctorUserId
-        ? TreatmentRepository.findUserById(doctorUserId, supabaseOptions)
-        : null;
-      const activeDoctor = doctorUserId
-        ? TreatmentRepository.findActiveDoctorById(doctorUserId, supabaseOptions)
+      const activeDoctor = doctorName
+        ? TreatmentRepository.findActiveDoctorByName(doctorName, supabaseOptions)
         : null;
 
       const treatmentsByPatient = patientId
@@ -819,8 +789,7 @@ function testTreatmentRepositorySupabaseReadLog() {
       addCheck('SUPABASE_TREATMENT_FIND_RELATIONS', true, {
         appointment_ok: appointmentId ? !!appointment : true,
         patient_ok: patientId ? !!patient : true,
-        doctor_ok: doctorUserId ? !!doctor : true,
-        active_doctor_found: !!activeDoctor
+        active_doctor_found: doctorName ? !!activeDoctor : true
       });
 
       addCheck('SUPABASE_TREATMENT_LIST_RELATED_ROWS', true, {
