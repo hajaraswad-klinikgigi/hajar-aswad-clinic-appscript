@@ -16,13 +16,15 @@ function getAllSettingsData(payload) {
       { table: repoGetTargetTableForSheet_('ClinicInfo'),                options: { limit: 10  } },
       { table: repoGetTargetTableForSheet_('DoctorCompensationRules'),   options: { limit: 100 } },
       { table: repoGetTargetTableForSheet_('ServiceCatalog'),            options: { limit: 500 } },
-      { table: repoGetTargetTableForSheet_('Users'),                     options: { limit: 100 } }
+      { table: repoGetTargetTableForSheet_('Users'),                     options: { limit: 100 } },
+      { table: repoGetTargetTableForSheet_('DoctorMaterialDeductions'),  options: { limit: 1000 } }
     ]);
 
-    const clinicRows = results[0];
-    const doctors    = results[1];
-    const services   = results[2];
-    const usersRaw   = results[3];
+    const clinicRows  = results[0];
+    const doctors     = results[1];
+    const services    = results[2];
+    const usersRaw    = results[3];
+    const deductions  = results[4];
 
     const users = usersRaw.map(function(u) {
       return {
@@ -38,10 +40,11 @@ function getAllSettingsData(payload) {
     return {
       success: true,
       data: {
-        clinic:   clinicRows[0] || null,
-        doctors:  doctors,
-        services: services,
-        users:    users
+        clinic:     clinicRows[0] || null,
+        doctors:    doctors,
+        services:   services,
+        users:      users,
+        deductions: deductions
       }
     };
   } catch (err) {

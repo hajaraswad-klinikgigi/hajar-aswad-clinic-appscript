@@ -10,6 +10,46 @@
 
   let patientSubmitInFlight = false;
 
+  /**
+   * Modal konfirmasi kustom, pengganti window.confirm() agar konsisten dgn UI app.
+   * opts: { title, message, confirmText, cancelText, danger }
+   * Returns Promise<boolean>.
+   */
+  function showAppConfirm(opts) {
+    opts = opts || {};
+    return new Promise(function(resolve) {
+      var modal     = document.getElementById('appConfirmModal');
+      var titleEl   = document.getElementById('appConfirmTitle');
+      var textEl    = document.getElementById('appConfirmText');
+      var okBtn     = document.getElementById('appConfirmOkBtn');
+      var cancelBtn = document.getElementById('appConfirmCancelBtn');
+
+      if (!modal || !okBtn || !cancelBtn) {
+        resolve(window.confirm(opts.message || ''));
+        return;
+      }
+
+      if (titleEl) titleEl.textContent = opts.title || 'Konfirmasi';
+      if (textEl)  textEl.textContent  = opts.message || '';
+      okBtn.textContent     = opts.confirmText || 'Ya';
+      cancelBtn.textContent = opts.cancelText  || 'Batal';
+      okBtn.className       = 'btn ' + (opts.danger ? 'btn-danger' : 'btn-primary');
+
+      function close(result) {
+        modal.classList.add('hidden');
+        modal.style.display = 'none';
+        okBtn.onclick = null;
+        cancelBtn.onclick = null;
+        resolve(result);
+      }
+      okBtn.onclick     = function() { close(true); };
+      cancelBtn.onclick = function() { close(false); };
+
+      modal.style.display = 'flex';
+      modal.classList.remove('hidden');
+    });
+  }
+
   function setLoadingState(message) {
     const msg = document.getElementById('message');
     if (msg) {
@@ -405,6 +445,30 @@
         }
 
         showToast(successMessage, 'success');
+
+        // Auto-prompt buat appointment hanya saat pasien baru ditambah (bukan edit).
+        if (capturedMode !== 'edit' && saved && saved.patient_id &&
+            typeof showAppointmentsPage === 'function' &&
+            typeof openCreateAppointmentModal === 'function') {
+          var pName = saved.full_name || 'pasien baru';
+          showAppConfirm({
+            title:       'Pasien Tersimpan',
+            message:     'Tambahkan appointment untuk ' + pName + ' sekarang?',
+            confirmText: 'Ya, Tambah Appointment',
+            cancelText:  'Nanti Saja'
+          }).then(function(ok) {
+            if (!ok) return;
+            showAppointmentsPage();
+            setTimeout(function() {
+              openCreateAppointmentModal({
+                patient_id:   saved.patient_id,
+                full_name:    saved.full_name,
+                patient_code: saved.patient_code,
+                phone:        saved.phone
+              });
+            }, 0);
+          });
+        }
       })
       .withFailureHandler(function(err) {
         patientSubmitInFlight = false;

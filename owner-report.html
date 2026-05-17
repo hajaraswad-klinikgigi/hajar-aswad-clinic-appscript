@@ -11,6 +11,7 @@ let ownerCurrentDailyData = null;
 let ownerPendingDeleteExpenseId = null;
 let ownerReportCache = {};
 let ownerExpandedDoctors = new Set();
+let ownerExpandedFeeDoctors = new Set();
 
 const OWNER_CATEGORY_LABELS = {
   doctor_fee:       'Fee Dokter',
@@ -365,6 +366,7 @@ function ownerPreloadTabs() {
 function ownerSwitchTab(tab) {
   ownerReportTab = tab;
   ownerExpandedDoctors.clear();
+  ownerExpandedFeeDoctors.clear();
 
   ['daily','monthly','yearly'].forEach(function(t) {
     const btn = document.getElementById('ownerTab' + t.charAt(0).toUpperCase() + t.slice(1));
@@ -408,6 +410,7 @@ function ownerSwitchTab(tab) {
 function ownerOnDateChange(val) {
   ownerReportDate = val;
   ownerExpandedDoctors.clear();
+  ownerExpandedFeeDoctors.clear();
   ownerLoadReport();
 }
 
@@ -417,6 +420,7 @@ function ownerOnMonthChange() {
   if (m) ownerReportMonth = Number(m.value);
   if (y) ownerReportYear  = Number(y.value);
   ownerExpandedDoctors.clear();
+  ownerExpandedFeeDoctors.clear();
   ownerLoadReport();
 }
 
@@ -424,6 +428,7 @@ function ownerOnYearChange() {
   const y = document.getElementById('ownerYearInput');
   if (y) ownerReportYear = Number(y.value);
   ownerExpandedDoctors.clear();
+  ownerExpandedFeeDoctors.clear();
   ownerLoadReport();
 }
 
@@ -628,7 +633,6 @@ function ownerRenderDaily(data) {
         </table></div>`}
     </div>
 
-    ${false /* Section Fee Dokter disembunyikan sementara — masih perlu penyesuaian, ubah ke true untuk aktifkan */ ? `
     <div class="content-card">
       <div class="owner-section-head"><div>
         <div class="owner-section-title">Fee Dokter</div>
@@ -636,7 +640,6 @@ function ownerRenderDaily(data) {
       </div></div>
       ${ownerRenderDoctorFeeSection(data.doctor_fee_draft)}
     </div>
-    ` : ''}
   `;
 }
 
@@ -654,7 +657,7 @@ function ownerRenderDoctorFeeSection(feeDraft) {
            'Fee dokter hari ini sudah dikonfirmasi dan tersimpan ke pengeluaran.</div>';
   }
 
-  var rows = (feeDraft.doctors || []).map(function(d) {
+  var rows = (feeDraft.doctors || []).map(function(d, idx) {
     if (d.skip_reason === 'fixed_salary') {
       return '<tr><td>' + escapeAppHtml(d.doctor_name) + '</td>' +
              '<td><span class="status-badge">Gaji Tetap</span></td>' +
@@ -665,9 +668,24 @@ function ownerRenderDoctorFeeSection(feeDraft) {
              '<td colspan="2"><span class="status-badge status-badge--cancelled">⚠ ' +
              escapeAppHtml(d.warning) + '</span></td></tr>';
     }
-    return '<tr><td>' + escapeAppHtml(d.doctor_name) + '</td>' +
-           '<td>' + d.treatment_count + ' pasien</td>' +
-           '<td>' + ownerFmtRp(d.fee_total) + '</td></tr>';
+
+    var docName = d.doctor_name || '-';
+    var expanded = ownerExpandedFeeDoctors.has(docName);
+    var arrowStyle = expanded ? 'transform:rotate(90deg)' : '';
+    var detailStyle = expanded ? '' : 'display:none';
+    var docNameJs = docName.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+
+    return '<tr class="owner-fee-row" data-fee-idx="' + idx + '" onclick="ownerToggleFeeDoctor(' + idx + ', \'' + docNameJs + '\')">' +
+             '<td>' +
+               '<span class="owner-doc-arrow" id="ownerFeeArrow' + idx + '" style="' + arrowStyle + '">›</span>' +
+               '<strong>' + escapeAppHtml(docName) + '</strong>' +
+             '</td>' +
+             '<td>' + d.treatment_count + ' pasien</td>' +
+             '<td>' + ownerFmtRp(d.fee_total) + '</td>' +
+           '</tr>' +
+           '<tr class="owner-fee-detail-row" data-fee-detail-idx="' + idx + '" style="' + detailStyle + '">' +
+             '<td colspan="3">' + ownerRenderFeeDetail(d) + '</td>' +
+           '</tr>';
   }).join('');
 
   var warnings = (feeDraft.warnings || []).filter(function(w, i, arr) {
@@ -685,6 +703,106 @@ function ownerRenderDoctorFeeSection(feeDraft) {
     (feeDraft.total_auto_fee > 0
       ? '<div style="margin-top:12px"><button class="btn btn-primary" onclick="ownerConfirmDoctorFee()">Konfirmasi & Simpan Fee ke Pengeluaran</button></div>'
       : '');
+}
+
+function ownerToggleFeeDoctor(idx, docName) {
+  var detail = document.querySelector('[data-fee-detail-idx="' + idx + '"]');
+  var arrow = document.getElementById('ownerFeeArrow' + idx);
+  if (!detail) return;
+  var collapsed = detail.style.display === 'none';
+  detail.style.display = collapsed ? '' : 'none';
+  if (arrow) arrow.style.transform = collapsed ? 'rotate(90deg)' : 'rotate(0deg)';
+  if (docName) {
+    if (collapsed) ownerExpandedFeeDoctors.add(docName);
+    else ownerExpandedFeeDoctors.delete(docName);
+  }
+}
+
+function ownerFmtPct(p) {
+  var n = Number(p || 0) * 100;
+  return (Math.round(n * 10) / 10) + '%';
+}
+
+function ownerRenderFeeDetail(d) {
+  var subtotal  = Number(d.subtotal || 0);
+  var material  = Number(d.material || 0);
+  var lab       = Number(d.lab || 0);
+  var opDeduct  = Number(d.operational_deduction || 0);
+  var basePct   = Number(d.base_percentage || 0);
+  var ctrlPct   = Number(d.control_percentage || basePct);
+  var feeTotal  = Number(d.fee_total || 0);
+  var afterDed  = Math.max(0, subtotal - material - lab);
+  var afterOp   = afterDed * (1 - opDeduct);
+
+  var breakdown    = Array.isArray(d.breakdown) ? d.breakdown : [];
+  var hasControl   = breakdown.some(function(b) { return b.is_control; });
+  var hasNonCtrl   = breakdown.some(function(b) { return !b.is_control; });
+
+  var effPct  = afterOp > 0 ? (feeTotal / afterOp) : 0;
+  var hasRule = basePct > 0 || ctrlPct > 0;
+
+  var pctLabel;
+  if (!hasRule) {
+    pctLabel = ownerFmtPct(effPct);
+  } else if (hasControl && hasNonCtrl) {
+    pctLabel = ownerFmtPct(effPct) + ' <span class="owner-fee-note">(campuran ' +
+               ownerFmtPct(basePct) + ' & kontrol ' + ownerFmtPct(ctrlPct) + ')</span>';
+  } else if (hasControl) {
+    pctLabel = ownerFmtPct(ctrlPct) + ' <span class="owner-fee-note">(kontrol)</span>';
+  } else {
+    pctLabel = ownerFmtPct(basePct);
+  }
+
+  var html = '<div class="owner-fee-detail">';
+
+  html += '<div class="owner-fee-calc">';
+  html +=   '<div class="owner-fee-calc-row"><span>Subtotal treatment</span><span>' + ownerFmtRp(subtotal) + '</span></div>';
+  html +=   '<div class="owner-fee-calc-row"><span>− Potongan material</span><span class="owner-fee-neg">−' + ownerFmtRp(material) + '</span></div>';
+  html +=   '<div class="owner-fee-calc-row"><span>− Potongan lab</span><span class="owner-fee-neg">−' + ownerFmtRp(lab) + '</span></div>';
+  html +=   '<div class="owner-fee-calc-row owner-fee-calc-sub"><span>Setelah potongan bahan/lab</span><span>' + ownerFmtRp(afterDed) + '</span></div>';
+  if (opDeduct > 0) {
+    html += '<div class="owner-fee-calc-row"><span>× (1 − Operasional ' + ownerFmtPct(opDeduct) + ')</span><span>' + ownerFmtRp(afterOp) + '</span></div>';
+  }
+  html +=   '<div class="owner-fee-calc-row owner-fee-calc-total"><span>× ' + pctLabel + ' = Fee Dokter</span><span><strong>' + ownerFmtRp(feeTotal) + '</strong></span></div>';
+  html += '</div>';
+
+  if (breakdown.length) {
+    html += '<div class="owner-fee-subtitle">Detail per Item Treatment</div>';
+    html += '<div class="table-wrapper"><table class="owner-fee-mini-table">';
+    html +=   '<thead><tr><th>Layanan</th><th style="text-align:right">Subtotal</th></tr></thead>';
+    html +=   '<tbody>';
+    breakdown.forEach(function(b) {
+      var tag = b.is_control ? ' <span class="owner-fee-tag owner-fee-tag-ctrl">kontrol</span>' : '';
+      html += '<tr><td>' + escapeAppHtml(b.service_name || '-') + tag + '</td>' +
+              '<td style="text-align:right">' + ownerFmtRp(b.subtotal) + '</td></tr>';
+    });
+    html +=   '</tbody>';
+    html += '</table></div>';
+  }
+
+  var matBd = Array.isArray(d.material_breakdown) ? d.material_breakdown : [];
+  if (matBd.length) {
+    html += '<div class="owner-fee-subtitle">Potongan per Item</div>';
+    html += '<div class="table-wrapper"><table class="owner-fee-mini-table">';
+    html +=   '<thead><tr><th>Layanan</th><th style="text-align:right">Qty</th>' +
+              '<th style="text-align:right">Material</th><th style="text-align:right">Lab</th></tr></thead>';
+    html +=   '<tbody>';
+    matBd.forEach(function(mb) {
+      html += '<tr>' +
+                '<td>' + escapeAppHtml(mb.service_name || '-') + '</td>' +
+                '<td style="text-align:right">' + (mb.qty || 0) + '</td>' +
+                '<td style="text-align:right" class="' + (mb.material_amount > 0 ? '' : 'owner-fee-zero') + '">' +
+                  (mb.material_amount > 0 ? ownerFmtRp(mb.material_amount) : '−') + '</td>' +
+                '<td style="text-align:right" class="' + (mb.lab_amount > 0 ? '' : 'owner-fee-zero') + '">' +
+                  (mb.lab_amount > 0 ? ownerFmtRp(mb.lab_amount) : '−') + '</td>' +
+              '</tr>';
+    });
+    html +=   '</tbody>';
+    html += '</table></div>';
+  }
+
+  html += '</div>';
+  return html;
 }
 
 function ownerConfirmDoctorFee() {

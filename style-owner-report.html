@@ -277,6 +277,127 @@
   }
 
   /* =========================================================
+     DOCTOR FEE — EXPAND DETAIL
+     ========================================================= */
+  .owner-fee-row {
+    background: #0d1117;
+    cursor: pointer;
+    user-select: none;
+  }
+  .owner-fee-row:hover { background: #1e2235; }
+
+  .owner-fee-detail-row td {
+    background: #0b1020;
+    padding: 0 !important;
+    border-top: 1px solid #1f2538;
+  }
+
+  .owner-fee-detail {
+    padding: 14px 18px 18px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+
+  .owner-fee-calc {
+    background: #161b2e;
+    border: 1px solid #1f2538;
+    border-radius: 10px;
+    padding: 12px 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    font-size: 13px;
+  }
+
+  .owner-fee-calc-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    color: #cbd5e1;
+    padding: 3px 0;
+  }
+
+  .owner-fee-calc-sub {
+    border-top: 1px dashed #2a3148;
+    padding-top: 7px;
+    margin-top: 4px;
+    color: #f1f5f9;
+    font-weight: 600;
+  }
+
+  .owner-fee-calc-total {
+    border-top: 1px solid #2a3148;
+    padding-top: 8px;
+    margin-top: 4px;
+    color: #f1f5f9;
+    font-size: 14px;
+  }
+
+  .owner-fee-calc-total strong { color: #86efac; }
+
+  .owner-fee-neg { color: #f87171; }
+
+  .owner-fee-note {
+    color: #6b7280;
+    font-size: 11px;
+    font-weight: 400;
+    margin-left: 4px;
+  }
+
+  .owner-fee-subtitle {
+    color: #94a3b8;
+    font-size: 12px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    margin-top: 2px;
+  }
+
+  .owner-fee-mini-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+  }
+
+  .owner-fee-mini-table th {
+    background: #161b2e;
+    color: #94a3b8;
+    font-weight: 700;
+    text-transform: uppercase;
+    font-size: 11px;
+    letter-spacing: 0.06em;
+    padding: 8px 10px;
+    border-bottom: 1px solid #1f2538;
+  }
+
+  .owner-fee-mini-table td {
+    background: #0d1117;
+    color: #cbd5e1;
+    padding: 7px 10px;
+    border-bottom: 1px solid #161b2e;
+  }
+
+  .owner-fee-tag {
+    display: inline-block;
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    padding: 1px 6px;
+    border-radius: 999px;
+    margin-left: 4px;
+    vertical-align: middle;
+  }
+
+  .owner-fee-tag-ctrl {
+    background: rgba(20, 184, 166, 0.15);
+    color: #5eead4;
+  }
+
+  .owner-fee-zero { color: #475569; }
+
+  /* =========================================================
      EXPENSE MODAL
      ========================================================= */
   .owner-modal-overlay {

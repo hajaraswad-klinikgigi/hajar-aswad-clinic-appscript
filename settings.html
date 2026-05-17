@@ -6,8 +6,10 @@ var settingsTab = 'clinic';
 var settingsDoctorRules = [];
 var settingsServices = [];
 var settingsUsers = [];
+var settingsDeductions = [];
 var settingsTabLoaded = {};
 var settingsClinicData = null;
+var settingsCurrentDoctorName = null;   // dokter yg sedang di-edit, untuk panel Potongan
 
 /* =========================================================
    ENTRY POINT
@@ -47,9 +49,10 @@ function settingsLoadAllData() {
     .withSuccessHandler(function(res) {
       if (!res || !res.success) { settingsRenderError(res && res.message); return; }
       settingsClinicData    = res.data.clinic;
-      settingsDoctorRules   = res.data.doctors  || [];
-      settingsServices      = res.data.services || [];
-      settingsUsers         = res.data.users    || [];
+      settingsDoctorRules   = res.data.doctors    || [];
+      settingsServices      = res.data.services   || [];
+      settingsUsers         = res.data.users      || [];
+      settingsDeductions    = res.data.deductions || [];
       settingsTabLoaded['clinic']  = true;
       settingsTabLoaded['doctor']  = true;
       settingsTabLoaded['service'] = true;
@@ -97,15 +100,20 @@ function settingsLoadTab(tab) {
       .getClinicInfo({ session_token: token });
 
   } else if (tab === 'doctor') {
+    // Tab Fee Dokter butuh rules + deductions + services. Kalau services belum
+    // di-load, fetch via getAllSettingsData biar 1 round-trip.
     google.script.run
       .withSuccessHandler(function(res) {
         if (!res || !res.success) { if (settingsTab === 'doctor') settingsRenderError(res && res.message); return; }
-        settingsDoctorRules = res.data || [];
-        settingsTabLoaded['doctor'] = true;
+        settingsDoctorRules = res.data.doctors    || [];
+        settingsServices    = res.data.services   || settingsServices;
+        settingsDeductions  = res.data.deductions || [];
+        settingsTabLoaded['doctor']  = true;
+        settingsTabLoaded['service'] = true;
         if (settingsTab === 'doctor') settingsRenderDoctorTab();
       })
       .withFailureHandler(function(err) { if (settingsTab === 'doctor') settingsRenderError(err && err.message); })
-      .getDoctorCompensationRules({ session_token: token });
+      .getAllSettingsData({ session_token: token });
 
   } else if (tab === 'service') {
     google.script.run
@@ -209,12 +217,16 @@ function settingsRenderDoctorTab() {
     var activeBadge = r.is_active !== false
       ? '<span class="settings-badge settings-badge-active">Aktif</span>'
       : '<span class="settings-badge settings-badge-inactive">Nonaktif</span>';
+    var deductionCount = settingsDeductions.filter(function(d) {
+      return d.doctor_name === r.doctor_name && d.is_active !== false;
+    }).length;
     var detail = r.fee_type === 'fixed'
       ? (r.fixed_salary ? formatAppRupiah(r.fixed_salary) + '/bln' : '-')
       : [
-          r.base_percentage    ? 'Base: ' + (r.base_percentage*100) + '%'    : '',
-          r.control_percentage ? 'Kontrol: ' + (r.control_percentage*100) + '%' : '',
-          r.material_deduction ? 'Potongan: ' + (r.material_deduction*100) + '%' : ''
+          r.base_percentage      ? 'Base: ' + (r.base_percentage*100) + '%'        : '',
+          r.control_percentage   ? 'Kontrol: ' + (r.control_percentage*100) + '%'  : '',
+          r.operational_deduction ? 'Operasional: ' + (r.operational_deduction*100) + '%' : '',
+          deductionCount         ? deductionCount + ' aturan potongan'             : 'Tanpa potongan'
         ].filter(Boolean).join(' &bull; ');
     return '<tr>' +
       '<td>' + escapeAppHtml(r.doctor_name) + '</td>' +
@@ -244,12 +256,13 @@ function settingsRenderDoctorTab() {
         '<tbody>' + (rows || '<tr><td colspan="5" class="settings-empty">Belum ada data</td></tr>') + '</tbody>' +
       '</table></div>' +
     '</div>' +
-    settingsDoctorModalHtml();
+    settingsDoctorModalHtml() +
+    settingsDeductionModalHtml();
 }
 
 function settingsDoctorModalHtml() {
   return '<div class="settings-modal-overlay" id="settingsDoctorModalOverlay">' +
-    '<div class="settings-modal-box">' +
+    '<div class="settings-modal-box settings-modal-box--wide">' +
       '<div class="settings-modal-head">' +
         '<h3 class="settings-modal-title" id="settingsDoctorModalTitle">Tambah Dokter</h3>' +
         '<button type="button" class="detail-close-btn" onclick="settingsCloseDoctorModal()">&#x2715;</button>' +
@@ -263,21 +276,36 @@ function settingsDoctorModalHtml() {
             '<option value="percentage">Persentase</option>' +
             '<option value="fixed">Gaji Tetap</option>' +
           '</select>' +
-          '<div id="sd_pct_fields">' +
-            '<label>Base Persentase (contoh: 0.35 = 35%)</label>' +
-            '<input type="number" id="sd_base_pct" step="0.01" min="0" max="1" placeholder="0.35">' +
-            '<label>Persentase Kontrol (opsional, biarkan kosong = sama dengan base)</label>' +
-            '<input type="number" id="sd_ctrl_pct" step="0.01" min="0" max="1" placeholder="0.50">' +
-            '<label>Potongan Material (opsional, contoh: 0.15 = 15%)</label>' +
-            '<input type="number" id="sd_mat_ded" step="0.01" min="0" max="1" placeholder="0.15">' +
+          '<div id="sd_detail_fields">' +
+            '<div id="sd_pct_fields">' +
+              '<label>Base Persentase (contoh: 0.35 = 35%)</label>' +
+              '<input type="number" id="sd_base_pct" step="0.01" min="0" max="1" placeholder="0.35">' +
+              '<label>Persentase Kontrol (opsional, biarkan kosong = sama dengan base)</label>' +
+              '<input type="number" id="sd_ctrl_pct" step="0.01" min="0" max="1" placeholder="0.50">' +
+              '<label>Potongan Operasional (opsional, contoh: 0.15 = 15%)</label>' +
+              '<input type="number" id="sd_op_ded" step="0.01" min="0" max="1" placeholder="0">' +
+              '<div class="settings-hint">Dipotong dari (subtotal − bahan − lab) sebelum dikalikan persentase.</div>' +
+            '</div>' +
+            '<div id="sd_fixed_fields" style="display:none">' +
+              '<label>Gaji Tetap (Rp/bulan)</label>' +
+              '<input type="number" id="sd_fixed_salary" min="0" placeholder="5000000">' +
+            '</div>' +
+            '<label>Catatan (opsional)</label>' +
+            '<input type="text" id="sd_notes" placeholder="Contoh: Belum SIP penuh">' +
           '</div>' +
-          '<div id="sd_fixed_fields" style="display:none">' +
-            '<label>Gaji Tetap (Rp/bulan)</label>' +
-            '<input type="number" id="sd_fixed_salary" min="0" placeholder="5000000">' +
-          '</div>' +
-          '<label>Catatan (opsional)</label>' +
-          '<input type="text" id="sd_notes" placeholder="Contoh: Belum SIP penuh">' +
         '</form>' +
+
+        // ── Section Potongan Bahan & Lab (hanya tampil saat Edit) ──
+        '<div id="sd_deductions_section" style="display:none;margin-top:24px;border-top:1px solid #e2e8f0;padding-top:18px">' +
+          '<div class="settings-table-header" style="margin-bottom:8px">' +
+            '<div class="settings-table-title" style="font-size:14px">Potongan Bahan & Lab per Layanan</div>' +
+            '<button type="button" class="btn btn-primary" style="padding:5px 12px;font-size:12px" ' +
+              'onclick="settingsOpenDeductionModal(null)">+ Tambah Potongan</button>' +
+          '</div>' +
+          '<div id="sd_deductions_table"></div>' +
+          '<div class="settings-hint" style="margin-top:8px">Potongan nominal Rupiah dari subtotal treatment sebelum fee dihitung. Varian (rarb/ra/rb) opsional untuk layanan yang punya beberapa lingkup.</div>' +
+        '</div>' +
+
       '</div>' +
       '<div class="settings-modal-footer">' +
         '<button type="button" class="btn btn-secondary" onclick="settingsCloseDoctorModal()">Batal</button>' +
@@ -287,37 +315,267 @@ function settingsDoctorModalHtml() {
   '</div>';
 }
 
+/* =========================================================
+   TAB 2 — DEDUCTION MODAL & RENDERING
+   ========================================================= */
+function settingsDeductionLabelType(t) {
+  if (t === 'fixed')     return 'Nominal Tetap';
+  if (t === 'per_tooth') return 'Per Gigi';
+  return t || '-';
+}
+
+function settingsDeductionLabelValue(d) {
+  if (d.deduction_type === 'fixed') {
+    return formatAppRupiah(d.amount || 0);
+  }
+  if (d.deduction_type === 'per_tooth') {
+    return formatAppRupiah(d.per_tooth_amount || 0) + ' / gigi';
+  }
+  return '-';
+}
+
+function settingsRenderDeductionTable() {
+  var el = document.getElementById('sd_deductions_table');
+  if (!el || !settingsCurrentDoctorName) return;
+
+  var rows = settingsDeductions
+    .filter(function(d) {
+      return d.doctor_name === settingsCurrentDoctorName && d.is_active !== false;
+    })
+    .map(function(d) {
+      var svc = settingsServices.find(function(s) { return s.service_id === d.service_id; });
+      var svcName = svc ? svc.service_name : ('? ' + d.service_id);
+      var catBadge = d.category === 'lab'
+        ? '<span class="settings-badge settings-badge-lab">Lab</span>'
+        : '<span class="settings-badge settings-badge-material">Bahan</span>';
+      return '<tr>' +
+        '<td>' + escapeAppHtml(svcName) + '</td>' +
+        '<td>' + catBadge + '</td>' +
+        '<td style="font-size:12px;color:#64748b">' + settingsDeductionLabelType(d.deduction_type) + '</td>' +
+        '<td>' + settingsDeductionLabelValue(d) + '</td>' +
+        '<td><div class="settings-row-actions">' +
+          '<button class="btn btn-secondary" style="padding:4px 10px;font-size:11px" ' +
+            'onclick="settingsOpenDeductionModal(' + d.id + ')">Edit</button>' +
+          '<button class="btn btn-danger" style="padding:4px 10px;font-size:11px" ' +
+            'onclick="settingsDeleteDeduction(' + d.id + ')">Hapus</button>' +
+        '</div></td>' +
+      '</tr>';
+    }).join('');
+
+  el.innerHTML = '<div class="table-wrapper"><table class="table">' +
+    '<thead><tr><th>Layanan</th><th>Kategori</th><th>Tipe</th><th>Nilai</th><th></th></tr></thead>' +
+    '<tbody>' + (rows || '<tr><td colspan="5" class="settings-empty">Belum ada potongan</td></tr>') + '</tbody>' +
+    '</table></div>';
+}
+
+function settingsDeductionModalHtml() {
+  // Build service options dari layanan aktif
+  var serviceOptions = settingsServices
+    .filter(function(s) { return s.is_active !== false; })
+    .map(function(s) {
+      return '<option value="' + escapeAppHtml(s.service_id) + '">' +
+              escapeAppHtml(s.service_name) + '</option>';
+    }).join('');
+
+  return '<div class="settings-modal-overlay" id="settingsDeductionModalOverlay">' +
+    '<div class="settings-modal-box">' +
+      '<div class="settings-modal-head">' +
+        '<h3 class="settings-modal-title" id="settingsDeductionModalTitle">Tambah Potongan</h3>' +
+        '<button type="button" class="detail-close-btn" onclick="settingsCloseDeductionModal()">&#x2715;</button>' +
+      '</div>' +
+      '<div class="settings-modal-body">' +
+        '<form id="settingsDeductionForm" onsubmit="settingsSubmitDeduction(event)">' +
+          '<input type="hidden" id="sdd_id">' +
+          '<label>Layanan</label>' +
+          '<select id="sdd_service_id" required>' +
+            '<option value="">— Pilih layanan —</option>' + serviceOptions +
+          '</select>' +
+          '<label>Kategori</label>' +
+          '<select id="sdd_category" required>' +
+            '<option value="material">Bahan</option>' +
+            '<option value="lab">Lab</option>' +
+          '</select>' +
+          '<label>Tipe Hitung</label>' +
+          '<select id="sdd_deduction_type" onchange="settingsDeductionTypeChange()" required>' +
+            '<option value="fixed">Nominal Tetap (per treatment)</option>' +
+            '<option value="per_tooth">Per Gigi (nominal × jumlah gigi)</option>' +
+          '</select>' +
+          '<div id="sdd_fixed_fields">' +
+            '<label>Nominal Potongan (Rp)</label>' +
+            '<input type="number" id="sdd_amount" min="0" placeholder="400000">' +
+          '</div>' +
+          '<div id="sdd_per_tooth_fields" style="display:none">' +
+            '<label>Nominal per Gigi (Rp)</label>' +
+            '<input type="number" id="sdd_per_tooth_amount" min="0" placeholder="1000000">' +
+          '</div>' +
+          '<label>Catatan (opsional)</label>' +
+          '<input type="text" id="sdd_notes" placeholder="Contoh: Bahan kawat + bracket">' +
+        '</form>' +
+      '</div>' +
+      '<div class="settings-modal-footer">' +
+        '<button type="button" class="btn btn-secondary" onclick="settingsCloseDeductionModal()">Batal</button>' +
+        '<button type="submit" form="settingsDeductionForm" class="btn btn-primary" id="settingsDeductionSaveBtn">Simpan</button>' +
+      '</div>' +
+    '</div>' +
+  '</div>';
+}
+
+function settingsDeductionTypeChange() {
+  var type = document.getElementById('sdd_deduction_type').value;
+  var f1 = document.getElementById('sdd_fixed_fields');
+  var f2 = document.getElementById('sdd_per_tooth_fields');
+  if (f1) f1.style.display = (type === 'fixed') ? '' : 'none';
+  if (f2) f2.style.display = (type === 'per_tooth') ? '' : 'none';
+}
+
+function settingsOpenDeductionModal(deductionId) {
+  if (!settingsCurrentDoctorName) {
+    showToast('Simpan data dokter terlebih dahulu sebelum menambah potongan', 'error');
+    return;
+  }
+  var overlay = document.getElementById('settingsDeductionModalOverlay');
+  if (!overlay) return;
+  overlay.classList.add('open');
+
+  var title = document.getElementById('settingsDeductionModalTitle');
+  document.getElementById('settingsDeductionForm').reset();
+
+  if (deductionId) {
+    if (title) title.textContent = 'Edit Potongan';
+    var d = settingsDeductions.find(function(x) { return x.id === deductionId; });
+    if (d) {
+      document.getElementById('sdd_id').value               = d.id;
+      document.getElementById('sdd_service_id').value       = d.service_id || '';
+      document.getElementById('sdd_category').value         = d.category || 'material';
+      document.getElementById('sdd_deduction_type').value   = d.deduction_type || 'fixed';
+      document.getElementById('sdd_amount').value           = d.amount || '';
+      document.getElementById('sdd_per_tooth_amount').value = d.per_tooth_amount || '';
+      document.getElementById('sdd_notes').value            = d.notes || '';
+    }
+  } else {
+    if (title) title.textContent = 'Tambah Potongan';
+    document.getElementById('sdd_id').value = '';
+  }
+  settingsDeductionTypeChange();
+}
+
+function settingsCloseDeductionModal() {
+  var overlay = document.getElementById('settingsDeductionModalOverlay');
+  if (overlay) overlay.classList.remove('open');
+}
+
+function settingsSubmitDeduction(e) {
+  e.preventDefault();
+  var btn = document.getElementById('settingsDeductionSaveBtn');
+  if (btn) btn.disabled = true;
+
+  var id = document.getElementById('sdd_id').value;
+  var type = document.getElementById('sdd_deduction_type').value;
+
+  var payload = {
+    session_token:  getCurrentSessionToken(),
+    doctor_name:    settingsCurrentDoctorName,
+    service_id:     document.getElementById('sdd_service_id').value,
+    category:       document.getElementById('sdd_category').value,
+    deduction_type: type,
+    notes:          document.getElementById('sdd_notes').value.trim() || null
+  };
+
+  if (type === 'fixed') {
+    payload.amount = Number(document.getElementById('sdd_amount').value) || 0;
+  } else if (type === 'per_tooth') {
+    payload.per_tooth_amount = Number(document.getElementById('sdd_per_tooth_amount').value) || 0;
+  }
+
+  var isEdit = !!id;
+  if (isEdit) payload.id = Number(id);
+
+  var fn = isEdit ? 'updateDoctorMaterialDeduction' : 'addDoctorMaterialDeduction';
+  google.script.run
+    .withSuccessHandler(function(res) {
+      if (btn) btn.disabled = false;
+      if (!res || !res.success) { showToast(res && res.message || 'Gagal menyimpan', 'error'); return; }
+      if (isEdit) {
+        var idx = settingsDeductions.findIndex(function(x) { return x.id === res.data.id; });
+        if (idx !== -1) settingsDeductions[idx] = res.data; else settingsDeductions.push(res.data);
+      } else {
+        settingsDeductions.push(res.data);
+      }
+      showToast('Potongan berhasil disimpan', 'success');
+      settingsCloseDeductionModal();
+      settingsRenderDeductionTable();
+    })
+    .withFailureHandler(function(err) {
+      if (btn) btn.disabled = false;
+      showToast('Error: ' + (err && err.message || err), 'error');
+    })
+    [fn](payload);
+}
+
+function settingsDeleteDeduction(deductionId) {
+  showAppConfirm({
+    title:       'Hapus Potongan',
+    message:     'Hapus potongan ini?',
+    confirmText: 'Hapus',
+    cancelText:  'Batal',
+    danger:      true
+  }).then(function(ok) {
+    if (!ok) return;
+    google.script.run
+      .withSuccessHandler(function(res) {
+        if (!res || !res.success) { showToast(res && res.message || 'Gagal', 'error'); return; }
+        var idx = settingsDeductions.findIndex(function(x) { return x.id === deductionId; });
+        if (idx !== -1) settingsDeductions[idx].is_active = false;
+        showToast('Potongan dihapus', 'success');
+        settingsRenderDeductionTable();
+      })
+      .withFailureHandler(function(err) { showToast('Error: ' + (err && err.message || err), 'error'); })
+      .deleteDoctorMaterialDeduction({ session_token: getCurrentSessionToken(), id: deductionId });
+  });
+}
+
 function settingsOpenDoctorModal(doctorName) {
   var overlay = document.getElementById('settingsDoctorModalOverlay');
   if (!overlay) return;
   overlay.classList.add('open');
 
   var title = document.getElementById('settingsDoctorModalTitle');
+  var detailFields = document.getElementById('sd_detail_fields');
+  var deductionsSection = document.getElementById('sd_deductions_section');
+
   if (doctorName) {
     if (title) title.textContent = 'Edit Fee Dokter';
     var rule = settingsDoctorRules.find(function(r) { return r.doctor_name === doctorName; });
     if (rule) {
+      settingsCurrentDoctorName = doctorName;
       document.getElementById('sd_doctor_name').value = rule.doctor_name;
       document.getElementById('sd_doctor_name').readOnly = true;
       document.getElementById('sd_fee_type').value = rule.fee_type || 'percentage';
       document.getElementById('sd_base_pct').value = rule.base_percentage || '';
       document.getElementById('sd_ctrl_pct').value = rule.control_percentage || '';
-      document.getElementById('sd_mat_ded').value = rule.material_deduction || '';
+      document.getElementById('sd_op_ded').value = rule.operational_deduction || '';
       document.getElementById('sd_fixed_salary').value = rule.fixed_salary || '';
       document.getElementById('sd_notes').value = rule.notes || '';
+      if (detailFields) detailFields.style.display = '';
       settingsDoctorFeeTypeChange();
+      if (deductionsSection) deductionsSection.style.display = '';
+      settingsRenderDeductionTable();
     }
   } else {
     if (title) title.textContent = 'Tambah Dokter';
+    settingsCurrentDoctorName = null;
     document.getElementById('settingsDoctorForm').reset();
     document.getElementById('sd_doctor_name').readOnly = false;
-    settingsDoctorFeeTypeChange();
+    // Mode Tambah: hanya Nama Dokter + Tipe Fee. Detail diisi setelah save (mode Edit).
+    if (detailFields) detailFields.style.display = 'none';
+    if (deductionsSection) deductionsSection.style.display = 'none';
   }
 }
 
 function settingsCloseDoctorModal() {
   var overlay = document.getElementById('settingsDoctorModalOverlay');
   if (overlay) overlay.classList.remove('open');
+  settingsCurrentDoctorName = null;
 }
 
 function settingsDoctorFeeTypeChange() {
@@ -337,15 +595,16 @@ function settingsSubmitDoctor(e) {
   var isEdit = document.getElementById('sd_doctor_name').readOnly;
   var feeType = document.getElementById('sd_fee_type').value;
 
+  var opDedRaw = document.getElementById('sd_op_ded').value;
   var payload = {
-    session_token:      getCurrentSessionToken(),
-    doctor_name:        doctorName,
-    fee_type:           feeType,
-    base_percentage:    document.getElementById('sd_base_pct').value    ? Number(document.getElementById('sd_base_pct').value) : null,
-    control_percentage: document.getElementById('sd_ctrl_pct').value    ? Number(document.getElementById('sd_ctrl_pct').value) : null,
-    material_deduction: document.getElementById('sd_mat_ded').value     ? Number(document.getElementById('sd_mat_ded').value)  : null,
-    fixed_salary:       document.getElementById('sd_fixed_salary').value ? Number(document.getElementById('sd_fixed_salary').value) : null,
-    notes:              document.getElementById('sd_notes').value.trim() || null
+    session_token:         getCurrentSessionToken(),
+    doctor_name:           doctorName,
+    fee_type:              feeType,
+    base_percentage:       document.getElementById('sd_base_pct').value     ? Number(document.getElementById('sd_base_pct').value) : null,
+    control_percentage:    document.getElementById('sd_ctrl_pct').value     ? Number(document.getElementById('sd_ctrl_pct').value) : null,
+    operational_deduction: opDedRaw !== '' ? Number(opDedRaw) : 0,
+    fixed_salary:          document.getElementById('sd_fixed_salary').value ? Number(document.getElementById('sd_fixed_salary').value) : null,
+    notes:                 document.getElementById('sd_notes').value.trim() || null
   };
 
   var fn = isEdit ? 'updateDoctorCompensationRule' : 'addDoctorCompensationRule';
@@ -356,12 +615,17 @@ function settingsSubmitDoctor(e) {
       if (isEdit) {
         var idx = settingsDoctorRules.findIndex(function(r) { return r.doctor_name === doctorName; });
         if (idx !== -1) settingsDoctorRules[idx] = res.data;
+        showToast('Data fee dokter berhasil disimpan', 'success');
+        settingsCloseDoctorModal();
+        settingsRenderDoctorTab();
       } else {
         settingsDoctorRules.push(res.data);
+        showToast('Dokter ditambahkan. Lanjutkan mengisi detail fee dan potongan bahan/lab.', 'success');
+        // Re-render tabel di belakang modal supaya konsisten
+        settingsRenderDoctorTab();
+        // Transisi modal ke mode Edit supaya section potongan terbuka
+        settingsOpenDoctorModal(res.data.doctor_name);
       }
-      showToast('Data fee dokter berhasil disimpan', 'success');
-      settingsCloseDoctorModal();
-      settingsRenderDoctorTab();
     })
     .withFailureHandler(function(err) {
       if (btn) btn.disabled = false;

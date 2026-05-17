@@ -25,6 +25,7 @@ const REPO_TABLES = Object.freeze({
   BILLING_FEEDBACKS: 'BillingFeedbacks',
   EXPENSES: 'Expenses',
   DOCTOR_COMPENSATION_RULES: 'DoctorCompensationRules',
+  DOCTOR_MATERIAL_DEDUCTIONS: 'DoctorMaterialDeductions',
   CLINIC_INFO: 'ClinicInfo'
 });
 
@@ -49,6 +50,7 @@ const REPO_TARGET_TABLES = Object.freeze({
   BillingFeedbacks: 'billing_feedbacks',
   Expenses: 'expenses',
   DoctorCompensationRules: 'doctor_compensation_rules',
+  DoctorMaterialDeductions: 'doctor_material_deductions',
   ClinicInfo: 'clinic_info'
 });
 
@@ -73,6 +75,7 @@ const REPO_PRIMARY_KEYS = Object.freeze({
   BillingFeedbacks: 'feedback_id',
   Expenses: 'expense_id',
   DoctorCompensationRules: 'doctor_name',
+  DoctorMaterialDeductions: 'id',
   ClinicInfo: 'id'
 });
 

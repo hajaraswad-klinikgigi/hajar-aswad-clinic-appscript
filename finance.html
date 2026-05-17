@@ -946,171 +946,6 @@ function showFinancePage() {
       </div>
     </div>
 
-    <div id="financeBillingDetailModal" class="modal hidden">
-      <div class="modal-box detail-modal-box-sticky finance-detail-modal-box">
-        <div class="detail-modal-header-sticky">
-          <h2 class="detail-modal-title-sticky">Detail Billing</h2>
-
-          <button
-            type="button"
-            class="detail-close-btn"
-            onclick="closeFinanceBillingDetailModal()"
-            aria-label="Tutup detail billing"
-            title="Tutup"
-          >
-            <svg viewBox="0 0 24 24" fill="none" stroke-width="2">
-              <path d="M6 6l12 12"></path>
-              <path d="M18 6l-12 12"></path>
-            </svg>
-          </button>
-        </div>
-
-        <div id="financeBillingDetailContent" class="detail-modal-content-scroll"></div>
-      </div>
-    </div>
-
-    <div id="financeDiscountModal" class="modal hidden">
-      <div class="modal-box modal-box-sticky finance-small-modal-box">
-        <div class="detail-modal-header-sticky">
-          <h2 class="detail-modal-title-sticky">Tambah Diskon</h2>
-
-          <button
-            type="button"
-            class="detail-close-btn"
-            onclick="closeFinanceDiscountModal()"
-            aria-label="Tutup modal diskon"
-            title="Tutup"
-          >
-            <svg viewBox="0 0 24 24" fill="none" stroke-width="2">
-              <path d="M6 6l12 12"></path>
-              <path d="M18 6l-12 12"></path>
-            </svg>
-          </button>
-        </div>
-
-        <div class="modal-form-scroll">
-          <form onsubmit="submitFinanceDiscount(event)">
-            <input type="hidden" id="finance_discount_billing_id">
-
-            <div class="patient-form-section">Billing</div>
-            <label>No Billing</label>
-            <input type="text" id="finance_discount_billing_number" readonly>
-
-            <div class="patient-form-section">Diskon</div>
-            <div class="patient-form-grid">
-              <div>
-                <label>Label Diskon</label>
-                <input type="text" id="finance_discount_label" placeholder="Contoh: Diskon manual owner">
-                <div id="error_finance_discount_label" class="field-error"></div>
-              </div>
-              <div>
-                <label>Nominal Diskon</label>
-                <input type="text" id="finance_discount_amount" inputmode="numeric" autocomplete="off" placeholder="Contoh: 50000" oninput="handleFinanceAmountInput(this)">
-                <div id="error_finance_discount_amount" class="field-error"></div>
-              </div>
-            </div>
-
-            <label>Alasan / Catatan</label>
-            <textarea id="finance_discount_reason" placeholder="Contoh: Diskon khusus pasien"></textarea>
-            <div id="error_finance_discount_reason" class="field-error"></div>
-
-            <div class="finance-modal-note" id="finance_discount_outstanding_info"></div>
-
-            <div class="modal-actions modal-actions-right">
-              <button type="button" class="btn btn-secondary" onclick="closeFinanceDiscountModal()">Batal</button>
-              <button type="submit" class="btn btn-primary" id="financeDiscountSubmitBtn">Simpan Diskon</button>
-            </div>
-          </form>
-        </div>
-      </div>
-    </div>
-
-    <div id="financePaymentModal" class="modal hidden">
-      <div class="modal-box modal-box-sticky finance-small-modal-box">
-        <div class="detail-modal-header-sticky">
-          <h2 class="detail-modal-title-sticky">Input Pembayaran</h2>
-
-          <button
-            type="button"
-            class="detail-close-btn"
-            onclick="closeFinancePaymentModal()"
-            aria-label="Tutup modal pembayaran"
-            title="Tutup"
-          >
-            <svg viewBox="0 0 24 24" fill="none" stroke-width="2">
-              <path d="M6 6l12 12"></path>
-              <path d="M18 6l-12 12"></path>
-            </svg>
-          </button>
-        </div>
-
-        <div class="modal-form-scroll">
-          <form onsubmit="submitFinancePayment(event)">
-            <input type="hidden" id="finance_payment_billing_id">
-            <input type="hidden" id="finance_payment_scope" value="full">
-
-            <div class="patient-form-section">Billing</div>
-            <label>No Billing</label>
-            <input type="text" id="finance_payment_billing_number" readonly>
-
-            <div id="finance_payment_installment_wrap" class="finance-payment-installment-wrap" style="display:none;">
-              <label>Target Cicilan</label>
-              <select id="finance_payment_installment_id" onchange="handleFinancePaymentInstallmentChange()">
-                <option value="">Pilih cicilan</option>
-              </select>
-              <div id="error_finance_payment_installment_id" class="field-error"></div>
-              <div id="finance_payment_installment_info" class="finance-installment-payment-info"></div>
-            </div>
-
-            <div class="patient-form-section">Pembayaran</div>
-            <div class="patient-form-grid">
-              <div>
-                <label>Tanggal</label>
-                <input type="date" id="finance_payment_date">
-                <div id="error_finance_payment_date" class="field-error"></div>
-              </div>
-              <div>
-                <label>Metode</label>
-                <select id="finance_payment_method">
-                  <option value="">Pilih metode</option>
-                  <option value="cash">Cash</option>
-                  <option value="transfer">Transfer</option>
-                  <option value="qris">QRIS</option>
-                  <option value="edc">EDC</option>
-                  <option value="other">Other</option>
-                </select>
-                <div id="error_finance_payment_method" class="field-error"></div>
-              </div>
-            </div>
-
-            <label>Nominal Pembayaran</label>
-            <input type="text" id="finance_payment_amount" inputmode="numeric" autocomplete="off" placeholder="Contoh: 100000" oninput="handleFinanceAmountInput(this)">
-            <div id="error_finance_payment_amount" class="field-error"></div>
-
-            <div class="patient-form-grid">
-              <div>
-                <label>Nomor Referensi</label>
-                <input type="text" id="finance_payment_reference_no" placeholder="Opsional, nomor transfer/QRIS">
-                <div id="error_finance_payment_reference_no" class="field-error"></div>
-              </div>
-              <div>
-                <label>Catatan</label>
-                <textarea id="finance_payment_notes" placeholder="Opsional"></textarea>
-                <div id="error_finance_payment_notes" class="field-error"></div>
-              </div>
-            </div>
-
-            <div class="finance-modal-note" id="finance_payment_outstanding_info"></div>
-
-            <div class="modal-actions modal-actions-right">
-              <button type="button" class="btn btn-secondary" onclick="closeFinancePaymentModal()">Batal</button>
-              <button type="submit" class="btn btn-primary" id="financePaymentSubmitBtn">Simpan Pembayaran</button>
-            </div>
-          </form>
-        </div>
-      </div>
-    </div>
-
       </div><!-- /financeTabBilling -->
 
       <div id="financeTabLaporan" style="display:none;">
@@ -2946,6 +2781,8 @@ function openFinanceBillingDetail(billingId) {
     return;
   }
 
+  ensureFinanceBillingDetailModal();
+
   if (!financeShowModalById('financeBillingDetailModal')) return;
 
   const token = ++financeBillingDetailLoadToken;
@@ -3684,6 +3521,8 @@ function applyFinanceDiscountErrors(errors) {
 }
 
 function openFinanceDiscountModal() {
+  ensureFinanceBillingDetailModal();
+
   const data = currentFinanceBillingDetail || {};
   const billing = data.billing || {};
 
@@ -4106,6 +3945,8 @@ function getFinancePaymentLoadingText() {
 }
 
 function openFinancePaymentModal() {
+  ensureFinanceBillingDetailModal();
+
   const data = currentFinanceBillingDetail || {};
   const billing = data.billing || {};
 
@@ -5222,10 +5063,194 @@ function generateFinanceInvoicePdf() {
     }));
 }
 
+function ensureFinanceBillingDetailModal() {
+  if (document.getElementById('financeBillingDetailModal')) return;
+
+  // Host ke document.body agar modal persists lintas-halaman (bisa dibuka dari
+  // Appointments, Dashboard, dll — tidak ikut hilang saat contentArea diganti).
+  const host = document.body;
+  const wrap = document.createElement('div');
+
+  wrap.innerHTML = `
+    <div id="financeBillingDetailModal" class="modal hidden">
+      <div class="modal-box detail-modal-box-sticky finance-detail-modal-box">
+        <div class="detail-modal-header-sticky">
+          <h2 class="detail-modal-title-sticky">Detail Billing</h2>
+
+          <button
+            type="button"
+            class="detail-close-btn"
+            onclick="closeFinanceBillingDetailModal()"
+            aria-label="Tutup detail billing"
+            title="Tutup"
+          >
+            <svg viewBox="0 0 24 24" fill="none" stroke-width="2">
+              <path d="M6 6l12 12"></path>
+              <path d="M18 6l-12 12"></path>
+            </svg>
+          </button>
+        </div>
+
+        <div id="financeBillingDetailContent" class="detail-modal-content-scroll"></div>
+      </div>
+    </div>
+
+    <div id="financeDiscountModal" class="modal hidden">
+      <div class="modal-box modal-box-sticky finance-small-modal-box">
+        <div class="detail-modal-header-sticky">
+          <h2 class="detail-modal-title-sticky">Tambah Diskon</h2>
+
+          <button
+            type="button"
+            class="detail-close-btn"
+            onclick="closeFinanceDiscountModal()"
+            aria-label="Tutup modal diskon"
+            title="Tutup"
+          >
+            <svg viewBox="0 0 24 24" fill="none" stroke-width="2">
+              <path d="M6 6l12 12"></path>
+              <path d="M18 6l-12 12"></path>
+            </svg>
+          </button>
+        </div>
+
+        <div class="modal-form-scroll">
+          <form onsubmit="submitFinanceDiscount(event)">
+            <input type="hidden" id="finance_discount_billing_id">
+
+            <div class="patient-form-section">Billing</div>
+            <label>No Billing</label>
+            <input type="text" id="finance_discount_billing_number" readonly>
+
+            <div class="patient-form-section">Diskon</div>
+            <div class="patient-form-grid">
+              <div>
+                <label>Label Diskon</label>
+                <input type="text" id="finance_discount_label" placeholder="Contoh: Diskon manual owner">
+                <div id="error_finance_discount_label" class="field-error"></div>
+              </div>
+              <div>
+                <label>Nominal Diskon</label>
+                <input type="text" id="finance_discount_amount" inputmode="numeric" autocomplete="off" placeholder="Contoh: 50000" oninput="handleFinanceAmountInput(this)">
+                <div id="error_finance_discount_amount" class="field-error"></div>
+              </div>
+            </div>
+
+            <label>Alasan / Catatan</label>
+            <textarea id="finance_discount_reason" placeholder="Contoh: Diskon khusus pasien"></textarea>
+            <div id="error_finance_discount_reason" class="field-error"></div>
+
+            <div class="finance-modal-note" id="finance_discount_outstanding_info"></div>
+
+            <div class="modal-actions modal-actions-right">
+              <button type="button" class="btn btn-secondary" onclick="closeFinanceDiscountModal()">Batal</button>
+              <button type="submit" class="btn btn-primary" id="financeDiscountSubmitBtn">Simpan Diskon</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+
+    <div id="financePaymentModal" class="modal hidden">
+      <div class="modal-box modal-box-sticky finance-small-modal-box">
+        <div class="detail-modal-header-sticky">
+          <h2 class="detail-modal-title-sticky">Input Pembayaran</h2>
+
+          <button
+            type="button"
+            class="detail-close-btn"
+            onclick="closeFinancePaymentModal()"
+            aria-label="Tutup modal pembayaran"
+            title="Tutup"
+          >
+            <svg viewBox="0 0 24 24" fill="none" stroke-width="2">
+              <path d="M6 6l12 12"></path>
+              <path d="M18 6l-12 12"></path>
+            </svg>
+          </button>
+        </div>
+
+        <div class="modal-form-scroll">
+          <form onsubmit="submitFinancePayment(event)">
+            <input type="hidden" id="finance_payment_billing_id">
+            <input type="hidden" id="finance_payment_scope" value="full">
+
+            <div class="patient-form-section">Billing</div>
+            <label>No Billing</label>
+            <input type="text" id="finance_payment_billing_number" readonly>
+
+            <div id="finance_payment_installment_wrap" class="finance-payment-installment-wrap" style="display:none;">
+              <label>Target Cicilan</label>
+              <select id="finance_payment_installment_id" onchange="handleFinancePaymentInstallmentChange()">
+                <option value="">Pilih cicilan</option>
+              </select>
+              <div id="error_finance_payment_installment_id" class="field-error"></div>
+              <div id="finance_payment_installment_info" class="finance-installment-payment-info"></div>
+            </div>
+
+            <div class="patient-form-section">Pembayaran</div>
+            <div class="patient-form-grid">
+              <div>
+                <label>Tanggal</label>
+                <input type="date" id="finance_payment_date">
+                <div id="error_finance_payment_date" class="field-error"></div>
+              </div>
+              <div>
+                <label>Metode</label>
+                <select id="finance_payment_method">
+                  <option value="">Pilih metode</option>
+                  <option value="cash">Cash</option>
+                  <option value="transfer">Transfer</option>
+                  <option value="qris">QRIS</option>
+                  <option value="edc">EDC</option>
+                  <option value="other">Other</option>
+                </select>
+                <div id="error_finance_payment_method" class="field-error"></div>
+              </div>
+            </div>
+
+            <label>Nominal Pembayaran</label>
+            <input type="text" id="finance_payment_amount" inputmode="numeric" autocomplete="off" placeholder="Contoh: 100000" oninput="handleFinanceAmountInput(this)">
+            <div id="error_finance_payment_amount" class="field-error"></div>
+
+            <div class="patient-form-grid">
+              <div>
+                <label>Nomor Referensi</label>
+                <input type="text" id="finance_payment_reference_no" placeholder="Opsional, nomor transfer/QRIS">
+                <div id="error_finance_payment_reference_no" class="field-error"></div>
+              </div>
+              <div>
+                <label>Catatan</label>
+                <textarea id="finance_payment_notes" placeholder="Opsional"></textarea>
+                <div id="error_finance_payment_notes" class="field-error"></div>
+              </div>
+            </div>
+
+            <div class="finance-modal-note" id="finance_payment_outstanding_info"></div>
+
+            <div class="modal-actions modal-actions-right">
+              <button type="button" class="btn btn-secondary" onclick="closeFinancePaymentModal()">Batal</button>
+              <button type="submit" class="btn btn-primary" id="financePaymentSubmitBtn">Simpan Pembayaran</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+  `;
+
+  // appendChild satu per satu karena ada 3 sibling root
+  while (wrap.firstElementChild) {
+    host.appendChild(wrap.firstElementChild);
+  }
+}
+
 function ensureFinanceInvoiceEmailModal() {
   if (document.getElementById('financeInvoiceEmailModal')) return;
 
-  const host = document.getElementById('contentArea') || document.body;
+  // Host = body agar modal persists lintas-halaman, sama seperti
+  // ensureFinanceBillingDetailModal — invoice email bisa dipanggil dari
+  // konteks billing detail tanpa terikat halaman Finance.
+  const host = document.body;
   const wrap = document.createElement('div');
 
   wrap.innerHTML = `
