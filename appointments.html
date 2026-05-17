@@ -2025,46 +2025,16 @@
 
         closeTreatmentModal();
         var completedAptId = payload && payload.appointment_id;
-        var tPatientName = 'pasien';
         if (completedAptId) {
           var aidx = (allAppointments || []).findIndex(function(a) {
             return a.appointment_id === completedAptId;
           });
           if (aidx !== -1) {
-            tPatientName = allAppointments[aidx].patient_name || tPatientName;
             allAppointments[aidx].status = 'completed';
             applyAppointmentFilters(true);
           }
         }
         showToast('Treatment berhasil disimpan', 'success');
-
-        // Konfirmasi lanjut atur pembayaran tanpa berpindah ke halaman Finance.
-        var newBilling = res && res.data && res.data.billing;
-        var newBillingId = newBilling && newBilling.billing_id;
-        if (newBillingId &&
-            typeof openFinanceBillingDetail === 'function' &&
-            typeof showAppConfirm === 'function') {
-          showAppConfirm({
-            title:       'Treatment Tersimpan',
-            message:     'Lanjutkan atur pembayaran untuk ' + tPatientName + ' sekarang?',
-            confirmText: 'Ya, Atur Pembayaran',
-            cancelText:  'Nanti Saja'
-          }).then(function(ok) {
-            if (!ok) return;
-
-            // Seed billing baru ke allFinanceBillings (kalau ada) supaya fast
-            // preview di modal detail tampil seragam dengan flow dari Finance,
-            // bukan skeleton kosong. Field di newBilling sudah lengkap.
-            if (typeof allFinanceBillings !== 'undefined' && Array.isArray(allFinanceBillings)) {
-              var existsIdx = allFinanceBillings.findIndex(function(r) {
-                return String(r && r.billing_id || '') === String(newBillingId);
-              });
-              if (existsIdx === -1) allFinanceBillings.unshift(newBilling);
-            }
-
-            openFinanceBillingDetail(newBillingId);
-          });
-        }
       })
       .withFailureHandler(function(err) {
         treatmentSubmitInFlight = false;

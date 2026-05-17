@@ -548,6 +548,9 @@ function confirmDoctorFeeToExpenses(payload) {
   try {
     const auth = readAuthSession_(payload);
     if (!auth.success) return auth;
+    if (!userIsFullyPrivileged_(auth.user)) {
+      return { success: false, message: 'Hanya owner atau super admin yang bisa mengonfirmasi fee dokter.' };
+    }
 
     const date       = String((payload && payload.date) || '').trim();
     const doctorFees = Array.isArray(payload && payload.doctor_fees) ? payload.doctor_fees : [];

@@ -19,6 +19,16 @@ function hashPassword(text) {
 const APP_ALLOWED_ROLES = ['admin', 'owner'];
 const APP_SESSION_TTL_SECONDS = 21600; // 6 jam
 
+// Phase 2a: 5 role rangkap (many-to-many via app_user_roles)
+const APP_ROLES_VALID = Object.freeze([
+  'owner', 'super_admin',
+  'admin_appointment', 'admin_finance',
+  'doctor'
+]);
+
+// Owner & super_admin selalu lulus role check apapun
+const APP_ROLES_FULLY_PRIVILEGED = Object.freeze(['owner', 'super_admin']);
+
 function normalizeAppRole_(role) {
   return String(role || '').trim().toLowerCase();
 }
@@ -27,13 +37,72 @@ function isAllowedAppRole_(role) {
   return APP_ALLOWED_ROLES.indexOf(normalizeAppRole_(role)) !== -1;
 }
 
-function buildSafeAuthUser_(user) {
+function getAppUserRolesByUserId_(userId) {
+  const normalizedUserId = String(userId || '').trim();
+  if (!normalizedUserId) return [];
+
+  const rows = (typeof dbFindAll_ === 'function')
+    ? (dbFindAll_(REPO_TABLES.APP_USER_ROLES) || [])
+    : [];
+
+  const seen = {};
+  const roles = [];
+
+  rows.forEach(function(row) {
+    if (String(row.user_id || '').trim() !== normalizedUserId) return;
+    const role = normalizeAppRole_(row.role || '');
+    if (APP_ROLES_VALID.indexOf(role) === -1) return;
+    if (seen[role]) return;
+    seen[role] = true;
+    roles.push(role);
+  });
+
+  return roles;
+}
+
+function userHasRole_(user, role) {
+  if (!user || !role) return false;
+  const target = normalizeAppRole_(role);
+  return Array.isArray(user.roles) && user.roles.indexOf(target) !== -1;
+}
+
+function userHasAnyRole_(user, roles) {
+  if (!user || !Array.isArray(roles)) return false;
+  for (var i = 0; i < roles.length; i++) {
+    if (userHasRole_(user, roles[i])) return true;
+  }
+  return false;
+}
+
+function userIsFullyPrivileged_(user) {
+  return userHasAnyRole_(user, APP_ROLES_FULLY_PRIVILEGED);
+}
+
+function requireRole(context, allowedRoles) {
+  const auth = readAuthSession_(context);
+  if (!auth || !auth.success) return auth;
+
+  const allowed = Array.isArray(allowedRoles) ? allowedRoles : [];
+  if (allowed.indexOf('*') !== -1) return auth;
+  if (userIsFullyPrivileged_(auth.user)) return auth;
+  if (!userHasAnyRole_(auth.user, allowed)) {
+    return {
+      success: false,
+      message: 'Akses ditolak. Role Anda: ' + ((auth.user.roles || []).join(', ') || '-')
+    };
+  }
+  return auth;
+}
+
+function buildSafeAuthUser_(user, opts) {
+  const rolesArr = (opts && Array.isArray(opts.roles)) ? opts.roles.slice() : [];
   return {
     user_id: String((user && user.user_id) || '').trim(),
     full_name: String((user && user.full_name) || '').trim(),
     username: String((user && user.username) || '').trim(),
     role: normalizeAppRole_((user && user.role) || ''),
-    clinic_id: String((user && user.clinic_id) || '').trim()
+    clinic_id: String((user && user.clinic_id) || '').trim(),
+    roles: rolesArr
   };
 }
 
@@ -181,9 +250,11 @@ function readAuthSession_(context) {
     };
   }
 
+  const roles = getAppUserRolesByUserId_(userId);
+
   return {
     success: true,
-    user: buildSafeAuthUser_(latestUser),
+    user: buildSafeAuthUser_(latestUser, { roles: roles }),
     session: {
       expires_at: String(session.expires_at || '')
     }
@@ -202,9 +273,8 @@ function requireFinancePermission_(context, actionLabel) {
     };
   }
 
-  const role = normalizeAppRole_(auth.user.role || '');
-
-  if (!isFinanceManagerRole(role)) {
+  if (!userIsFullyPrivileged_(auth.user) &&
+      !userHasAnyRole_(auth.user, ['admin_finance'])) {
     return {
       success: false,
       message: 'Anda tidak memiliki izin untuk menjalankan aksi Finance ini.'
@@ -214,7 +284,7 @@ function requireFinancePermission_(context, actionLabel) {
   return {
     success: true,
     user: auth.user,
-    role: role,
+    role: normalizeAppRole_(auth.user.role || ''),
     action: String(actionLabel || '').trim()
   };
 }
@@ -231,9 +301,7 @@ function requireFinanceOwnerPermission_(context, actionLabel) {
     };
   }
 
-  const role = normalizeAppRole_(auth.user.role || '');
-
-  if (role !== 'owner') {
+  if (!userIsFullyPrivileged_(auth.user)) {
     return {
       success: false,
       message: 'Hanya owner yang memiliki izin menjalankan aksi ini.'
@@ -243,7 +311,7 @@ function requireFinanceOwnerPermission_(context, actionLabel) {
   return {
     success: true,
     user: auth.user,
-    role: role,
+    role: normalizeAppRole_(auth.user.role || ''),
     action: String(actionLabel || '').trim()
   };
 }
@@ -306,12 +374,13 @@ function loginUser(username, password) {
   }
 
   const session = createAuthSession_(user);
+  const roles = getAppUserRolesByUserId_(user.user_id);
 
   return {
     success: true,
     message: 'Login berhasil',
     data: Object.assign(
-      buildSafeAuthUser_(user),
+      buildSafeAuthUser_(user, { roles: roles }),
       {
         session_token: session.session_token,
         session_expires_at: session.expires_at

@@ -26,7 +26,8 @@ const REPO_TABLES = Object.freeze({
   EXPENSES: 'Expenses',
   DOCTOR_COMPENSATION_RULES: 'DoctorCompensationRules',
   DOCTOR_MATERIAL_DEDUCTIONS: 'DoctorMaterialDeductions',
-  CLINIC_INFO: 'ClinicInfo'
+  CLINIC_INFO: 'ClinicInfo',
+  APP_USER_ROLES: 'AppUserRoles'
 });
 
 /**
@@ -51,7 +52,8 @@ const REPO_TARGET_TABLES = Object.freeze({
   Expenses: 'expenses',
   DoctorCompensationRules: 'doctor_compensation_rules',
   DoctorMaterialDeductions: 'doctor_material_deductions',
-  ClinicInfo: 'clinic_info'
+  ClinicInfo: 'clinic_info',
+  AppUserRoles: 'app_user_roles'
 });
 
 /**
@@ -76,7 +78,8 @@ const REPO_PRIMARY_KEYS = Object.freeze({
   Expenses: 'expense_id',
   DoctorCompensationRules: 'doctor_name',
   DoctorMaterialDeductions: 'id',
-  ClinicInfo: 'id'
+  ClinicInfo: 'id',
+  AppUserRoles: 'user_id'
 });
 
 /* =========================================================
