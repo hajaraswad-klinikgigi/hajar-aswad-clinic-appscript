@@ -1,7 +1,19 @@
-# Rencana — Multi-Klinik + Clerk Auth + Audit Log
+# Rencana — Multi-Klinik + Google Sign-In + Audit Log
 
 Dibuat: 2026-05-16
-Status: Phase 1 selesai, Phase 1.5/2/3 disepakati, role concept di-revise 2026-05-16 (5 role + rangkap)
+Status: Phase 1 selesai, Phase 1.5 selesai, Phase 2a selesai (role rangkap foundation), Phase 2b sedang dikerjakan (Google Sign-In)
+
+## ⚠️ REVISI 2026-05-17 — Auth provider diubah dari Clerk → Google Sign-In
+
+Setelah evaluasi ulang, **Clerk DIBATALKAN** sebagai auth provider. Alasan:
+- Apps Script di-host di iframe Google (`script.google.com/macros/...`) — banyak friksi dgn widget/redirect Clerk
+- Tidak bisa pakai npm/SDK Clerk — harus pakai REST API yang lebih rumit
+- Aplikasi sudah di Google ecosystem (Apps Script + Supabase + Google Drive backup) — lebih natural pakai Google Sign-In
+- Setiap staff klinik sudah punya akun Gmail pribadi — tidak perlu daftar ke provider eksternal
+
+**Ganti dengan**: Google Identity Services (GIS) client-side + verify JWT id_token di backend via tokeninfo endpoint. Gratis tanpa batas user. Native Apps Script.
+
+Section PHASE 2 di bawah masih berisi konten Clerk sebagai **arsip historis**. Implementasi sebenarnya = Phase 2a (role rangkap foundation, sudah selesai & commit `c6e3862`) + Phase 2b (Google Sign-In, sedang dikerjakan). Lihat memory `multi_clinic_phase2a_progress_2026_05_17.md` untuk status terkini.
 
 ## Konteks & Tujuan
 
@@ -19,8 +31,8 @@ Klinik Hajar Aswad pakai Apps Script + Supabase. Saat ini admin share **1 akun**
 | Aspek | Keputusan |
 |---|---|
 | Multi-klinik | Single Supabase + kolom `clinic_id` di semua tabel utama (default `'KLINIK-1'`) |
-| Auth | Clerk + full backend JWT verification (cache 5 menit) |
-| Sign-up | Open sign-up + whitelist email di tabel `clinic_users` |
+| Auth | **Google Sign-In (GIS)** — id_token JWT di-verify via Google tokeninfo endpoint. Lookup email di `app_users.email` (UNIQUE). ~~Clerk dibatalkan, lihat revisi di atas.~~ |
+| Sign-up | Owner add user manual via Settings → input email Gmail staff. Tidak open sign-up. |
 | Audit visibility | Owner & Super Admin lihat semua; Admin lihat scope modulnya; Dokter tidak akses |
 | Migration | Big bang ke `/dev`, deploy ke `/exec` setelah lulus testing |
 | Scope | 4 fase bertahap (1, 1.5, 2, 3) |
