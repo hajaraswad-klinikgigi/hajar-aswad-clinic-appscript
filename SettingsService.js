@@ -17,23 +17,38 @@ function getAllSettingsData(payload) {
       { table: repoGetTargetTableForSheet_('DoctorCompensationRules'),   options: { limit: 100 } },
       { table: repoGetTargetTableForSheet_('ServiceCatalog'),            options: { limit: 500 } },
       { table: repoGetTargetTableForSheet_('Users'),                     options: { limit: 100 } },
-      { table: repoGetTargetTableForSheet_('DoctorMaterialDeductions'),  options: { limit: 1000 } }
+      { table: repoGetTargetTableForSheet_('DoctorMaterialDeductions'),  options: { limit: 1000 } },
+      { table: repoGetTargetTableForSheet_(REPO_TABLES.APP_USER_ROLES),  options: { limit: 1000 } }
     ]);
 
-    const clinicRows  = results[0];
-    const doctors     = results[1];
-    const services    = results[2];
-    const usersRaw    = results[3];
-    const deductions  = results[4];
+    const clinicRows   = results[0];
+    const doctors      = results[1];
+    const services     = results[2];
+    const usersRaw     = results[3];
+    const deductions   = results[4];
+    const allRoleRows  = results[5] || [];
+
+    const rolesByUser = {};
+    allRoleRows.forEach(function(r) {
+      const uid = String(r.user_id || '').trim();
+      const role = normalizeAppRole_(r.role || '');
+      if (!uid || APP_ROLES_VALID.indexOf(role) === -1) return;
+      if (!rolesByUser[uid]) rolesByUser[uid] = [];
+      if (rolesByUser[uid].indexOf(role) === -1) rolesByUser[uid].push(role);
+    });
 
     const users = usersRaw.map(function(u) {
+      const uid = String(u.user_id || '').trim();
       return {
-        user_id:    u.user_id,
-        username:   u.username,
-        full_name:  u.full_name,
-        role:       u.role,
-        is_active:  u.is_active,
-        created_at: u.created_at
+        user_id:      u.user_id,
+        username:     u.username,
+        full_name:    u.full_name,
+        email:        u.email || null,
+        role:         u.role,
+        roles:        rolesByUser[uid] || [],
+        is_active:    u.is_active,
+        totp_enabled: !!String(u.totp_secret || '').trim(),
+        created_at:   u.created_at
       };
     });
 
