@@ -223,7 +223,7 @@ function checkFeeAlreadyConfirmed_(date) {
 
 function getDoctorCompensationRules(payload) {
   try {
-    const auth = readAuthSession_(payload);
+    const auth = requireRole(payload, ['admin_finance']);
     if (!auth.success) return auth;
 
     const rules = getDoctorCompRulesRaw_();
@@ -235,7 +235,7 @@ function getDoctorCompensationRules(payload) {
 
 function getDoctorCompensationRule(payload) {
   try {
-    const auth = readAuthSession_(payload);
+    const auth = requireRole(payload, ['admin_finance']);
     if (!auth.success) return auth;
 
     const doctorName = String((payload && payload.doctor_name) || '').trim();
@@ -258,7 +258,7 @@ function getDoctorCompensationRule(payload) {
 
 function addDoctorCompensationRule(payload) {
   try {
-    const auth = readAuthSession_(payload);
+    const auth = requireRole(payload, []);
     if (!auth.success) return auth;
 
     const doctorName = String((payload && payload.doctor_name) || '').trim();
@@ -296,7 +296,7 @@ function addDoctorCompensationRule(payload) {
 
 function updateDoctorCompensationRule(payload) {
   try {
-    const auth = readAuthSession_(payload);
+    const auth = requireRole(payload, []);
     if (!auth.success) return auth;
 
     const doctorName = String((payload && payload.doctor_name) || '').trim();
@@ -336,7 +336,7 @@ function updateDoctorCompensationRule(payload) {
 
 function getDoctorMaterialDeductions(payload) {
   try {
-    const auth = readAuthSession_(payload);
+    const auth = requireRole(payload, ['admin_finance']);
     if (!auth.success) return auth;
 
     const doctorName = String((payload && payload.doctor_name) || '').trim();
@@ -389,7 +389,7 @@ function buildDeductionRow_(payload) {
 
 function addDoctorMaterialDeduction(payload) {
   try {
-    const auth = readAuthSession_(payload);
+    const auth = requireRole(payload, []);
     if (!auth.success) return auth;
 
     if (!payload.doctor_name) return { success: false, message: 'doctor_name wajib diisi.' };
@@ -408,7 +408,7 @@ function addDoctorMaterialDeduction(payload) {
 
 function updateDoctorMaterialDeduction(payload) {
   try {
-    const auth = readAuthSession_(payload);
+    const auth = requireRole(payload, []);
     if (!auth.success) return auth;
 
     const id = payload && payload.id;
@@ -451,7 +451,7 @@ function deleteDoctorMaterialDeduction(payload) {
 
 function calculateDoctorFeeDraft(payload) {
   try {
-    const auth = readAuthSession_(payload);
+    const auth = requireRole(payload, ['admin_finance']);
     if (!auth.success) return auth;
 
     const date = String((payload && payload.date) || formatTodayYmd()).trim();
@@ -546,11 +546,8 @@ function calculateDoctorFeeDraft(payload) {
 
 function confirmDoctorFeeToExpenses(payload) {
   try {
-    const auth = readAuthSession_(payload);
+    const auth = requireRole(payload, ['admin_finance']);
     if (!auth.success) return auth;
-    if (!userIsFullyPrivileged_(auth.user)) {
-      return { success: false, message: 'Hanya owner atau super admin yang bisa mengonfirmasi fee dokter.' };
-    }
 
     const date       = String((payload && payload.date) || '').trim();
     const doctorFees = Array.isArray(payload && payload.doctor_fees) ? payload.doctor_fees : [];

@@ -9,7 +9,7 @@ const SETTINGS_OPTS = { backend_mode: 'supabase' };
 
 function getAllSettingsData(payload) {
   try {
-    const auth = readAuthSession_(payload);
+    const auth = requireRole(payload, []);
     if (!auth.success) return auth;
 
     const results = supabaseSelectParallel_([
@@ -56,7 +56,7 @@ function getAllSettingsData(payload) {
 
 function getClinicInfo(payload) {
   try {
-    const auth = readAuthSession_(payload);
+    const auth = requireRole(payload, []);
     if (!auth.success) return auth;
     const rows = dbFindAll_('ClinicInfo', SETTINGS_OPTS);
     return { success: true, data: rows[0] || null };
@@ -67,7 +67,7 @@ function getClinicInfo(payload) {
 
 function updateClinicInfo(payload) {
   try {
-    const auth = readAuthSession_(payload);
+    const auth = requireRole(payload, []);
     if (!auth.success) return auth;
 
     const rows = dbFindAll_('ClinicInfo', SETTINGS_OPTS);
@@ -91,7 +91,7 @@ function updateClinicInfo(payload) {
 
 function getServiceCatalogList(payload) {
   try {
-    const auth = readAuthSession_(payload);
+    const auth = requireRole(payload, ['admin_appointment', 'admin_finance']);
     if (!auth.success) return auth;
     const includeInactive = payload && payload.include_inactive === true;
     const all = dbFindAll_('ServiceCatalog', SETTINGS_OPTS);
@@ -106,7 +106,7 @@ function getServiceCatalogList(payload) {
 
 function addServiceCatalog(payload) {
   try {
-    const auth = readAuthSession_(payload);
+    const auth = requireRole(payload, []);
     if (!auth.success) return auth;
 
     const name = String((payload && payload.service_name) || '').trim();
@@ -139,7 +139,7 @@ function addServiceCatalog(payload) {
 
 function updateServiceCatalog(payload) {
   try {
-    const auth = readAuthSession_(payload);
+    const auth = requireRole(payload, []);
     if (!auth.success) return auth;
 
     const serviceId = String((payload && payload.service_id) || '').trim();
@@ -232,7 +232,7 @@ function syncAppUserRoles_(userId, roles, clinicId) {
 
 function getUserList(payload) {
   try {
-    const auth = readAuthSession_(payload);
+    const auth = requireRole(payload, []);
     if (!auth.success) return auth;
 
     const users = dbFindAll_('Users', SETTINGS_OPTS);
@@ -269,11 +269,8 @@ function getUserList(payload) {
 
 function addUser(payload) {
   try {
-    const auth = readAuthSession_(payload);
+    const auth = requireRole(payload, []);
     if (!auth.success) return auth;
-    if (!userIsFullyPrivileged_(auth.user)) {
-      return { success: false, message: 'Hanya owner atau super admin yang bisa menambah pengguna.' };
-    }
 
     const username = String((payload && payload.username) || '').trim();
     const fullName = String((payload && payload.full_name) || '').trim();
@@ -323,11 +320,8 @@ function addUser(payload) {
 
 function updateUser(payload) {
   try {
-    const auth = readAuthSession_(payload);
+    const auth = requireRole(payload, []);
     if (!auth.success) return auth;
-    if (!userIsFullyPrivileged_(auth.user)) {
-      return { success: false, message: 'Hanya owner atau super admin yang bisa mengubah pengguna.' };
-    }
 
     const userId = String((payload && payload.user_id) || '').trim();
     if (!userId) return { success: false, message: 'user_id wajib diisi.' };
@@ -392,11 +386,8 @@ function deleteUser(payload) {
  */
 function generateTotpForUser(payload) {
   try {
-    const auth = readAuthSession_(payload);
+    const auth = requireRole(payload, []);
     if (!auth.success) return auth;
-    if (!userIsFullyPrivileged_(auth.user)) {
-      return { success: false, message: 'Hanya owner atau super admin yang bisa setup Authenticator.' };
-    }
 
     const userId = String((payload && payload.user_id) || '').trim();
     if (!userId) return { success: false, message: 'user_id wajib diisi.' };
@@ -450,11 +441,8 @@ function resetTotpForUser(payload) {
 
 function sendTotpSetupEmail(payload) {
   try {
-    const auth = readAuthSession_(payload);
+    const auth = requireRole(payload, []);
     if (!auth.success) return auth;
-    if (!userIsFullyPrivileged_(auth.user)) {
-      return { success: false, message: 'Hanya owner atau super admin yang bisa kirim setup link.' };
-    }
     const userId = String((payload && payload.user_id) || '').trim();
     if (!userId) return { success: false, message: 'user_id wajib diisi.' };
     const user = dbFindById_('Users', 'user_id', userId, SETTINGS_OPTS);
@@ -566,11 +554,8 @@ function markTotpSetupTokenUsed(token) {
  */
 function disableTotpForUser(payload) {
   try {
-    const auth = readAuthSession_(payload);
+    const auth = requireRole(payload, []);
     if (!auth.success) return auth;
-    if (!userIsFullyPrivileged_(auth.user)) {
-      return { success: false, message: 'Hanya owner atau super admin yang bisa disable Authenticator.' };
-    }
 
     const userId = String((payload && payload.user_id) || '').trim();
     if (!userId) return { success: false, message: 'user_id wajib diisi.' };

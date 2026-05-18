@@ -208,11 +208,8 @@ function validateServiceCatalogData(data, excludeServiceId) {
 }
 
 function createServiceCatalog(data) {
-  const auth = readAuthSession_(data);
+  const auth = requireRole(data, []);
   if (!auth.success) return auth;
-  if (auth.user.role !== 'admin' && auth.user.role !== 'owner') {
-    return { success: false, message: 'Hanya admin atau owner yang dapat menambah layanan.' };
-  }
 
   const errors = validateServiceCatalogData(data);
 
@@ -245,11 +242,8 @@ function createServiceCatalog(data) {
 }
 
 function updateServiceCatalog(data) {
-  const auth = readAuthSession_(data);
+  const auth = requireRole(data, []);
   if (!auth.success) return auth;
-  if (auth.user.role !== 'admin' && auth.user.role !== 'owner') {
-    return { success: false, message: 'Hanya admin atau owner yang dapat mengubah layanan.' };
-  }
 
   if (!data.service_id) {
     return {

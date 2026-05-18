@@ -234,7 +234,10 @@
         if (!dashboardCache[period]) renderDashboardError(msg);
         showToast(msg, 'error');
       })
-      .getDashboardOwnerSummary(period);
+      .getDashboardOwnerSummary({
+        session_token: getCurrentSessionToken(),
+        period: period
+      });
   }
 
   function renderDashboard(res) {

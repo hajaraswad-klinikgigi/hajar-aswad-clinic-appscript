@@ -477,8 +477,14 @@ function buildDashboardRecallSummary(recallRows) {
   };
 }
 
-function getDashboardOwnerSummary(period) {
-  const normalizedPeriod = String(period || 'today').toLowerCase();
+function getDashboardOwnerSummary(payload) {
+  const auth = requireRole(payload, []);
+  if (!auth.success) return auth;
+
+  const rawPeriod = (payload && typeof payload === 'object')
+    ? payload.period
+    : payload;
+  const normalizedPeriod = String(rawPeriod || 'today').toLowerCase();
   const dashboardReadOptions = getDashboardUiReadOptions_();
   const dashboardBackendMode = getDashboardUiReadBackendMode_();
 
