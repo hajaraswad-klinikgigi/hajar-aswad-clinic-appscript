@@ -306,4 +306,89 @@
     color: #cbd5e1;
     line-height: 1.5;
   }
+
+  /* =========================================================
+     Kebab menu (kolom Aksi)
+     ========================================================= */
+  .kebab-wrap {
+    position: relative;
+    display: inline-block;
+  }
+  .kebab-btn {
+    width: 30px;
+    height: 30px;
+    border: 1px solid #334155;
+    background: #1e293b;
+    border-radius: 8px;
+    cursor: pointer;
+    color: #cbd5e1;
+    font-size: 18px;
+    line-height: 1;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    transition: background 120ms ease, color 120ms ease, border-color 120ms ease;
+  }
+  .kebab-btn:hover {
+    background: #334155;
+    color: #f1f5f9;
+    border-color: #475569;
+  }
+  .kebab-btn:focus-visible {
+    outline: 2px solid #38bdf8;
+    outline-offset: 2px;
+  }
+  .kebab-menu {
+    display: none;
+    position: fixed;
+    min-width: 200px;
+    background: #0f172a;
+    border: 1px solid #334155;
+    border-radius: 10px;
+    box-shadow: 0 12px 32px rgba(0,0,0,0.45);
+    padding: 6px;
+    z-index: 9999;
+  }
+  .kebab-menu.open { display: block; }
+  .kebab-item {
+    display: block;
+    width: 100%;
+    text-align: left;
+    background: transparent;
+    border: none;
+    padding: 10px 14px;
+    font-size: 13px;
+    color: #e2e8f0;
+    cursor: pointer;
+    border-radius: 6px;
+    font-family: inherit;
+    line-height: 1.4;
+  }
+  .kebab-item:hover {
+    background: rgba(56,189,248,0.12);
+    color: #f1f5f9;
+  }
+  .kebab-item:focus-visible {
+    outline: 2px solid #38bdf8;
+    outline-offset: -2px;
+  }
+  .kebab-item-danger { color: #f87171; }
+  .kebab-item-danger:hover {
+    background: rgba(248,113,113,0.15);
+    color: #fca5a5;
+  }
+  .kebab-item-disabled {
+    color: #64748b;
+    cursor: not-allowed;
+  }
+  .kebab-item-disabled:hover {
+    background: transparent;
+    color: #64748b;
+  }
+  .kebab-divider {
+    border: none;
+    border-top: 1px solid #334155;
+    margin: 4px 0;
+  }
 </style>

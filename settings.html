@@ -235,15 +235,16 @@ function settingsRenderDoctorTab() {
       '<td>' + typeBadge + '</td>' +
       '<td style="font-size:12px;color:#94a3b8">' + detail + '</td>' +
       '<td>' + activeBadge + '</td>' +
-      '<td><div class="settings-row-actions">' +
-        settingsIconBtn_('edit', 'edit', 'Edit aturan fee',
-          "settingsOpenDoctorModal('" + escapeAppHtml(r.doctor_name) + "')") +
-        (r.is_active !== false
-          ? settingsIconBtn_('deactivate', 'power', 'Nonaktifkan',
-              "settingsDeactivateDoctor('" + escapeAppHtml(r.doctor_name) + "')")
-          : settingsIconBtn_('activate', 'checkCircle', 'Aktifkan',
-              "settingsActivateDoctor('" + escapeAppHtml(r.doctor_name) + "')")) +
-      '</div></td>' +
+      '<td>' + settingsKebabBtn_([
+        { label: 'Edit aturan fee',
+          onclick: "settingsOpenDoctorModal('" + escapeAppHtml(r.doctor_name) + "')" },
+        { divider: true },
+        r.is_active !== false
+          ? { label: 'Nonaktifkan', danger: true,
+              onclick: "settingsDeactivateDoctor('" + escapeAppHtml(r.doctor_name) + "')" }
+          : { label: 'Aktifkan',
+              onclick: "settingsActivateDoctor('" + escapeAppHtml(r.doctor_name) + "')" }
+      ]) + '</td>' +
     '</tr>';
   }).join('');
 
@@ -355,12 +356,13 @@ function settingsRenderDeductionTable() {
         '<td>' + catBadge + '</td>' +
         '<td style="font-size:12px;color:#64748b">' + settingsDeductionLabelType(d.deduction_type) + '</td>' +
         '<td>' + settingsDeductionLabelValue(d) + '</td>' +
-        '<td><div class="settings-row-actions">' +
-          settingsIconBtn_('edit', 'edit', 'Edit potongan',
-            'settingsOpenDeductionModal(' + d.id + ')') +
-          settingsIconBtn_('danger', 'trash', 'Hapus potongan',
-            'settingsDeleteDeduction(' + d.id + ')') +
-        '</div></td>' +
+        '<td>' + settingsKebabBtn_([
+          { label: 'Edit potongan',
+            onclick: 'settingsOpenDeductionModal(' + d.id + ')' },
+          { divider: true },
+          { label: 'Hapus potongan', danger: true,
+            onclick: 'settingsDeleteDeduction(' + d.id + ')' }
+        ]) + '</td>' +
       '</tr>';
     }).join('');
 
@@ -708,15 +710,16 @@ function settingsRenderServiceTab() {
       '<td>' + formatAppRupiah(s.default_price) + '</td>' +
       '<td>' + (flags || '-') + '</td>' +
       '<td>' + activeBadge + '</td>' +
-      '<td><div class="settings-row-actions">' +
-        settingsIconBtn_('edit', 'edit', 'Edit layanan',
-          "settingsOpenServiceModal('" + escapeAppHtml(s.service_id) + "')") +
-        (s.is_active !== false
-          ? settingsIconBtn_('deactivate', 'power', 'Nonaktifkan',
-              "settingsDeactivateService('" + escapeAppHtml(s.service_id) + "')")
-          : settingsIconBtn_('activate', 'checkCircle', 'Aktifkan',
-              "settingsActivateService('" + escapeAppHtml(s.service_id) + "')")) +
-      '</div></td>' +
+      '<td>' + settingsKebabBtn_([
+        { label: 'Edit layanan',
+          onclick: "settingsOpenServiceModal('" + escapeAppHtml(s.service_id) + "')" },
+        { divider: true },
+        s.is_active !== false
+          ? { label: 'Nonaktifkan', danger: true,
+              onclick: "settingsDeactivateService('" + escapeAppHtml(s.service_id) + "')" }
+          : { label: 'Aktifkan',
+              onclick: "settingsActivateService('" + escapeAppHtml(s.service_id) + "')" }
+      ]) + '</td>' +
     '</tr>';
   }).join('');
 
@@ -887,59 +890,95 @@ function settingsActivateService(serviceId) {
 /* =========================================================
    TAB 4 — MANAJEMEN USER
    ========================================================= */
-var SETTINGS_ICON_SVG = {
-  edit:
-    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">' +
-      '<path d="M12 20h9"></path>' +
-      '<path d="M16.5 3.5a2.12 2.12 0 1 1 3 3L7 19l-4 1 1-4 12.5-12.5z"></path>' +
-    '</svg>',
-  trash:
-    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">' +
-      '<polyline points="3 6 5 6 21 6"></polyline>' +
-      '<path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"></path>' +
-      '<path d="M10 11v6"></path><path d="M14 11v6"></path>' +
-      '<path d="M9 6V4h6v2"></path>' +
-    '</svg>',
-  power:
-    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' +
-      '<path d="M18.36 6.64a9 9 0 1 1-12.73 0"></path>' +
-      '<line x1="12" y1="2" x2="12" y2="12"></line>' +
-    '</svg>',
-  checkCircle:
-    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' +
-      '<path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>' +
-      '<polyline points="22 4 12 14.01 9 11.01"></polyline>' +
-    '</svg>',
-  shield:
-    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' +
-      '<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>' +
-      '<polyline points="9 12 11 14 15 10"></polyline>' +
-    '</svg>',
-  smartphone:
-    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' +
-      '<rect x="5" y="2" width="14" height="20" rx="2" ry="2"></rect>' +
-      '<line x1="12" y1="18" x2="12" y2="18"></line>' +
-    '</svg>',
-  refresh:
-    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' +
-      '<polyline points="23 4 23 10 17 10"></polyline>' +
-      '<polyline points="1 20 1 14 7 14"></polyline>' +
-      '<path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>' +
-    '</svg>',
-  envelope:
-    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' +
-      '<path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path>' +
-      '<polyline points="22,6 12,13 2,6"></polyline>' +
-    '</svg>'
-};
 
-function settingsIconBtn_(variant, icon, title, onclickAttr) {
-  return '<button type="button" class="icon-btn ' + variant + '" ' +
-    'title="' + escapeAppHtml(title) + '" aria-label="' + escapeAppHtml(title) + '" ' +
-    'onclick="' + onclickAttr + '">' +
-    SETTINGS_ICON_SVG[icon] +
-    '</button>';
+/**
+ * Render tombol kebab + floating menu untuk kolom Aksi.
+ *
+ * items: array of { label, onclick, danger, divider, disabled }
+ *   - { divider: true } → garis pemisah, item lainnya diabaikan
+ *   - { disabled: true } → item tampil abu-abu, tidak bisa diklik
+ *
+ * onclick disisipkan ke atribut HTML — caller WAJIB sudah escape value
+ * yang masuk (pakai escapeAppHtml untuk substring user-input).
+ */
+function settingsKebabBtn_(items) {
+  var itemsHtml = (items || []).map(function(it) {
+    if (it && it.divider) {
+      return '<hr class="kebab-divider"/>';
+    }
+    var cls = 'kebab-item';
+    if (it.danger)   cls += ' kebab-item-danger';
+    if (it.disabled) cls += ' kebab-item-disabled';
+    var onclick = it.disabled
+      ? 'event.stopPropagation();'
+      : 'settingsKebabClose_();' + (it.onclick || '');
+    return '<button type="button" class="' + cls + '" ' +
+      'onclick="' + onclick + '">' +
+      escapeAppHtml(it.label || '') +
+      '</button>';
+  }).join('');
+
+  return '<div class="kebab-wrap">' +
+    '<button type="button" class="kebab-btn" aria-haspopup="true" aria-expanded="false" ' +
+      'aria-label="Pilihan aksi" onclick="settingsKebabToggle_(this, event)">' +
+      '&#x22EE;' + // ⋮ vertical ellipsis
+    '</button>' +
+    '<div class="kebab-menu" role="menu">' + itemsHtml + '</div>' +
+  '</div>';
 }
+
+function settingsKebabClose_() {
+  document.querySelectorAll('.kebab-menu.open').forEach(function(m) {
+    m.classList.remove('open');
+    var btn = m.previousElementSibling;
+    if (btn) btn.setAttribute('aria-expanded', 'false');
+  });
+}
+
+function settingsKebabPosition_(btn, menu) {
+  var rect = btn.getBoundingClientRect();
+  menu.style.position = 'fixed';
+  menu.style.visibility = 'hidden';
+  menu.classList.add('open');
+  var menuW = menu.offsetWidth;
+  var menuH = menu.offsetHeight;
+  menu.classList.remove('open');
+  menu.style.visibility = '';
+
+  var spaceBelow = window.innerHeight - rect.bottom;
+  var top = (spaceBelow >= menuH + 8)
+    ? rect.bottom + 4
+    : Math.max(8, rect.top - menuH - 4);
+
+  var spaceRight = window.innerWidth - rect.right;
+  var left = (spaceRight >= menuW)
+    ? rect.right - menuW
+    : Math.max(8, rect.left - menuW + rect.width);
+
+  menu.style.top = top + 'px';
+  menu.style.left = left + 'px';
+}
+
+function settingsKebabToggle_(btn, ev) {
+  ev.stopPropagation();
+  var menu = btn.nextElementSibling;
+  if (!menu) return;
+  var wasOpen = menu.classList.contains('open');
+  settingsKebabClose_();
+  if (!wasOpen) {
+    settingsKebabPosition_(btn, menu);
+    menu.classList.add('open');
+    btn.setAttribute('aria-expanded', 'true');
+  }
+}
+
+// Tutup menu saat klik di luar atau tekan Escape.
+document.addEventListener('click', settingsKebabClose_);
+document.addEventListener('keydown', function(e) {
+  if (e.key === 'Escape') settingsKebabClose_();
+});
+window.addEventListener('resize', settingsKebabClose_);
+window.addEventListener('scroll', settingsKebabClose_, true);
 
 var SETTINGS_ROLE_OPTIONS = [
   { key: 'owner',             label: 'Owner' },
@@ -1016,31 +1055,29 @@ function settingsRenderUserTab() {
     var rolesJsArg = JSON.stringify(u.roles || []).replace(/"/g, '&quot;');
     var emailJsArg = "'" + escapeAppHtml(u.email || '') + "'";
     var fullNameJsArg = "'" + escapeAppHtml(u.full_name || u.username || '') + "'";
-    var totpBtn = u.totp_enabled
-      ? settingsIconBtn_('refresh', 'refresh', 'Reset Authenticator (HP staff baru)',
-          "settingsOpenTotpModal('" + escapeAppHtml(u.user_id) + "'," + fullNameJsArg + ',true)')
-      : settingsIconBtn_('edit', 'smartphone', 'Setup Authenticator (tampil QR)',
-          "settingsOpenTotpModal('" + escapeAppHtml(u.user_id) + "'," + fullNameJsArg + ',false)');
-    var emailSetupBtn = u.email
-      ? settingsIconBtn_('detail', 'envelope', 'Kirim link setup ke email staff',
-          "settingsSendTotpSetupEmail('" + escapeAppHtml(u.user_id) + "'," + fullNameJsArg + ')')
-      : '';
+    var kebabItems = [
+      { label: 'Edit pengguna',
+        onclick: "settingsOpenEditRolesModal('" + escapeAppHtml(u.user_id) + "','" + escapeAppHtml(u.username) + "'," + rolesJsArg + ',' + emailJsArg + ')' },
+      { label: u.totp_enabled ? 'Reset Authenticator (HP staff baru)' : 'Setup Authenticator (tampil QR)',
+        onclick: "settingsOpenTotpModal('" + escapeAppHtml(u.user_id) + "'," + fullNameJsArg + ',' + (u.totp_enabled ? 'true' : 'false') + ')' }
+    ];
+    if (u.email) {
+      kebabItems.push({ label: 'Kirim link setup ke email',
+        onclick: "settingsSendTotpSetupEmail('" + escapeAppHtml(u.user_id) + "'," + fullNameJsArg + ')' });
+    }
+    kebabItems.push({ divider: true });
+    kebabItems.push(u.is_active !== false
+      ? { label: 'Nonaktifkan pengguna', danger: true,
+          onclick: "settingsDeactivateUser('" + escapeAppHtml(u.user_id) + "','" + escapeAppHtml(u.username) + "')" }
+      : { label: 'Aktifkan pengguna',
+          onclick: "settingsActivateUser('" + escapeAppHtml(u.user_id) + "')" });
+
     return '<tr>' +
       '<td style="min-width:180px">' + escapeAppHtml(u.full_name||'') + inactiveTag + '</td>' +
       '<td style="min-width:200px;max-width:260px">' + emailDisplay + '</td>' +
       '<td style="min-width:180px">' + settingsFormatRolesChips_(u.roles) + '</td>' +
       '<td style="white-space:nowrap;text-align:center">' + totpBadge + '</td>' +
-      '<td><div class="settings-row-actions">' +
-        settingsIconBtn_('edit', 'shield', 'Edit pengguna',
-          "settingsOpenEditRolesModal('" + escapeAppHtml(u.user_id) + "','" + escapeAppHtml(u.username) + "'," + rolesJsArg + ',' + emailJsArg + ')') +
-        totpBtn +
-        emailSetupBtn +
-        (u.is_active !== false
-          ? settingsIconBtn_('deactivate', 'power', 'Nonaktifkan pengguna',
-              "settingsDeactivateUser('" + escapeAppHtml(u.user_id) + "','" + escapeAppHtml(u.username) + "')")
-          : settingsIconBtn_('activate', 'checkCircle', 'Aktifkan pengguna',
-              "settingsActivateUser('" + escapeAppHtml(u.user_id) + "')")) +
-      '</div></td>' +
+      '<td>' + settingsKebabBtn_(kebabItems) + '</td>' +
     '</tr>';
   }).join('');
 
