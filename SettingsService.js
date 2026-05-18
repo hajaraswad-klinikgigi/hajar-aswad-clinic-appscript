@@ -488,7 +488,7 @@ function sendTotpSetupEmail(payload) {
 
     const htmlBody =
       '<div style="font-family:Arial,sans-serif;max-width:560px;margin:0 auto;color:#1a2035">' +
-        '<h2>Halo ' + escapeAppHtml(fullName) + ',</h2>' +
+        '<h2>Halo ' + escapeHtmlServer_(fullName) + ',</h2>' +
         '<p>Admin klinik baru saja generate setup Google Authenticator untuk akun Anda di sistem Klinik Hajar Aswad.</p>' +
         '<p><strong>Sebelum mulai, install app <a href="https://play.google.com/store/apps/details?id=com.google.android.apps.authenticator2">Google Authenticator</a> di HP Anda (gratis).</strong></p>' +
         '<p>Setelah app terpasang, klik tombol di bawah untuk buka halaman setup berisi QR code:</p>' +

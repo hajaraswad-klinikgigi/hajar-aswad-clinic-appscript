@@ -187,6 +187,21 @@ function include(filename) {
   return HtmlService.createHtmlOutputFromFile(filename).getContent();
 }
 
+/**
+ * Server-side HTML escape — dipakai untuk email body, log, dan
+ * pesan error yang mengandung user input. Setara dengan
+ * `escapeAppHtml` di scripts.html (client-side), tapi safe dipanggil
+ * dari V8 runtime Apps Script.
+ */
+function escapeHtmlServer_(value) {
+  return String(value == null ? '' : value)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
+
 function getSpreadsheet() {
   if (!_spreadsheet) {
     _spreadsheet = SpreadsheetApp.openById(SPREADSHEET_ID);
