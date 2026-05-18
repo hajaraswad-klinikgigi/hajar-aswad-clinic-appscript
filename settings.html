@@ -232,11 +232,11 @@ function settingsRenderDoctorTab() {
           deductionCount         ? deductionCount + ' aturan potongan'             : 'Tanpa potongan'
         ].filter(Boolean).join(' &bull; ');
     return '<tr>' +
-      '<td style="min-width:280px;white-space:nowrap">' + escapeAppHtml(r.doctor_name) + '</td>' +
-      '<td style="width:1%;white-space:nowrap">' + typeBadge + '</td>' +
-      '<td style="min-width:380px;font-size:12px;color:#94a3b8">' + detail + '</td>' +
-      '<td style="width:1%;white-space:nowrap">' + activeBadge + '</td>' +
-      '<td style="width:1%;white-space:nowrap;text-align:right">' + settingsKebabBtn_([
+      '<td>' + escapeAppHtml(r.doctor_name) + '</td>' +
+      '<td>' + typeBadge + '</td>' +
+      '<td style="font-size:12px;color:#94a3b8">' + detail + '</td>' +
+      '<td>' + activeBadge + '</td>' +
+      '<td style="text-align:right">' + settingsKebabBtn_([
         { label: 'Edit aturan fee',
           onclick: "settingsOpenDoctorModal('" + escapeAppHtml(r.doctor_name) + "')" },
         { divider: true },
@@ -255,13 +255,13 @@ function settingsRenderDoctorTab() {
         '<div class="settings-table-title">Aturan Fee Dokter</div>' +
         '<button class="btn btn-primary" style="padding:7px 14px;font-size:13px" onclick="settingsOpenDoctorModal(null)">+ Tambah Dokter</button>' +
       '</div>' +
-      '<div class="table-wrapper"><table class="table">' +
+      '<div class="table-wrapper"><table class="table" style="table-layout:fixed;width:100%">' +
         '<thead><tr>' +
-          '<th style="min-width:280px">Nama Dokter</th>' +
-          '<th style="width:1%;white-space:nowrap">Tipe</th>' +
-          '<th style="min-width:380px">Detail</th>' +
-          '<th style="width:1%;white-space:nowrap">Status</th>' +
-          '<th style="width:1%;white-space:nowrap;text-align:right">Aksi</th>' +
+          '<th style="width:25%">Nama Dokter</th>' +
+          '<th style="width:12%">Tipe</th>' +
+          '<th style="width:33%">Detail</th>' +
+          '<th style="width:13%">Status</th>' +
+          '<th style="width:17%;text-align:right">Aksi</th>' +
         '</tr></thead>' +
         '<tbody>' + (rows || '<tr><td colspan="5" class="settings-empty">Belum ada data</td></tr>') + '</tbody>' +
       '</table></div>' +
@@ -712,11 +712,11 @@ function settingsRenderServiceTab() {
       s.is_ortho_control ? '<span class="settings-badge settings-badge-fixed">Kontrol</span>' : ''
     ].filter(Boolean).join(' ');
     return '<tr>' +
-      '<td style="min-width:340px">' + escapeAppHtml(s.service_name||'') + '</td>' +
-      '<td style="width:1%;white-space:nowrap">' + formatAppRupiah(s.default_price) + '</td>' +
-      '<td style="width:1%;white-space:nowrap">' + (flags || '-') + '</td>' +
-      '<td style="width:1%;white-space:nowrap">' + activeBadge + '</td>' +
-      '<td style="width:1%;white-space:nowrap;text-align:right">' + settingsKebabBtn_([
+      '<td>' + escapeAppHtml(s.service_name||'') + '</td>' +
+      '<td>' + formatAppRupiah(s.default_price) + '</td>' +
+      '<td>' + (flags || '-') + '</td>' +
+      '<td>' + activeBadge + '</td>' +
+      '<td style="text-align:right">' + settingsKebabBtn_([
         { label: 'Edit layanan',
           onclick: "settingsOpenServiceModal('" + escapeAppHtml(s.service_id) + "')" },
         { divider: true },
@@ -735,13 +735,13 @@ function settingsRenderServiceTab() {
         '<div class="settings-table-title">Katalog Layanan</div>' +
         '<button class="btn btn-primary" style="padding:7px 14px;font-size:13px" onclick="settingsOpenServiceModal(null)">+ Tambah Layanan</button>' +
       '</div>' +
-      '<div class="table-wrapper"><table class="table">' +
+      '<div class="table-wrapper"><table class="table" style="table-layout:fixed;width:100%">' +
         '<thead><tr>' +
-          '<th style="min-width:340px">Nama Layanan</th>' +
-          '<th style="width:1%;white-space:nowrap">Harga Default</th>' +
-          '<th style="width:1%;white-space:nowrap">Flag Ortho</th>' +
-          '<th style="width:1%;white-space:nowrap">Status</th>' +
-          '<th style="width:1%;white-space:nowrap;text-align:right">Aksi</th>' +
+          '<th style="width:42%">Nama Layanan</th>' +
+          '<th style="width:18%">Harga Default</th>' +
+          '<th style="width:12%">Flag Ortho</th>' +
+          '<th style="width:12%">Status</th>' +
+          '<th style="width:16%;text-align:right">Aksi</th>' +
         '</tr></thead>' +
         '<tbody>' + (rows || '<tr><td colspan="5" class="settings-empty">Belum ada data</td></tr>') + '</tbody>' +
       '</table></div>' +
@@ -1085,11 +1085,11 @@ function settingsRenderUserTab() {
           onclick: "settingsActivateUser('" + escapeAppHtml(u.user_id) + "')" });
 
     return '<tr>' +
-      '<td style="min-width:240px;white-space:nowrap">' + escapeAppHtml(u.full_name||'') + inactiveTag + '</td>' +
-      '<td style="min-width:280px">' + emailDisplay + '</td>' +
-      '<td style="width:1%;white-space:nowrap">' + settingsFormatRolesChips_(u.roles) + '</td>' +
-      '<td style="width:1%;white-space:nowrap;text-align:center">' + totpBadge + '</td>' +
-      '<td style="width:1%;white-space:nowrap;text-align:right">' + settingsKebabBtn_(kebabItems) + '</td>' +
+      '<td>' + escapeAppHtml(u.full_name||'') + inactiveTag + '</td>' +
+      '<td>' + emailDisplay + '</td>' +
+      '<td>' + settingsFormatRolesChips_(u.roles) + '</td>' +
+      '<td style="text-align:center">' + totpBadge + '</td>' +
+      '<td style="text-align:right">' + settingsKebabBtn_(kebabItems) + '</td>' +
     '</tr>';
   }).join('');
 
@@ -1099,13 +1099,13 @@ function settingsRenderUserTab() {
         '<div class="settings-table-title">Pengguna</div>' +
         '<button class="btn btn-primary" style="padding:7px 14px;font-size:13px" onclick="settingsOpenUserModal()">+ Tambah Pengguna</button>' +
       '</div>' +
-      '<div class="table-wrapper"><table class="table" style="table-layout:auto">' +
+      '<div class="table-wrapper"><table class="table" style="table-layout:fixed;width:100%">' +
         '<thead><tr>' +
-          '<th style="min-width:240px">Nama Lengkap</th>' +
-          '<th style="min-width:280px">Email Google</th>' +
-          '<th style="width:1%;white-space:nowrap">Roles</th>' +
-          '<th style="width:1%;white-space:nowrap;text-align:center">Authenticator</th>' +
-          '<th style="width:1%;white-space:nowrap;text-align:right">Aksi</th>' +
+          '<th style="width:22%">Nama Lengkap</th>' +
+          '<th style="width:30%">Email Google</th>' +
+          '<th style="width:18%">Roles</th>' +
+          '<th style="width:13%;text-align:center">Authenticator</th>' +
+          '<th style="width:17%;text-align:right">Aksi</th>' +
         '</tr></thead>' +
         '<tbody>' + (rows || '<tr><td colspan="5" class="settings-empty">Belum ada data</td></tr>') + '</tbody>' +
       '</table></div>' +

@@ -84,6 +84,29 @@
   //   4. Sukses → set currentUser + show dashboard
   //   5. Setelah login, kalau role staff (admin_*) → enable auto-logout 10min
 
+  /**
+   * Auto-submit login saat user input 6 digit kode TOTP.
+   * Filter karakter non-digit, lalu trigger submitLogin kalau email
+   * sudah diisi & kode lengkap. Cegah double-submit pakai flag.
+   */
+  var loginAutoSubmitInFlight_ = false;
+  function loginTotpAutoSubmit_(inputEl) {
+    if (!inputEl) return;
+    var cleaned = String(inputEl.value || '').replace(/\D/g, '').slice(0, 6);
+    if (cleaned !== inputEl.value) inputEl.value = cleaned;
+    if (cleaned.length !== 6) return;
+    if (loginAutoSubmitInFlight_) return;
+
+    var emailEl = document.getElementById('loginEmail');
+    var email = String((emailEl && emailEl.value) || '').trim();
+    if (!email) {
+      if (emailEl) emailEl.focus();
+      return;
+    }
+    loginAutoSubmitInFlight_ = true;
+    submitLogin(null);
+  }
+
   function submitLogin(e) {
     if (e && e.preventDefault) e.preventDefault();
     var email = String(document.getElementById('loginEmail').value || '').trim().toLowerCase();
@@ -104,12 +127,13 @@
 
     google.script.run
       .withSuccessHandler(function(res) {
+        loginAutoSubmitInFlight_ = false;
         if (btn) { btn.disabled = false; btn.textContent = 'Login'; }
         if (!res || !res.success) {
           setLoadingState((res && res.message) || 'Login gagal');
           // Clear field code supaya user input kode baru (TOTP refresh 30 detik).
           var codeEl = document.getElementById('loginTotpCode');
-          if (codeEl) codeEl.value = '';
+          if (codeEl) { codeEl.value = ''; codeEl.focus(); }
           return;
         }
         clearLoadingState();
@@ -119,6 +143,7 @@
         maybeStartInactivityWatch_();
       })
       .withFailureHandler(function(err) {
+        loginAutoSubmitInFlight_ = false;
         if (btn) { btn.disabled = false; btn.textContent = 'Login'; }
         setLoadingState('Error: ' + (err && err.message ? err.message : err));
       })

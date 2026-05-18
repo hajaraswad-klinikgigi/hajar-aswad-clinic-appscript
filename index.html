@@ -38,7 +38,7 @@
           <input type="email" id="loginEmail" placeholder="email@gmail.com" autocomplete="username" required>
 
           <label style="font-size:11px;color:#94a3b8;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:6px;margin-top:8px;display:block">Kode Authenticator</label>
-          <input type="text" id="loginTotpCode" placeholder="6 digit" inputmode="numeric" pattern="[0-9]*" maxlength="6" autocomplete="one-time-code" required style="letter-spacing:0.3em;font-size:18px;text-align:center;font-weight:700">
+          <input type="text" id="loginTotpCode" placeholder="6 digit" inputmode="numeric" pattern="[0-9]*" maxlength="6" autocomplete="one-time-code" required oninput="loginTotpAutoSubmit_(this)" style="letter-spacing:0.3em;font-size:18px;text-align:center;font-weight:700">
           <p style="color:#64748b;font-size:11px;margin:-6px 0 14px;text-align:center;line-height:1.5">
             Buka app <strong>Google Authenticator</strong> di HP Anda, lalu masukkan 6 digit kode yang muncul.
           </p>

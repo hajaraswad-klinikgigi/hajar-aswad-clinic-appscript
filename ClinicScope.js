@@ -55,7 +55,11 @@ function clinicScopeFilter_(payload) {
  */
 const CLINIC_SCOPE_EXEMPT_TABLES = Object.freeze({
   clinics: true,
-  app_user_roles: true
+  app_user_roles: true,
+  // totp_setup_tokens tidak punya kolom clinic_id — token user-scoped
+  // (linked via user_id FK ke app_users). Auto-scope injection bakal
+  // gagal dengan "column not found".
+  totp_setup_tokens: true
 });
 
 function clinicScopeAppliesToTable_(targetTable) {
