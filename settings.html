@@ -1084,11 +1084,11 @@ function settingsRenderUserTab() {
           onclick: "settingsActivateUser('" + escapeAppHtml(u.user_id) + "')" });
 
     return '<tr>' +
-      '<td style="min-width:180px">' + escapeAppHtml(u.full_name||'') + inactiveTag + '</td>' +
-      '<td style="min-width:200px;max-width:260px">' + emailDisplay + '</td>' +
-      '<td style="min-width:180px">' + settingsFormatRolesChips_(u.roles) + '</td>' +
-      '<td style="white-space:nowrap;text-align:center">' + totpBadge + '</td>' +
-      '<td style="text-align:right">' + settingsKebabBtn_(kebabItems) + '</td>' +
+      '<td style="min-width:240px;white-space:nowrap">' + escapeAppHtml(u.full_name||'') + inactiveTag + '</td>' +
+      '<td style="min-width:280px">' + emailDisplay + '</td>' +
+      '<td style="width:1%;white-space:nowrap">' + settingsFormatRolesChips_(u.roles) + '</td>' +
+      '<td style="width:1%;white-space:nowrap;text-align:center">' + totpBadge + '</td>' +
+      '<td style="width:1%;white-space:nowrap;text-align:right">' + settingsKebabBtn_(kebabItems) + '</td>' +
     '</tr>';
   }).join('');
 
@@ -1099,7 +1099,13 @@ function settingsRenderUserTab() {
         '<button class="btn btn-primary" style="padding:7px 14px;font-size:13px" onclick="settingsOpenUserModal()">+ Tambah Pengguna</button>' +
       '</div>' +
       '<div class="table-wrapper"><table class="table" style="table-layout:auto">' +
-        '<thead><tr><th style="min-width:180px">Nama Lengkap</th><th style="min-width:200px">Email Google</th><th style="min-width:180px">Roles</th><th style="text-align:center">Authenticator</th><th style="text-align:right">Aksi</th></tr></thead>' +
+        '<thead><tr>' +
+          '<th style="min-width:240px">Nama Lengkap</th>' +
+          '<th style="min-width:280px">Email Google</th>' +
+          '<th style="width:1%;white-space:nowrap">Roles</th>' +
+          '<th style="width:1%;white-space:nowrap;text-align:center">Authenticator</th>' +
+          '<th style="width:1%;white-space:nowrap;text-align:right">Aksi</th>' +
+        '</tr></thead>' +
         '<tbody>' + (rows || '<tr><td colspan="5" class="settings-empty">Belum ada data</td></tr>') + '</tbody>' +
       '</table></div>' +
     '</div>' +
