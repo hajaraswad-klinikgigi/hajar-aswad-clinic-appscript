@@ -46,9 +46,16 @@ function clinicScopeFilter_(payload) {
 /**
  * Tabel yang TIDAK perlu di-scope per klinik (master config
  * lintas klinik). Bukan tabel mutasi data klinik.
+ *
+ * `app_user_roles` exempt karena owner & super_admin pakai
+ * clinic_id = NULL (global scope, migration 009). Auto-scope
+ * `clinic_id eq.KLINIK-1` akan melewatkan row global tsb.
+ * Call site di Auth.js / SettingsService sudah filter manual
+ * by user_id, jadi aman tanpa auto-scope.
  */
 const CLINIC_SCOPE_EXEMPT_TABLES = Object.freeze({
-  clinics: true
+  clinics: true,
+  app_user_roles: true
 });
 
 function clinicScopeAppliesToTable_(targetTable) {
