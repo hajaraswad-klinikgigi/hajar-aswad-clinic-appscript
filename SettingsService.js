@@ -482,7 +482,7 @@ function sendTotpSetupEmail(payload) {
       created_by: String(auth.user.user_id || '')
     }, SETTINGS_OPTS);
 
-    const webAppUrl = ScriptApp.getService().getUrl();
+    const webAppUrl = getAppWebAppUrl_();
     const setupUrl = webAppUrl + '?totp_setup_token=' + encodeURIComponent(token);
     const fullName = String(user.full_name || '').trim() || user.email;
 
@@ -505,7 +505,8 @@ function sendTotpSetupEmail(payload) {
     MailApp.sendEmail({
       to: user.email,
       subject: '[Klinik Hajar Aswad] Setup Google Authenticator Anda',
-      htmlBody: htmlBody
+      htmlBody: htmlBody,
+      name: 'Klinik Hajar Aswad'
     });
 
     return {

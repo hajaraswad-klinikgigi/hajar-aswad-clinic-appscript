@@ -1215,7 +1215,8 @@ function sendBillingInvoiceEmail(payload) {
         customMessage,
         emailBuildOptions
       ),
-      attachments: [pdfData.blob]
+      attachments: [pdfData.blob],
+      name: 'Klinik Hajar Aswad'
     });
 
     const now = nowIso();
