@@ -205,23 +205,16 @@ function escapeHtmlServer_(value) {
 /* =========================================================
    WEB APP URL HELPER (untuk link di email)
    =========================================================
-   ScriptApp.getService().getUrl() defaultnya kembalikan URL
-   deployment ter-PUBLISH (/exec). Saat Phase 2C ini, /exec masih
-   state lama (pre-deploy) dan tidak punya fix terbaru — email
-   link yang point ke /exec kena bug.
+   Pakai ScriptApp.getService().getUrl() yang kembalikan URL
+   deployment ter-PUBLISH (/exec). /dev URL tidak boleh dipakai
+   untuk link email karena hanya bisa diakses script editor.
 
-   Override `WEB_APP_URL_OVERRIDE` di bawah supaya email link
-   point ke /dev selama testing. Setelah deploy /exec final,
-   ganti ke '' (pakai getService().getUrl()) atau 'exec'.
+   Selama deployment /exec belum punya fix terbaru, email-link
+   feature (TOTP setup link, invoice link) akan kena bug routing
+   di /exec lama. Solusi: deploy /exec dengan code latest dulu.
    ========================================================= */
 
-const WEB_APP_URL_OVERRIDE = 'dev'; // 'dev' | 'exec' | ''
-
 function getAppWebAppUrl_() {
-  const override = String(WEB_APP_URL_OVERRIDE || '').trim().toLowerCase();
-  if (override === 'dev' || override === 'exec') {
-    return 'https://script.google.com/macros/s/' + ScriptApp.getScriptId() + '/' + override;
-  }
   return ScriptApp.getService().getUrl();
 }
 
