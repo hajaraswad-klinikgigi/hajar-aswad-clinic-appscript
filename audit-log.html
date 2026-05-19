@@ -1,3 +1,167 @@
+<style>
+  /* =========================================================
+     AUDIT LOG (AKTIVITAS) — page-specific styles
+     Filter UI re-uses `.recall-*` classes dari style-recall.html
+     (same dark-theme toolbar/chip/panel pattern).
+     Diff table tetap pakai class `.activity-diff-*` (unique).
+     ========================================================= */
+  .activity-banner {
+    margin: 0 0 16px;
+    padding: 10px 14px;
+    background: rgba(79, 110, 247, 0.08);
+    border: 1px solid rgba(79, 110, 247, 0.30);
+    border-radius: 10px;
+    font-size: 12px;
+    color: #bfdbfe;
+    line-height: 1.5;
+  }
+
+  /* Override recall grid utk 4 filter field di Aktivitas */
+  #activityFiltersPanel .recall-filter-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+  @media (max-width: 1024px) {
+    #activityFiltersPanel .recall-filter-grid {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+  }
+  @media (max-width: 600px) {
+    #activityFiltersPanel .recall-filter-grid {
+      grid-template-columns: 1fr;
+    }
+  }
+
+  /* Main table cells */
+  .activity-time-main {
+    font-size: 12px;
+    color: #e2e8f0;
+  }
+  .activity-time-sub {
+    font-size: 10.5px;
+    color: #64748b;
+  }
+  .activity-entity-id {
+    margin-top: 2px;
+    font-size: 10.5px;
+    color: #64748b;
+    word-break: break-all;
+  }
+  .activity-actor-id {
+    font-size: 12px;
+    color: #e2e8f0;
+    word-break: break-all;
+  }
+  .activity-actor-roles {
+    margin-top: 2px;
+    font-size: 10.5px;
+    color: #64748b;
+  }
+  .activity-notes-cell {
+    font-size: 12px;
+    color: #cbd5e1;
+    word-break: break-word;
+  }
+
+  /* Detail modal info block (inside dark settings-modal-box) */
+  .activity-detail-info {
+    display: grid;
+    grid-template-columns: 100px 1fr;
+    gap: 8px 14px;
+    margin-bottom: 14px;
+    padding: 12px 14px;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.07);
+    border-radius: 10px;
+    font-size: 12px;
+  }
+  .activity-detail-info dt {
+    font-weight: 700;
+    color: #94a3b8;
+    margin: 0;
+  }
+  .activity-detail-info dd {
+    margin: 0;
+    color: #e2e8f0;
+    word-break: break-word;
+  }
+  .activity-detail-info dd.activity-notes {
+    white-space: pre-wrap;
+    color: #cbd5e1;
+  }
+
+  /* Diff table */
+  .activity-diff {
+    border: 1px solid rgba(255, 255, 255, 0.10);
+    border-radius: 10px;
+    overflow: hidden;
+  }
+  .activity-diff-header,
+  .activity-diff-row {
+    display: grid;
+    grid-template-columns: 170px 1fr 1fr;
+    gap: 0;
+  }
+  .activity-diff-header > div,
+  .activity-diff-row > div {
+    padding: 9px 12px;
+    font-size: 12px;
+    word-break: break-word;
+    white-space: pre-wrap;
+  }
+  .activity-diff-header {
+    background: rgba(255, 255, 255, 0.05);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.10);
+  }
+  .activity-diff-header > div {
+    font-weight: 700;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+  .activity-diff-header > div + div {
+    border-left: 1px solid rgba(255, 255, 255, 0.10);
+  }
+  .activity-diff-row + .activity-diff-row {
+    border-top: 1px solid rgba(255, 255, 255, 0.05);
+  }
+  .activity-diff-row > div + div {
+    border-left: 1px solid rgba(255, 255, 255, 0.05);
+  }
+  .activity-diff-field {
+    background: rgba(255, 255, 255, 0.03);
+    color: #94a3b8;
+    font-weight: 600;
+  }
+  .activity-diff-value {
+    color: #e2e8f0;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 11.5px;
+  }
+  .activity-diff-value-muted {
+    color: #64748b;
+    font-style: italic;
+    font-family: inherit;
+  }
+
+  .activity-diff-cell-changed  { background: rgba(234, 179, 8, 0.12); }
+  .activity-diff-cell-added    { background: rgba(34, 197, 94, 0.14); }
+  .activity-diff-cell-removed  { background: rgba(239, 68, 68, 0.13); }
+  .activity-diff-cell-neutral  { background: transparent; }
+
+  .activity-diff-empty {
+    padding: 24px;
+    text-align: center;
+    color: #64748b;
+    font-size: 12.5px;
+    border: 1px dashed rgba(255, 255, 255, 0.10);
+    border-radius: 10px;
+  }
+
+  .activity-header-color-before { color: #fca5a5; }
+  .activity-header-color-after  { color: #86efac; }
+  .activity-header-color-muted  { color: #64748b; }
+</style>
+
 <script>
 /* =========================================================
    AUDIT LOG (AKTIVITAS) PAGE — STATE
@@ -11,6 +175,9 @@ var activityAllowedEntityTypes = null;
 var activityActiveSince = '2026-05-19';
 var activityFiltersApplied = {};
 var activityLoading = false;
+var activityFiltersExpanded = false;
+var activitySearchDebounce = null;
+var ACTIVITY_SEARCH_DEBOUNCE_MS = 280;
 
 var ACTIVITY_ENTITY_TYPE_LABELS = {
   patient:                   'Pasien',
@@ -75,50 +242,101 @@ function showActivityPage() {
         '<div class="owner-subtitle">Rekam jejak perubahan data oleh seluruh pengguna staff klinik</div>' +
       '</div>' +
 
-      '<div id="activityBanner" style="margin:0 0 16px;padding:10px 14px;background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;font-size:12px;color:#1e40af;line-height:1.5">' +
+      '<div class="activity-banner">' +
         '<strong>Catatan:</strong> Audit log mulai aktif sejak <strong>' + escapeAppHtml(activityActiveSince) + '</strong>. Perubahan sebelum tanggal tersebut tidak tercatat di halaman ini.' +
       '</div>' +
 
-      '<div id="activityFilterArea" style="margin:0 0 12px"></div>' +
-
-      '<div class="table-wrapper"><table class="table" style="table-layout:fixed;width:100%">' +
-        '<thead><tr>' +
-          '<th style="width:15%">Waktu</th>' +
-          '<th style="width:14%">Entitas</th>' +
-          '<th style="width:13%">Aksi</th>' +
-          '<th style="width:20%">Aktor</th>' +
-          '<th style="width:30%">Catatan</th>' +
-          '<th style="width:8%;text-align:right">Detail</th>' +
-        '</tr></thead>' +
-        '<tbody id="activityTbody">' +
-          '<tr><td colspan="6">' +
-            '<div class="settings-empty-state">' +
-              '<div class="settings-empty-state-title">Memuat aktivitas...</div>' +
+      '<div class="content-card patients-toolbar-card">' +
+        '<div class="recall-toolbar">' +
+          '<div class="recall-toolbar-main">' +
+            '<div class="patients-search-wrap recall-search-wrap">' +
+              '<label class="patients-toolbar-label">Aktor</label>' +
+              '<input type="text" id="activitySearchActor" class="search-box" ' +
+                'placeholder="Cari aktor (user_id)..." ' +
+                'oninput="activityOnSearchInput_()">' +
             '</div>' +
-          '</td></tr>' +
-        '</tbody>' +
-      '</table></div>' +
-
-      '<div class="pagination">' +
-        '<div class="pagination-nav">' +
-          '<button type="button" class="pagination-arrow" id="activityPrevBtn" onclick="activityPrevPage_()" aria-label="Halaman sebelumnya" disabled>' +
-            '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"></polyline></svg>' +
-          '</button>' +
-          '<span class="pagination-label">Page</span>' +
-          '<span class="pagination-current" id="activityCurrentPage">1</span>' +
-          '<button type="button" class="pagination-arrow" id="activityNextBtn" onclick="activityNextPage_()" aria-label="Halaman berikutnya" disabled>' +
-            '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"></polyline></svg>' +
-          '</button>' +
+            '<div class="recall-toolbar-actions">' +
+              '<button type="button" id="activityFiltersToggleBtn" class="recall-filter-chip" ' +
+                'onclick="activityToggleFilters_()" aria-label="Toggle filters" title="Filters">' +
+                '<svg viewBox="0 0 24 24" fill="none" stroke-width="2">' +
+                  '<path d="M3 5h18"></path><path d="M6 12h12"></path><path d="M10 19h4"></path>' +
+                '</svg>' +
+                '<span class="recall-filter-chip-label">Filters</span>' +
+              '</button>' +
+              '<button type="button" id="activityFiltersResetBtn" class="recall-reset-link" ' +
+                'onclick="activityResetFilter_()" style="display:none;">Reset</button>' +
+            '</div>' +
+          '</div>' +
+          '<div id="activityFiltersPanel" class="recall-filter-panel">' +
+            '<div class="recall-filter-grid">' +
+              '<div class="recall-filter-wrap">' +
+                '<label class="patients-toolbar-label">Dari tanggal</label>' +
+                '<input type="date" id="activityFilterStartDate" onchange="activityApplyFilter_()">' +
+              '</div>' +
+              '<div class="recall-filter-wrap">' +
+                '<label class="patients-toolbar-label">Sampai tanggal</label>' +
+                '<input type="date" id="activityFilterEndDate" onchange="activityApplyFilter_()">' +
+              '</div>' +
+              '<div class="recall-filter-wrap">' +
+                '<label class="patients-toolbar-label">Entitas</label>' +
+                '<select id="activityFilterEntityType" onchange="activityApplyFilter_()">' +
+                  '<option value="">Semua entitas</option>' +
+                  activityBuildEntityTypeOptions_() +
+                '</select>' +
+              '</div>' +
+              '<div class="recall-filter-wrap">' +
+                '<label class="patients-toolbar-label">Aksi</label>' +
+                '<select id="activityFilterAction" onchange="activityApplyFilter_()">' +
+                  '<option value="">Semua aksi</option>' +
+                  activityBuildActionOptions_() +
+                '</select>' +
+              '</div>' +
+            '</div>' +
+          '</div>' +
         '</div>' +
-        '<div class="pagination-meta">' +
-          '<span class="pagination-rows-chip">' + activityPageSize + ' rows</span>' +
-          '<span class="pagination-count" id="activityPaginationInfo">-</span>' +
+      '</div>' +
+
+      '<div class="content-card">' +
+        '<div class="table-wrapper"><table class="table" style="table-layout:fixed;width:100%">' +
+          '<thead><tr>' +
+            '<th style="width:15%">Waktu</th>' +
+            '<th style="width:14%">Entitas</th>' +
+            '<th style="width:13%">Aksi</th>' +
+            '<th style="width:20%">Aktor</th>' +
+            '<th style="width:30%">Catatan</th>' +
+            '<th style="width:8%;text-align:right">Detail</th>' +
+          '</tr></thead>' +
+          '<tbody id="activityTbody">' +
+            '<tr><td colspan="6">' +
+              '<div class="settings-empty-state">' +
+                '<div class="settings-empty-state-title">Memuat aktivitas...</div>' +
+              '</div>' +
+            '</td></tr>' +
+          '</tbody>' +
+        '</table></div>' +
+
+        '<div class="pagination">' +
+          '<div class="pagination-nav">' +
+            '<button type="button" class="pagination-arrow" id="activityPrevBtn" onclick="activityPrevPage_()" aria-label="Halaman sebelumnya" disabled>' +
+              '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"></polyline></svg>' +
+            '</button>' +
+            '<span class="pagination-label">Page</span>' +
+            '<span class="pagination-current" id="activityCurrentPage">1</span>' +
+            '<button type="button" class="pagination-arrow" id="activityNextBtn" onclick="activityNextPage_()" aria-label="Halaman berikutnya" disabled>' +
+              '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"></polyline></svg>' +
+            '</button>' +
+          '</div>' +
+          '<div class="pagination-meta">' +
+            '<span class="pagination-rows-chip">' + activityPageSize + ' rows</span>' +
+            '<span class="pagination-count" id="activityPaginationInfo">-</span>' +
+          '</div>' +
         '</div>' +
       '</div>' +
     '</div>' +
     activityDetailModalHtml_();
 
-  activityRenderFilterUI_();
+  activityFiltersExpanded = false;
+  activityUpdateFilterControls_();
   activityPageNumber = 1;
   activityLoadPage_();
 }
@@ -156,6 +374,7 @@ function activityLoadPage_() {
       activityFiltersApplied = data.filters_applied || {};
       activityRenderBody_();
       activitySyncEntityTypeOptions_();
+      activityUpdateFilterControls_();
     })
     .withFailureHandler(function(err) {
       activityLoading = false;
@@ -185,16 +404,16 @@ function activityRenderBody_() {
   } else {
     tbody.innerHTML = activityRows.map(function(r) {
       return '<tr>' +
-        '<td style="font-size:11.5px;color:#475569">' + activityFormatTimestamp_(r.occurred_at) + '</td>' +
+        '<td>' + activityFormatTimestamp_(r.occurred_at) + '</td>' +
         '<td>' + activityFormatEntityType_(r.entity_type) +
-          '<div style="font-size:10.5px;color:#94a3b8;word-break:break-all;margin-top:2px">' + escapeAppHtml(r.entity_id || '') + '</div>' +
+          '<div class="activity-entity-id">' + escapeAppHtml(r.entity_id || '') + '</div>' +
         '</td>' +
         '<td>' + activityFormatAction_(r.action) + '</td>' +
-        '<td style="font-size:11.5px">' +
-          '<div style="color:#1e293b">' + escapeAppHtml(r.actor_user_id || '') + '</div>' +
-          '<div style="font-size:10.5px;color:#94a3b8;margin-top:2px">' + activityFormatRoles_(r.actor_roles) + '</div>' +
+        '<td>' +
+          '<div class="activity-actor-id">' + escapeAppHtml(r.actor_user_id || '') + '</div>' +
+          '<div class="activity-actor-roles">' + activityFormatRoles_(r.actor_roles) + '</div>' +
         '</td>' +
-        '<td style="font-size:11.5px;color:#475569;word-break:break-word">' + escapeAppHtml(r.notes || '') + '</td>' +
+        '<td class="activity-notes-cell">' + escapeAppHtml(r.notes || '') + '</td>' +
         '<td style="text-align:right">' +
           '<button type="button" class="icon-btn" onclick="activityOpenDetail_(' + Number(r.id) + ')" aria-label="Lihat detail" title="Lihat detail">' +
             '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7z"/></svg>' +
@@ -211,7 +430,7 @@ function activityRenderBody_() {
   if (pageEl) pageEl.textContent = activityPageNumber;
   if (prevBtn) prevBtn.disabled = !activityHasPrev;
   if (nextBtn) nextBtn.disabled = !activityHasNext;
-  if (infoEl) infoEl.textContent = activityRows.length + ' rows on this page';
+  if (infoEl) infoEl.textContent = activityRows.length + ' di halaman ini';
 }
 
 /* =========================================================
@@ -238,12 +457,11 @@ function activityFormatTimestamp_(iso) {
   if (!iso) return '-';
   var d = new Date(iso);
   if (isNaN(d.getTime())) return escapeAppHtml(String(iso));
-  var dd = String(d.getDate()).padStart(2, '0');
-  var mm = String(d.getMonth() + 1).padStart(2, '0');
-  var yy = d.getFullYear();
-  var hh = String(d.getHours()).padStart(2, '0');
-  var mi = String(d.getMinutes()).padStart(2, '0');
-  return dd + '/' + mm + '/' + yy + '<br><span style="color:#94a3b8;font-size:10.5px">' + hh + ':' + mi + '</span>';
+  var pad = function(n) { return ('0' + n).slice(-2); };
+  var dateStr = pad(d.getDate()) + '/' + pad(d.getMonth() + 1) + '/' + d.getFullYear();
+  var timeStr = pad(d.getHours()) + ':' + pad(d.getMinutes());
+  return '<div class="activity-time-main">' + dateStr + '</div>' +
+         '<div class="activity-time-sub">' + timeStr + '</div>';
 }
 
 function activityFormatEntityType_(t) {
@@ -265,77 +483,20 @@ function activityFormatAction_(a) {
 }
 
 function activityFormatRoles_(roles) {
-  if (!Array.isArray(roles) || !roles.length) {
-    return '<span style="font-style:italic">-</span>';
-  }
+  if (!Array.isArray(roles) || !roles.length) return '<span style="font-style:italic">-</span>';
   return roles.map(function(r) { return escapeAppHtml(String(r || '')); }).join(', ');
 }
 
 /* =========================================================
-   FILTER UI
+   FILTER CONTROLS (pola recall.html)
    ========================================================= */
-function activityRenderFilterUI_() {
-  var filterArea = document.getElementById('activityFilterArea');
-  if (!filterArea) return;
-
-  var startVal = String(activityFiltersApplied.start_date || '');
-  var endVal   = String(activityFiltersApplied.end_date || '');
-  var actorVal = (Array.isArray(activityFiltersApplied.actor_user_ids) && activityFiltersApplied.actor_user_ids.length)
-    ? String(activityFiltersApplied.actor_user_ids[0])
-    : '';
-
-  filterArea.innerHTML =
-    '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px;padding:12px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px">' +
-      '<div>' +
-        '<label style="font-size:11px;color:#64748b;margin-bottom:4px;display:block;font-weight:500">Dari tanggal</label>' +
-        '<input type="date" id="activityFilterStartDate" value="' + escapeAppHtml(startVal) + '" ' +
-          'style="width:100%;padding:7px 10px;border:1px solid #cbd5e1;border-radius:6px;font-size:12px;background:white">' +
-      '</div>' +
-      '<div>' +
-        '<label style="font-size:11px;color:#64748b;margin-bottom:4px;display:block;font-weight:500">Sampai tanggal</label>' +
-        '<input type="date" id="activityFilterEndDate" value="' + escapeAppHtml(endVal) + '" ' +
-          'style="width:100%;padding:7px 10px;border:1px solid #cbd5e1;border-radius:6px;font-size:12px;background:white">' +
-      '</div>' +
-      '<div>' +
-        '<label style="font-size:11px;color:#64748b;margin-bottom:4px;display:block;font-weight:500">Entitas</label>' +
-        '<select id="activityFilterEntityType" ' +
-          'style="width:100%;padding:7px 10px;border:1px solid #cbd5e1;border-radius:6px;font-size:12px;background:white">' +
-          '<option value="">Semua entitas</option>' +
-          activityBuildEntityTypeOptions_() +
-        '</select>' +
-      '</div>' +
-      '<div>' +
-        '<label style="font-size:11px;color:#64748b;margin-bottom:4px;display:block;font-weight:500">Aksi</label>' +
-        '<select id="activityFilterAction" ' +
-          'style="width:100%;padding:7px 10px;border:1px solid #cbd5e1;border-radius:6px;font-size:12px;background:white">' +
-          '<option value="">Semua aksi</option>' +
-          activityBuildActionOptions_() +
-        '</select>' +
-      '</div>' +
-      '<div>' +
-        '<label style="font-size:11px;color:#64748b;margin-bottom:4px;display:block;font-weight:500">Aktor (user_id)</label>' +
-        '<input type="text" id="activityFilterActor" value="' + escapeAppHtml(actorVal) + '" placeholder="mis. usr-fikri" ' +
-          'style="width:100%;padding:7px 10px;border:1px solid #cbd5e1;border-radius:6px;font-size:12px" ' +
-          'onkeydown="if(event.key===\'Enter\'){activityApplyFilter_();event.preventDefault();}">' +
-      '</div>' +
-      '<div style="display:flex;align-items:flex-end;gap:6px">' +
-        '<button type="button" onclick="activityApplyFilter_()" ' +
-          'style="flex:1;padding:8px 12px;background:#1e40af;color:white;border:none;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer">Terapkan</button>' +
-        '<button type="button" onclick="activityResetFilter_()" ' +
-          'style="padding:8px 12px;background:white;color:#64748b;border:1px solid #cbd5e1;border-radius:6px;font-size:12px;cursor:pointer">Reset</button>' +
-      '</div>' +
-    '</div>';
-}
-
 function activityBuildEntityTypeOptions_() {
   var list;
   if (Array.isArray(activityAllowedEntityTypes) && activityAllowedEntityTypes.length > 0) {
     list = activityAllowedEntityTypes.slice();
   } else {
-    // null (full access) atau belum tahu — pakai semua label keys
     list = Object.keys(ACTIVITY_ENTITY_TYPE_LABELS);
   }
-  // Sort by label Bahasa Indonesia
   list.sort(function(a, b) {
     var la = ACTIVITY_ENTITY_TYPE_LABELS[a] || a;
     var lb = ACTIVITY_ENTITY_TYPE_LABELS[b] || b;
@@ -366,19 +527,13 @@ function activityBuildActionOptions_() {
   }).join('');
 }
 
-/**
- * Sinkronkan opsi entity_type dropdown dengan allowed_entity_types
- * setelah data load (kalau awalnya pakai fallback semua label keys).
- * Preserve selected value kalau masih valid.
- */
 function activitySyncEntityTypeOptions_() {
   var sel = document.getElementById('activityFilterEntityType');
   if (!sel) return;
-  if (!Array.isArray(activityAllowedEntityTypes)) return; // null = full access, no need sync
+  if (!Array.isArray(activityAllowedEntityTypes)) return;
 
   var currentValue = sel.value;
   sel.innerHTML = '<option value="">Semua entitas</option>' + activityBuildEntityTypeOptions_();
-  // Restore selection kalau masih ada di opsi baru
   var matched = false;
   for (var i = 0; i < sel.options.length; i++) {
     if (sel.options[i].value === currentValue) { matched = true; break; }
@@ -386,18 +541,80 @@ function activitySyncEntityTypeOptions_() {
   if (matched) sel.value = currentValue;
 }
 
+function activityGetActiveFilterCount_() {
+  // Hitung filter di panel saja (date×2, entity, action). Search actor di luar.
+  var startEl  = document.getElementById('activityFilterStartDate');
+  var endEl    = document.getElementById('activityFilterEndDate');
+  var entityEl = document.getElementById('activityFilterEntityType');
+  var actionEl = document.getElementById('activityFilterAction');
+  var count = 0;
+  if (startEl  && String(startEl.value  || '').trim()) count++;
+  if (endEl    && String(endEl.value    || '').trim()) count++;
+  if (entityEl && String(entityEl.value || '').trim()) count++;
+  if (actionEl && String(actionEl.value || '').trim()) count++;
+  return count;
+}
+
+function activityHasActiveSearch_() {
+  var searchEl = document.getElementById('activitySearchActor');
+  return !!(searchEl && String(searchEl.value || '').trim());
+}
+
+function activityUpdateFilterControls_() {
+  var panel    = document.getElementById('activityFiltersPanel');
+  var toggleBtn = document.getElementById('activityFiltersToggleBtn');
+  var resetBtn = document.getElementById('activityFiltersResetBtn');
+
+  var activeCount = activityGetActiveFilterCount_();
+
+  if (panel) {
+    panel.classList.toggle('show', !!activityFiltersExpanded);
+  }
+
+  if (toggleBtn) {
+    toggleBtn.classList.toggle('active', !!activityFiltersExpanded);
+    toggleBtn.innerHTML =
+      '<svg viewBox="0 0 24 24" fill="none" stroke-width="2">' +
+        '<path d="M3 5h18"></path><path d="M6 12h12"></path><path d="M10 19h4"></path>' +
+      '</svg>' +
+      '<span class="recall-filter-chip-label">Filters</span>' +
+      (activeCount > 0 ? '<span class="recall-filter-chip-count">' + activeCount + '</span>' : '');
+  }
+
+  if (resetBtn) {
+    var hasAny = activeCount > 0 || activityHasActiveSearch_();
+    resetBtn.style.display = hasAny ? 'inline-flex' : 'none';
+  }
+}
+
+function activityToggleFilters_() {
+  activityFiltersExpanded = !activityFiltersExpanded;
+  activityUpdateFilterControls_();
+}
+
+function activityOnSearchInput_() {
+  if (activitySearchDebounce) {
+    clearTimeout(activitySearchDebounce);
+  }
+  // Update reset link visibility immediately
+  activityUpdateFilterControls_();
+  activitySearchDebounce = setTimeout(function() {
+    activityApplyFilter_();
+  }, ACTIVITY_SEARCH_DEBOUNCE_MS);
+}
+
 function activityApplyFilter_() {
   var startEl  = document.getElementById('activityFilterStartDate');
   var endEl    = document.getElementById('activityFilterEndDate');
   var entityEl = document.getElementById('activityFilterEntityType');
   var actionEl = document.getElementById('activityFilterAction');
-  var actorEl  = document.getElementById('activityFilterActor');
+  var searchEl = document.getElementById('activitySearchActor');
 
   var start  = startEl  ? String(startEl.value || '').trim()  : '';
   var end    = endEl    ? String(endEl.value || '').trim()    : '';
   var entity = entityEl ? String(entityEl.value || '').trim() : '';
   var action = actionEl ? String(actionEl.value || '').trim() : '';
-  var actor  = actorEl  ? String(actorEl.value || '').trim()  : '';
+  var actor  = searchEl ? String(searchEl.value || '').trim() : '';
 
   if (start && end && start > end) {
     showToast('Tanggal mulai tidak boleh lebih besar dari tanggal akhir', 'error');
@@ -412,6 +629,7 @@ function activityApplyFilter_() {
     actor_user_ids: actor ? [actor] : []
   };
   activityPageNumber = 1;
+  activityUpdateFilterControls_();
   activityLoadPage_();
 }
 
@@ -420,17 +638,18 @@ function activityResetFilter_() {
   activityPageNumber = 1;
 
   var ids = ['activityFilterStartDate', 'activityFilterEndDate', 'activityFilterEntityType',
-             'activityFilterAction', 'activityFilterActor'];
+             'activityFilterAction', 'activitySearchActor'];
   ids.forEach(function(id) {
     var el = document.getElementById(id);
     if (el) el.value = '';
   });
 
+  activityUpdateFilterControls_();
   activityLoadPage_();
 }
 
 /* =========================================================
-   DETAIL MODAL + DIFF HIGHLIGHT (P3c.5)
+   DETAIL MODAL + DIFF HIGHLIGHT
    ========================================================= */
 function activityDetailModalHtml_() {
   return '<div class="settings-modal-overlay" id="activityDetailModalOverlay">' +
@@ -440,18 +659,13 @@ function activityDetailModalHtml_() {
         '<button type="button" class="detail-close-btn" onclick="activityCloseDetail_()" aria-label="Tutup">&#x2715;</button>' +
       '</div>' +
       '<div class="settings-modal-body">' +
-        '<div style="display:grid;grid-template-columns:110px 1fr;gap:8px 14px;margin-bottom:14px;padding:12px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:6px;font-size:12px">' +
-          '<div style="font-weight:600;color:#64748b">Waktu</div>' +
-          '<div id="activityDetailWhen">-</div>' +
-          '<div style="font-weight:600;color:#64748b">Entitas</div>' +
-          '<div id="activityDetailEntity">-</div>' +
-          '<div style="font-weight:600;color:#64748b">Aksi</div>' +
-          '<div id="activityDetailAction">-</div>' +
-          '<div style="font-weight:600;color:#64748b">Aktor</div>' +
-          '<div id="activityDetailActor">-</div>' +
-          '<div style="font-weight:600;color:#64748b">Catatan</div>' +
-          '<div id="activityDetailNotes" style="white-space:pre-wrap;color:#475569">-</div>' +
-        '</div>' +
+        '<dl class="activity-detail-info">' +
+          '<dt>Waktu</dt><dd id="activityDetailWhen">-</dd>' +
+          '<dt>Entitas</dt><dd id="activityDetailEntity">-</dd>' +
+          '<dt>Aksi</dt><dd id="activityDetailAction">-</dd>' +
+          '<dt>Aktor</dt><dd id="activityDetailActor">-</dd>' +
+          '<dt>Catatan</dt><dd id="activityDetailNotes" class="activity-notes">-</dd>' +
+        '</dl>' +
         '<div id="activityDetailDiff"></div>' +
       '</div>' +
       '<div class="settings-modal-footer">' +
@@ -482,13 +696,13 @@ function activityOpenDetail_(id) {
     var entityLabel = ACTIVITY_ENTITY_TYPE_LABELS[String(row.entity_type || '')] || String(row.entity_type || '-');
     entityEl.innerHTML =
       '<span class="settings-badge" style="font-size:11px">' + escapeAppHtml(entityLabel) + '</span>' +
-      ' <span style="font-size:11px;color:#94a3b8;margin-left:6px;word-break:break-all">' + escapeAppHtml(String(row.entity_id || '')) + '</span>';
+      ' <span class="activity-entity-id" style="display:inline;margin-left:8px">' + escapeAppHtml(String(row.entity_id || '')) + '</span>';
   }
   if (actionEl) actionEl.innerHTML = activityFormatAction_(row.action);
   if (actorEl) {
     actorEl.innerHTML =
       escapeAppHtml(String(row.actor_user_id || '-')) +
-      ' <span style="color:#94a3b8">(' + escapeAppHtml(activityFormatRolesPlain_(row.actor_roles)) + ')</span>';
+      ' <span style="color:#64748b">(' + escapeAppHtml(activityFormatRolesPlain_(row.actor_roles)) + ')</span>';
   }
   if (notesEl) notesEl.textContent = row.notes || '-';
   if (diffEl) diffEl.innerHTML = activityRenderDiff_(row.old_value, row.new_value);
@@ -515,12 +729,6 @@ function activityFormatRolesPlain_(roles) {
   return roles.map(function(r) { return String(r || ''); }).join(', ');
 }
 
-/**
- * Render side-by-side diff old vs new dengan color highlight.
- * - create (old=null): semua field di kolom new dengan background green
- * - delete (new=null): semua field di kolom old dengan background red
- * - update: field yang berubah background yellow, sama-sama tidak berubah putih
- */
 function activityRenderDiff_(oldObj, newObj) {
   var isCreate = (oldObj === null || oldObj === undefined);
   var isDelete = (newObj === null || newObj === undefined);
@@ -534,21 +742,22 @@ function activityRenderDiff_(oldObj, newObj) {
   var keys = Object.keys(keySet).sort();
 
   if (keys.length === 0) {
-    return '<div style="padding:20px;text-align:center;color:#94a3b8;font-size:12px;border:1px solid #e2e8f0;border-radius:6px">' +
-      'Tidak ada data old/new yang tersedia untuk entri ini.</div>';
+    return '<div class="activity-diff-empty">Tidak ada data old/new yang tersedia untuk entri ini.</div>';
   }
 
+  var beforeClass = isCreate ? 'activity-header-color-muted' : 'activity-header-color-before';
+  var afterClass  = isDelete ? 'activity-header-color-muted' : 'activity-header-color-after';
   var beforeLabel = isCreate ? '(tidak ada — entry baru)' : 'Sebelum';
   var afterLabel  = isDelete ? '(tidak ada — entry dihapus)' : 'Sesudah';
 
   var headerHtml =
-    '<div style="display:grid;grid-template-columns:170px 1fr 1fr;gap:0;background:#f1f5f9;border:1px solid #cbd5e1;border-bottom:0;border-radius:6px 6px 0 0;overflow:hidden">' +
-      '<div style="padding:8px 12px;font-size:11px;font-weight:600;color:#475569;border-right:1px solid #cbd5e1">Field</div>' +
-      '<div style="padding:8px 12px;font-size:11px;font-weight:600;color:' + (isCreate ? '#94a3b8' : '#dc2626') + ';border-right:1px solid #cbd5e1">' + beforeLabel + '</div>' +
-      '<div style="padding:8px 12px;font-size:11px;font-weight:600;color:' + (isDelete ? '#94a3b8' : '#16a34a') + '">' + afterLabel + '</div>' +
+    '<div class="activity-diff-header">' +
+      '<div>Field</div>' +
+      '<div class="' + beforeClass + '">' + beforeLabel + '</div>' +
+      '<div class="' + afterClass + '">' + afterLabel + '</div>' +
     '</div>';
 
-  var rowsHtml = keys.map(function(k, idx) {
+  var rowsHtml = keys.map(function(k) {
     var hasOld = Object.prototype.hasOwnProperty.call(oldData, k);
     var hasNew = Object.prototype.hasOwnProperty.call(newData, k);
     var oldVal = hasOld ? oldData[k] : undefined;
@@ -569,33 +778,31 @@ function activityRenderDiff_(oldObj, newObj) {
       if (os !== ns) status = 'changed';
     }
 
-    var bgOld = '#ffffff', bgNew = '#ffffff';
+    var oldClass = 'activity-diff-cell-neutral';
+    var newClass = 'activity-diff-cell-neutral';
     if (status === 'created' || status === 'added') {
-      bgOld = '#f8fafc';
-      bgNew = '#dcfce7';
+      newClass = 'activity-diff-cell-added';
     } else if (status === 'deleted' || status === 'removed') {
-      bgOld = '#fee2e2';
-      bgNew = '#f8fafc';
+      oldClass = 'activity-diff-cell-removed';
     } else if (status === 'changed') {
-      bgOld = '#fef9c3';
-      bgNew = '#fef9c3';
+      oldClass = 'activity-diff-cell-changed';
+      newClass = 'activity-diff-cell-changed';
     }
 
-    var border = idx > 0 ? 'border-top:1px solid #e2e8f0' : '';
-    return '<div style="display:grid;grid-template-columns:170px 1fr 1fr;gap:0;' + border + '">' +
-      '<div style="padding:8px 12px;background:#f8fafc;font-size:11.5px;font-weight:500;color:#475569;border-right:1px solid #e2e8f0;word-break:break-word">' + escapeAppHtml(k) + '</div>' +
-      '<div style="padding:8px 12px;background:' + bgOld + ';font-size:11.5px;color:#1e293b;border-right:1px solid #e2e8f0;word-break:break-word;white-space:pre-wrap;font-family:ui-monospace,SFMono-Regular,Menlo,monospace">' + activityFormatDiffValue_(oldVal, hasOld) + '</div>' +
-      '<div style="padding:8px 12px;background:' + bgNew + ';font-size:11.5px;color:#1e293b;word-break:break-word;white-space:pre-wrap;font-family:ui-monospace,SFMono-Regular,Menlo,monospace">' + activityFormatDiffValue_(newVal, hasNew) + '</div>' +
+    return '<div class="activity-diff-row">' +
+      '<div class="activity-diff-field">' + escapeAppHtml(k) + '</div>' +
+      '<div class="activity-diff-value ' + oldClass + '">' + activityFormatDiffValue_(oldVal, hasOld) + '</div>' +
+      '<div class="activity-diff-value ' + newClass + '">' + activityFormatDiffValue_(newVal, hasNew) + '</div>' +
     '</div>';
   }).join('');
 
-  return '<div style="border:1px solid #cbd5e1;border-radius:6px;overflow:hidden">' + headerHtml + rowsHtml + '</div>';
+  return '<div class="activity-diff">' + headerHtml + rowsHtml + '</div>';
 }
 
 function activityFormatDiffValue_(v, hasIt) {
-  if (!hasIt) return '<span style="color:#cbd5e1;font-style:italic;font-family:inherit">(tidak ada)</span>';
-  if (v === null) return '<span style="color:#94a3b8;font-style:italic;font-family:inherit">null</span>';
-  if (v === undefined) return '<span style="color:#94a3b8;font-style:italic;font-family:inherit">undefined</span>';
+  if (!hasIt) return '<span class="activity-diff-value-muted">(tidak ada)</span>';
+  if (v === null) return '<span class="activity-diff-value-muted">null</span>';
+  if (v === undefined) return '<span class="activity-diff-value-muted">undefined</span>';
   if (typeof v === 'object') {
     try {
       return escapeAppHtml(JSON.stringify(v, null, 2));
@@ -603,7 +810,7 @@ function activityFormatDiffValue_(v, hasIt) {
       return escapeAppHtml(String(v));
     }
   }
-  if (v === '') return '<span style="color:#cbd5e1;font-style:italic;font-family:inherit">(kosong)</span>';
+  if (v === '') return '<span class="activity-diff-value-muted">(kosong)</span>';
   return escapeAppHtml(String(v));
 }
 </script>
