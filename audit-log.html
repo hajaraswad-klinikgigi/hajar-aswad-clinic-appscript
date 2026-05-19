@@ -115,7 +115,8 @@ function showActivityPage() {
           '<span class="pagination-count" id="activityPaginationInfo">-</span>' +
         '</div>' +
       '</div>' +
-    '</div>';
+    '</div>' +
+    activityDetailModalHtml_();
 
   activityRenderFilterUI_();
   activityPageNumber = 1;
@@ -429,9 +430,180 @@ function activityResetFilter_() {
 }
 
 /* =========================================================
-   DETAIL (placeholder — diisi di P3c.5)
+   DETAIL MODAL + DIFF HIGHLIGHT (P3c.5)
    ========================================================= */
+function activityDetailModalHtml_() {
+  return '<div class="settings-modal-overlay" id="activityDetailModalOverlay">' +
+    '<div class="settings-modal-box settings-modal-box--wide" style="max-width:1000px;width:95vw">' +
+      '<div class="settings-modal-head">' +
+        '<h3 class="settings-modal-title">Detail Aktivitas</h3>' +
+        '<button type="button" class="detail-close-btn" onclick="activityCloseDetail_()" aria-label="Tutup">&#x2715;</button>' +
+      '</div>' +
+      '<div class="settings-modal-body">' +
+        '<div style="display:grid;grid-template-columns:110px 1fr;gap:8px 14px;margin-bottom:14px;padding:12px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:6px;font-size:12px">' +
+          '<div style="font-weight:600;color:#64748b">Waktu</div>' +
+          '<div id="activityDetailWhen">-</div>' +
+          '<div style="font-weight:600;color:#64748b">Entitas</div>' +
+          '<div id="activityDetailEntity">-</div>' +
+          '<div style="font-weight:600;color:#64748b">Aksi</div>' +
+          '<div id="activityDetailAction">-</div>' +
+          '<div style="font-weight:600;color:#64748b">Aktor</div>' +
+          '<div id="activityDetailActor">-</div>' +
+          '<div style="font-weight:600;color:#64748b">Catatan</div>' +
+          '<div id="activityDetailNotes" style="white-space:pre-wrap;color:#475569">-</div>' +
+        '</div>' +
+        '<div id="activityDetailDiff"></div>' +
+      '</div>' +
+      '<div class="settings-modal-footer">' +
+        '<button type="button" class="btn btn-secondary" onclick="activityCloseDetail_()">Tutup</button>' +
+      '</div>' +
+    '</div>' +
+  '</div>';
+}
+
 function activityOpenDetail_(id) {
-  showToast('Detail row #' + id + ' akan tersedia di P3c.5', 'info');
+  var row = (activityRows || []).find(function(r) { return Number(r.id) === Number(id); });
+  if (!row) {
+    showToast('Data tidak ditemukan di halaman ini', 'error');
+    return;
+  }
+  var overlay = document.getElementById('activityDetailModalOverlay');
+  if (!overlay) return;
+
+  var whenEl   = document.getElementById('activityDetailWhen');
+  var entityEl = document.getElementById('activityDetailEntity');
+  var actionEl = document.getElementById('activityDetailAction');
+  var actorEl  = document.getElementById('activityDetailActor');
+  var notesEl  = document.getElementById('activityDetailNotes');
+  var diffEl   = document.getElementById('activityDetailDiff');
+
+  if (whenEl) whenEl.textContent = activityFormatTimestampLong_(row.occurred_at);
+  if (entityEl) {
+    var entityLabel = ACTIVITY_ENTITY_TYPE_LABELS[String(row.entity_type || '')] || String(row.entity_type || '-');
+    entityEl.innerHTML =
+      '<span class="settings-badge" style="font-size:11px">' + escapeAppHtml(entityLabel) + '</span>' +
+      ' <span style="font-size:11px;color:#94a3b8;margin-left:6px;word-break:break-all">' + escapeAppHtml(String(row.entity_id || '')) + '</span>';
+  }
+  if (actionEl) actionEl.innerHTML = activityFormatAction_(row.action);
+  if (actorEl) {
+    actorEl.innerHTML =
+      escapeAppHtml(String(row.actor_user_id || '-')) +
+      ' <span style="color:#94a3b8">(' + escapeAppHtml(activityFormatRolesPlain_(row.actor_roles)) + ')</span>';
+  }
+  if (notesEl) notesEl.textContent = row.notes || '-';
+  if (diffEl) diffEl.innerHTML = activityRenderDiff_(row.old_value, row.new_value);
+
+  overlay.classList.add('open');
+}
+
+function activityCloseDetail_() {
+  var overlay = document.getElementById('activityDetailModalOverlay');
+  if (overlay) overlay.classList.remove('open');
+}
+
+function activityFormatTimestampLong_(iso) {
+  if (!iso) return '-';
+  var d = new Date(iso);
+  if (isNaN(d.getTime())) return String(iso);
+  var pad = function(n) { return ('0' + n).slice(-2); };
+  return pad(d.getDate()) + '/' + pad(d.getMonth() + 1) + '/' + d.getFullYear() + ' ' +
+    pad(d.getHours()) + ':' + pad(d.getMinutes()) + ':' + pad(d.getSeconds());
+}
+
+function activityFormatRolesPlain_(roles) {
+  if (!Array.isArray(roles) || !roles.length) return '-';
+  return roles.map(function(r) { return String(r || ''); }).join(', ');
+}
+
+/**
+ * Render side-by-side diff old vs new dengan color highlight.
+ * - create (old=null): semua field di kolom new dengan background green
+ * - delete (new=null): semua field di kolom old dengan background red
+ * - update: field yang berubah background yellow, sama-sama tidak berubah putih
+ */
+function activityRenderDiff_(oldObj, newObj) {
+  var isCreate = (oldObj === null || oldObj === undefined);
+  var isDelete = (newObj === null || newObj === undefined);
+
+  var oldData = (oldObj && typeof oldObj === 'object') ? oldObj : {};
+  var newData = (newObj && typeof newObj === 'object') ? newObj : {};
+
+  var keySet = {};
+  Object.keys(oldData).forEach(function(k) { keySet[k] = true; });
+  Object.keys(newData).forEach(function(k) { keySet[k] = true; });
+  var keys = Object.keys(keySet).sort();
+
+  if (keys.length === 0) {
+    return '<div style="padding:20px;text-align:center;color:#94a3b8;font-size:12px;border:1px solid #e2e8f0;border-radius:6px">' +
+      'Tidak ada data old/new yang tersedia untuk entri ini.</div>';
+  }
+
+  var beforeLabel = isCreate ? '(tidak ada — entry baru)' : 'Sebelum';
+  var afterLabel  = isDelete ? '(tidak ada — entry dihapus)' : 'Sesudah';
+
+  var headerHtml =
+    '<div style="display:grid;grid-template-columns:170px 1fr 1fr;gap:0;background:#f1f5f9;border:1px solid #cbd5e1;border-bottom:0;border-radius:6px 6px 0 0;overflow:hidden">' +
+      '<div style="padding:8px 12px;font-size:11px;font-weight:600;color:#475569;border-right:1px solid #cbd5e1">Field</div>' +
+      '<div style="padding:8px 12px;font-size:11px;font-weight:600;color:' + (isCreate ? '#94a3b8' : '#dc2626') + ';border-right:1px solid #cbd5e1">' + beforeLabel + '</div>' +
+      '<div style="padding:8px 12px;font-size:11px;font-weight:600;color:' + (isDelete ? '#94a3b8' : '#16a34a') + '">' + afterLabel + '</div>' +
+    '</div>';
+
+  var rowsHtml = keys.map(function(k, idx) {
+    var hasOld = Object.prototype.hasOwnProperty.call(oldData, k);
+    var hasNew = Object.prototype.hasOwnProperty.call(newData, k);
+    var oldVal = hasOld ? oldData[k] : undefined;
+    var newVal = hasNew ? newData[k] : undefined;
+
+    var status = 'unchanged';
+    if (isCreate) {
+      status = 'created';
+    } else if (isDelete) {
+      status = 'deleted';
+    } else if (!hasOld && hasNew) {
+      status = 'added';
+    } else if (hasOld && !hasNew) {
+      status = 'removed';
+    } else {
+      var os = JSON.stringify(oldVal);
+      var ns = JSON.stringify(newVal);
+      if (os !== ns) status = 'changed';
+    }
+
+    var bgOld = '#ffffff', bgNew = '#ffffff';
+    if (status === 'created' || status === 'added') {
+      bgOld = '#f8fafc';
+      bgNew = '#dcfce7';
+    } else if (status === 'deleted' || status === 'removed') {
+      bgOld = '#fee2e2';
+      bgNew = '#f8fafc';
+    } else if (status === 'changed') {
+      bgOld = '#fef9c3';
+      bgNew = '#fef9c3';
+    }
+
+    var border = idx > 0 ? 'border-top:1px solid #e2e8f0' : '';
+    return '<div style="display:grid;grid-template-columns:170px 1fr 1fr;gap:0;' + border + '">' +
+      '<div style="padding:8px 12px;background:#f8fafc;font-size:11.5px;font-weight:500;color:#475569;border-right:1px solid #e2e8f0;word-break:break-word">' + escapeAppHtml(k) + '</div>' +
+      '<div style="padding:8px 12px;background:' + bgOld + ';font-size:11.5px;color:#1e293b;border-right:1px solid #e2e8f0;word-break:break-word;white-space:pre-wrap;font-family:ui-monospace,SFMono-Regular,Menlo,monospace">' + activityFormatDiffValue_(oldVal, hasOld) + '</div>' +
+      '<div style="padding:8px 12px;background:' + bgNew + ';font-size:11.5px;color:#1e293b;word-break:break-word;white-space:pre-wrap;font-family:ui-monospace,SFMono-Regular,Menlo,monospace">' + activityFormatDiffValue_(newVal, hasNew) + '</div>' +
+    '</div>';
+  }).join('');
+
+  return '<div style="border:1px solid #cbd5e1;border-radius:6px;overflow:hidden">' + headerHtml + rowsHtml + '</div>';
+}
+
+function activityFormatDiffValue_(v, hasIt) {
+  if (!hasIt) return '<span style="color:#cbd5e1;font-style:italic;font-family:inherit">(tidak ada)</span>';
+  if (v === null) return '<span style="color:#94a3b8;font-style:italic;font-family:inherit">null</span>';
+  if (v === undefined) return '<span style="color:#94a3b8;font-style:italic;font-family:inherit">undefined</span>';
+  if (typeof v === 'object') {
+    try {
+      return escapeAppHtml(JSON.stringify(v, null, 2));
+    } catch (e) {
+      return escapeAppHtml(String(v));
+    }
+  }
+  if (v === '') return '<span style="color:#cbd5e1;font-style:italic;font-family:inherit">(kosong)</span>';
+  return escapeAppHtml(String(v));
 }
 </script>
