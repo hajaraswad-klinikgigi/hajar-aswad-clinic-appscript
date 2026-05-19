@@ -652,9 +652,33 @@ function createTreatment(payload) {
 
     dbInsert_('MedicalRecords', medicalRecord);
 
+    const appointmentCompletedAt = nowIso();
     dbUpdateById_('Appointments', 'appointment_id', payload.appointment_id, {
       status: 'completed',
-      updated_at: nowIso()
+      updated_at: appointmentCompletedAt
+    });
+
+    // Audit dilog SEKARANG (setelah core mutations confirmed) — sebelum
+    // orthoSync/billing yang masih bisa fail. Treatment & appointment sudah
+    // ada di DB walaupun downstream gagal.
+    writeAuditLog_({
+      actor: auth.user,
+      entity_type: 'appointment',
+      entity_id: payload.appointment_id,
+      action: 'complete',
+      old_value: appointment,
+      new_value: Object.assign({}, appointment, { status: 'completed', updated_at: appointmentCompletedAt }),
+      notes: 'Auto-completed via treatment ' + treatmentId
+    });
+
+    writeAuditLog_({
+      actor: auth.user,
+      entity_type: 'treatment',
+      entity_id: treatmentId,
+      action: 'create',
+      old_value: null,
+      new_value: treatment,
+      notes: 'Treatment dibuat dengan ' + normalizedItems.length + ' item; medical_record ' + medicalRecord.record_id
     });
 
     if (orthoMode !== 'none') {

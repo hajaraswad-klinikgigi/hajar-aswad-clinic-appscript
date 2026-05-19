@@ -652,6 +652,15 @@ function saveOrthoRecallContact(payload) {
 
   const merged = Object.assign({}, existing, updated);
 
+  writeAuditLog_({
+    actor: auth.user,
+    entity_type: 'ortho_recall',
+    entity_id: orthoRecallId,
+    action: 'save_contact',
+    old_value: existing,
+    new_value: merged
+  });
+
   return {
     success: true,
     message: 'Follow up kontak berhasil disimpan',
@@ -751,6 +760,16 @@ function completeOrthoRecallProgram(payload) {
 
   const merged = Object.assign({}, existing, updated);
 
+  writeAuditLog_({
+    actor: auth.user,
+    entity_type: 'ortho_recall',
+    entity_id: orthoRecallId,
+    action: 'complete',
+    old_value: existing,
+    new_value: merged,
+    notes: reason ? 'Alasan: ' + reason : null
+  });
+
   return {
     success: true,
     message: 'Program recall berhasil diselesaikan',
@@ -834,6 +853,16 @@ function cancelOrthoRecallProgram(payload) {
   clearPatientDetailBundleCache(existing.patient_id);
 
   const merged = Object.assign({}, existing, updated);
+
+  writeAuditLog_({
+    actor: auth.user,
+    entity_type: 'ortho_recall',
+    entity_id: orthoRecallId,
+    action: 'cancel',
+    old_value: existing,
+    new_value: merged,
+    notes: reason ? 'Alasan: ' + reason : null
+  });
 
   return {
     success: true,

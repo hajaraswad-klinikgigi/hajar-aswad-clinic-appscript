@@ -585,6 +585,15 @@ function createAppointment(data) {
 
     clearAppointmentsListCache();
 
+    writeAuditLog_({
+      actor: auth.user,
+      entity_type: 'appointment',
+      entity_id: appointment.appointment_id,
+      action: 'create',
+      old_value: null,
+      new_value: appointment
+    });
+
     return {
       success: true,
       message: 'Appointment berhasil ditambahkan',
@@ -710,6 +719,15 @@ function updateAppointment(data) {
 
     clearAppointmentsListCache();
 
+    writeAuditLog_({
+      actor: auth.user,
+      entity_type: 'appointment',
+      entity_id: data.appointment_id,
+      action: 'update',
+      old_value: existing,
+      new_value: updated
+    });
+
     return {
       success: true,
       message: 'Data appointment berhasil diperbarui',
@@ -785,9 +803,10 @@ function cancelAppointment(payloadOrId, optionsArg) {
       };
     }
 
+    const cancelledAt = nowIso();
     const ok = updateAppointmentRowFromSnapshot(snapshot, id, {
       status: 'cancelled',
-      updated_at: nowIso()
+      updated_at: cancelledAt
     });
 
     if (!ok) {
@@ -798,6 +817,15 @@ function cancelAppointment(payloadOrId, optionsArg) {
     }
 
     clearAppointmentsListCache();
+
+    writeAuditLog_({
+      actor: auth.user,
+      entity_type: 'appointment',
+      entity_id: id,
+      action: 'cancel',
+      old_value: existing,
+      new_value: Object.assign({}, existing, { status: 'cancelled', updated_at: cancelledAt })
+    });
 
     return {
       success: true,
@@ -881,9 +909,10 @@ function restoreAppointment(payloadOrId, optionsArg) {
       };
     }
 
+    const restoredAt = nowIso();
     const ok = updateAppointmentRowFromSnapshot(snapshot, id, {
       status: 'scheduled',
-      updated_at: nowIso()
+      updated_at: restoredAt
     });
 
     if (!ok) {
@@ -894,6 +923,15 @@ function restoreAppointment(payloadOrId, optionsArg) {
     }
 
     clearAppointmentsListCache();
+
+    writeAuditLog_({
+      actor: auth.user,
+      entity_type: 'appointment',
+      entity_id: id,
+      action: 'restore',
+      old_value: existing,
+      new_value: Object.assign({}, existing, { status: 'scheduled', updated_at: restoredAt })
+    });
 
     return {
       success: true,

@@ -1063,6 +1063,15 @@ function createPatient(data) {
 
     dbInsert_('Patients', patient);
 
+    writeAuditLog_({
+      actor: auth.user,
+      entity_type: 'patient',
+      entity_id: patient.patient_id,
+      action: 'create',
+      old_value: null,
+      new_value: patient
+    });
+
     return {
       success: true,
       message: 'Pasien berhasil ditambahkan',
@@ -1201,6 +1210,15 @@ function updatePatient(data) {
 
     clearPatientDetailBundleCache(data.patient_id);
 
+    writeAuditLog_({
+      actor: auth.user,
+      entity_type: 'patient',
+      entity_id: data.patient_id,
+      action: 'update',
+      old_value: existing,
+      new_value: updated
+    });
+
     return {
       success: true,
       message: 'Data pasien berhasil diperbarui',
@@ -1268,9 +1286,10 @@ function deactivatePatient(payloadOrId, optionsArg) {
     };
   }
 
+  const deactivatedAt = nowIso();
   const ok = dbUpdateById_('Patients', 'patient_id', patientId, {
     is_active: false,
-    updated_at: nowIso()
+    updated_at: deactivatedAt
   });
 
   if (!ok) {
@@ -1281,6 +1300,15 @@ function deactivatePatient(payloadOrId, optionsArg) {
   }
 
   clearPatientDetailBundleCache(patientId);
+
+  writeAuditLog_({
+    actor: auth.user,
+    entity_type: 'patient',
+    entity_id: patientId,
+    action: 'deactivate',
+    old_value: existing,
+    new_value: Object.assign({}, existing, { is_active: false, updated_at: deactivatedAt })
+  });
 
   return {
     success: true,
