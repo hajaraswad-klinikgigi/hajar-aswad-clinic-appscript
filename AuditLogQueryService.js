@@ -196,15 +196,50 @@ function getAuditLogPage(payload) {
       filterPairs.push(['action', 'in.(' + cleanedActions.join(',') + ')']);
     }
 
-    // actor filter (multi-select user_id)
+    // actor filter (multi-select user_id, exact match)
     const requestedActors = Array.isArray(p.actor_user_ids)
       ? p.actor_user_ids
       : (p.actor_user_id ? [p.actor_user_id] : []);
     const cleanedActors = requestedActors
       .map(function(a) { return String(a || '').trim(); })
       .filter(function(a) { return a.length > 0; });
-    if (cleanedActors.length > 0) {
-      filterPairs.push(['actor_user_id', 'in.(' + cleanedActors.join(',') + ')']);
+
+    // actor_search: fuzzy match by full_name / username / user_id via lookup
+    // ke tabel app_users. Hasilnya digabung (union) dengan cleanedActors.
+    const actorSearchRaw = String(p.actor_search || '').trim();
+    let effectiveActors = cleanedActors.slice();
+
+    if (actorSearchRaw) {
+      const matchedUserIds = querySupabaseAuditLogActors_(actorSearchRaw, clinicId);
+      if (matchedUserIds.length === 0) {
+        return {
+          success: true,
+          data: {
+            rows: [],
+            page_number: pageNumber,
+            page_size: pageSize,
+            has_next: false,
+            has_prev: pageNumber > 1,
+            active_since: AUDIT_LOG_ACTIVE_SINCE,
+            allowed_entity_types: allowedEntityTypes,
+            filters_applied: {
+              start_date: startDate || null,
+              end_date: endDate || null,
+              entity_types: effectiveEntityTypes,
+              actions: cleanedActions,
+              actor_user_ids: cleanedActors,
+              actor_search: actorSearchRaw
+            }
+          }
+        };
+      }
+      matchedUserIds.forEach(function(uid) {
+        if (effectiveActors.indexOf(uid) === -1) effectiveActors.push(uid);
+      });
+    }
+
+    if (effectiveActors.length > 0) {
+      filterPairs.push(['actor_user_id', 'in.(' + effectiveActors.join(',') + ')']);
     }
 
     // Query via custom URL builder. supabaseSelect_ pakai single-key
@@ -233,7 +268,8 @@ function getAuditLogPage(payload) {
           end_date: endDate || null,
           entity_types: effectiveEntityTypes,
           actions: cleanedActions,
-          actor_user_ids: cleanedActors
+          actor_user_ids: cleanedActors,
+          actor_search: actorSearchRaw || null
         }
       }
     };
@@ -242,6 +278,53 @@ function getAuditLogPage(payload) {
     const msg = err && err.message ? err.message : String(err || '');
     return { success: false, message: 'Gagal load audit log: ' + msg };
   }
+}
+
+/**
+ * Cari user_ids dari tabel app_users berdasarkan substring nama / username
+ * / user_id (case-insensitive). Dipakai untuk fitur "Cari nama pengguna"
+ * di halaman Aktivitas.
+ *
+ * @param {string} searchTerm
+ * @param {string} clinicId    Optional. Kalau ada, scope ke clinic ini.
+ * @returns {string[]} user_ids matched
+ */
+function querySupabaseAuditLogActors_(searchTerm, clinicId) {
+  const raw = String(searchTerm || '').trim();
+  if (!raw) return [];
+
+  // Hapus karakter yang punya arti khusus di PostgREST filter syntax
+  // (parens, comma, dot, star, percent, underscore) — supaya tidak bisa
+  // dipakai untuk inject syntax baru. Sisanya safe untuk substring match.
+  const sanitized = raw.replace(/[(),.*%_]/g, '');
+  if (!sanitized) return [];
+
+  const pattern = '*' + sanitized + '*';
+  const config = getSupabaseConfig_();
+
+  const parts = ['select=user_id'];
+  // or=(full_name.ilike.*x*,username.ilike.*x*,user_id.ilike.*x*)
+  // Tidak di-encodeURIComponent — paren & comma di or= harus literal.
+  parts.push('or=(full_name.ilike.' + pattern +
+             ',username.ilike.' + pattern +
+             ',user_id.ilike.' + pattern + ')');
+  parts.push('limit=500');
+  if (clinicId) parts.push('clinic_id=eq.' + encodeURIComponent(clinicId));
+
+  const url = config.url + '/rest/v1/app_users?' + parts.join('&');
+  const response = UrlFetchApp.fetch(url, {
+    method: 'GET',
+    headers: buildSupabaseHeaders_(),
+    muteHttpExceptions: true
+  });
+  const result = parseSupabaseResponse_(response);
+  if (!result.success) {
+    throw new Error('Audit actor search failed: HTTP ' + result.status_code + ' - ' + JSON.stringify(result.body));
+  }
+  const rows = Array.isArray(result.body) ? result.body : [];
+  return rows
+    .map(function(r) { return String((r && r.user_id) || '').trim(); })
+    .filter(function(u) { return u.length > 0; });
 }
 
 /**

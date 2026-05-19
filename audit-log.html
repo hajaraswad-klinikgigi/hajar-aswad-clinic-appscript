@@ -5,17 +5,6 @@
      (same dark-theme toolbar/chip/panel pattern).
      Diff table tetap pakai class `.activity-diff-*` (unique).
      ========================================================= */
-  .activity-banner {
-    margin: 0 0 16px;
-    padding: 10px 14px;
-    background: rgba(79, 110, 247, 0.08);
-    border: 1px solid rgba(79, 110, 247, 0.30);
-    border-radius: 10px;
-    font-size: 12px;
-    color: #bfdbfe;
-    line-height: 1.5;
-  }
-
   /* Override recall grid utk 4 filter field di Aktivitas */
   #activityFiltersPanel .recall-filter-grid {
     grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -168,7 +157,7 @@
    ========================================================= */
 var activityRows = [];
 var activityPageNumber = 1;
-var activityPageSize = 50;
+var activityPageSize = 5;
 var activityHasNext = false;
 var activityHasPrev = false;
 var activityAllowedEntityTypes = null;
@@ -242,17 +231,13 @@ function showActivityPage() {
         '<div class="owner-subtitle">Rekam jejak perubahan data oleh seluruh pengguna staff klinik</div>' +
       '</div>' +
 
-      '<div class="activity-banner">' +
-        '<strong>Catatan:</strong> Audit log mulai aktif sejak <strong>' + escapeAppHtml(activityActiveSince) + '</strong>. Perubahan sebelum tanggal tersebut tidak tercatat di halaman ini.' +
-      '</div>' +
-
       '<div class="content-card patients-toolbar-card">' +
         '<div class="recall-toolbar">' +
           '<div class="recall-toolbar-main">' +
             '<div class="patients-search-wrap recall-search-wrap">' +
-              '<label class="patients-toolbar-label">Aktor</label>' +
+              '<label class="patients-toolbar-label">Cari Pengguna</label>' +
               '<input type="text" id="activitySearchActor" class="search-box" ' +
-                'placeholder="Cari aktor (user_id)..." ' +
+                'placeholder="Cari nama / username pengguna..." ' +
                 'oninput="activityOnSearchInput_()">' +
             '</div>' +
             '<div class="recall-toolbar-actions">' +
@@ -626,7 +611,7 @@ function activityApplyFilter_() {
     end_date:       end || null,
     entity_types:   entity ? [entity] : [],
     actions:        action ? [action] : [],
-    actor_user_ids: actor ? [actor] : []
+    actor_search:   actor || null
   };
   activityPageNumber = 1;
   activityUpdateFilterControls_();
