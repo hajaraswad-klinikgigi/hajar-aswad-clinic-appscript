@@ -1294,6 +1294,10 @@
       </svg>
     `;
 
+    if (!canUploadPatientPhoto()) {
+      return '';
+    }
+
     if (photo.delete_allowed) {
       return `
         <button
@@ -1358,12 +1362,16 @@
   }
 
   function renderPatientPhotoSection(groups) {
+    const uploadBtnHtml = canUploadPatientPhoto()
+      ? '<button type="button" class="btn btn-primary" onclick="openPatientPhotoUploadModal()">Tambah Foto</button>'
+      : '';
+
     if (!Array.isArray(groups) || !groups.length) {
       return `
         <div class="content-card">
           <div class="patient-ortho-recall-header">
             <div class="patient-ortho-recall-title">Foto Before / After</div>
-            <button type="button" class="btn btn-primary" onclick="openPatientPhotoUploadModal()">Tambah Foto</button>
+            ${uploadBtnHtml}
           </div>
           <div class="patient-photo-empty">Belum ada dokumentasi foto</div>
         </div>
@@ -1374,7 +1382,7 @@
       <div class="content-card">
         <div class="patient-ortho-recall-header">
           <div class="patient-ortho-recall-title">Foto Before / After</div>
-          <button type="button" class="btn btn-primary" onclick="openPatientPhotoUploadModal()">Tambah Foto</button>
+          ${uploadBtnHtml}
         </div>
 
         ${groups.map(function(group, idx) {

@@ -300,6 +300,28 @@
     return hasAnyAppRole(['owner', 'super_admin']);
   }
 
+  // Conditional button visibility per matrix §UI Guard.
+  // Backend tetap enforce via requireRole — ini hanya UX.
+  function canConfirmDoctorFee() {
+    return isFullyPrivileged() || hasAppRole('admin_finance');
+  }
+
+  function canDeleteExpense() {
+    return isFullyPrivileged();
+  }
+
+  function canUploadPatientPhoto() {
+    return isFullyPrivileged() || hasAppRole('admin_appointment');
+  }
+
+  function canManageServiceCatalog() {
+    return isFullyPrivileged();
+  }
+
+  function canManageDoctorCompensation() {
+    return isFullyPrivileged();
+  }
+
   // Apply sidebar visibility per role sesuai matrix §UI Guard.
   // Backend tetap enforce via requireRole — ini hanya UX.
   function applySidebarRoleVisibility_(user) {
