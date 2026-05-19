@@ -5,6 +5,26 @@
 
 const SETTINGS_OPTS = { backend_mode: 'supabase' };
 
+/**
+ * Strip field sensitif (password_hash, totp_secret) dari row user
+ * sebelum disimpan ke audit log.
+ */
+function sanitizeUserSnapshotForAudit_(user) {
+  if (!user || typeof user !== 'object') return null;
+  return {
+    user_id:        user.user_id,
+    username:       user.username,
+    full_name:      user.full_name,
+    email:          user.email || null,
+    role:           user.role,
+    is_active:      user.is_active,
+    totp_enabled:   !!(user.totp_secret && String(user.totp_secret).trim()),
+    totp_enabled_at: user.totp_enabled_at || null,
+    created_at:     user.created_at,
+    updated_at:     user.updated_at
+  };
+}
+
 // ── BOOTSTRAP (semua data sekaligus, 1 round-trip) ──
 
 function getAllSettingsData(payload) {
@@ -88,7 +108,8 @@ function updateClinicInfo(payload) {
     const rows = dbFindAll_('ClinicInfo', SETTINGS_OPTS);
     if (!rows.length) return { success: false, message: 'Data klinik belum ada.' };
 
-    const id    = rows[0].id;
+    const oldRow = rows[0];
+    const id    = oldRow.id;
     const patch = {};
     ['clinic_name', 'address', 'phone', 'email', 'logo_url'].forEach(function(f) {
       if (payload[f] !== undefined) patch[f] = String(payload[f] || '').trim();
@@ -96,6 +117,16 @@ function updateClinicInfo(payload) {
     patch.updated_at = new Date().toISOString();
 
     const updated = dbUpdateById_('ClinicInfo', 'id', id, patch, SETTINGS_OPTS);
+
+    writeAuditLog_({
+      actor: auth.user,
+      entity_type: 'clinic_info',
+      entity_id: String(id),
+      action: 'update',
+      old_value: oldRow,
+      new_value: updated
+    });
+
     return { success: true, data: updated };
   } catch (err) {
     return { success: false, message: err.message || err };
@@ -146,6 +177,16 @@ function addServiceCatalog(payload) {
     };
 
     const inserted = dbInsert_('ServiceCatalog', row, SETTINGS_OPTS);
+
+    writeAuditLog_({
+      actor: auth.user,
+      entity_type: 'service_catalog',
+      entity_id: newId,
+      action: 'create',
+      old_value: null,
+      new_value: inserted
+    });
+
     return { success: true, data: inserted };
   } catch (err) {
     return { success: false, message: err.message || err };
@@ -160,6 +201,8 @@ function updateServiceCatalog(payload) {
     const serviceId = String((payload && payload.service_id) || '').trim();
     if (!serviceId) return { success: false, message: 'service_id wajib diisi.' };
 
+    const oldRow = dbFindById_('ServiceCatalog', 'service_id', serviceId, SETTINGS_OPTS);
+
     const patch = {};
     ['service_name', 'default_price', 'is_ortho_install', 'is_ortho_control', 'is_active', 'notes'].forEach(function(f) {
       if (payload[f] !== undefined) patch[f] = payload[f];
@@ -167,6 +210,16 @@ function updateServiceCatalog(payload) {
     patch.updated_at = new Date().toISOString();
 
     const updated = dbUpdateById_('ServiceCatalog', 'service_id', serviceId, patch, SETTINGS_OPTS);
+
+    writeAuditLog_({
+      actor: auth.user,
+      entity_type: 'service_catalog',
+      entity_id: serviceId,
+      action: 'update',
+      old_value: oldRow,
+      new_value: updated
+    });
+
     return { success: true, data: updated };
   } catch (err) {
     return { success: false, message: err.message || err };
@@ -175,8 +228,39 @@ function updateServiceCatalog(payload) {
 
 function deleteServiceCatalog(payload) {
   // Soft delete — set is_active = false, jangan hapus fisik
-  // karena service mungkin masih dipakai di treatment_items lama
-  return updateServiceCatalog(Object.assign({}, payload, { is_active: false }));
+  // karena service mungkin masih dipakai di treatment_items lama.
+  // Standalone (bukan wrapper updateServiceCatalog) supaya audit
+  // action='deactivate' bukan 'update'.
+  try {
+    const auth = requireRole(payload, []);
+    if (!auth.success) return auth;
+
+    const serviceId = String((payload && payload.service_id) || '').trim();
+    if (!serviceId) return { success: false, message: 'service_id wajib diisi.' };
+
+    const oldRow = dbFindById_('ServiceCatalog', 'service_id', serviceId, SETTINGS_OPTS);
+    if (!oldRow) return { success: false, message: 'Layanan tidak ditemukan.' };
+
+    const patch = {
+      is_active: false,
+      updated_at: new Date().toISOString()
+    };
+
+    const updated = dbUpdateById_('ServiceCatalog', 'service_id', serviceId, patch, SETTINGS_OPTS);
+
+    writeAuditLog_({
+      actor: auth.user,
+      entity_type: 'service_catalog',
+      entity_id: serviceId,
+      action: 'deactivate',
+      old_value: oldRow,
+      new_value: updated
+    });
+
+    return { success: true, data: updated };
+  } catch (err) {
+    return { success: false, message: err.message || err };
+  }
 }
 
 // ── USER MANAGEMENT ──
@@ -327,6 +411,15 @@ function addUser(payload) {
     const inserted = dbInsert_('Users', row, SETTINGS_OPTS);
     syncAppUserRoles_(userId, roles, auth.user.clinic_id);
 
+    writeAuditLog_({
+      actor: auth.user,
+      entity_type: 'user',
+      entity_id: userId,
+      action: 'create',
+      old_value: null,
+      new_value: Object.assign(sanitizeUserSnapshotForAudit_(inserted) || {}, { roles: roles })
+    });
+
     return { success: true, data: { user_id: inserted.user_id, username: inserted.username, email: inserted.email || null, roles: roles } };
   } catch (err) {
     return { success: false, message: err.message || err };
@@ -340,6 +433,8 @@ function updateUser(payload) {
 
     const userId = String((payload && payload.user_id) || '').trim();
     if (!userId) return { success: false, message: 'user_id wajib diisi.' };
+
+    const oldUser = dbFindById_('Users', 'user_id', userId, SETTINGS_OPTS);
 
     const patch = {};
     if (payload.full_name !== undefined) patch.full_name = payload.full_name;
@@ -379,6 +474,15 @@ function updateUser(payload) {
       syncAppUserRoles_(userId, rolesToSync, auth.user.clinic_id);
     }
 
+    writeAuditLog_({
+      actor: auth.user,
+      entity_type: 'user',
+      entity_id: userId,
+      action: 'update',
+      old_value: sanitizeUserSnapshotForAudit_(oldUser),
+      new_value: Object.assign(sanitizeUserSnapshotForAudit_(updated) || {}, rolesToSync ? { roles: rolesToSync } : {})
+    });
+
     return { success: true, data: Object.assign({}, updated, { roles: rolesToSync || undefined }) };
   } catch (err) {
     return { success: false, message: err.message || err };
@@ -386,7 +490,38 @@ function updateUser(payload) {
 }
 
 function deleteUser(payload) {
-  return updateUser(Object.assign({}, payload, { is_active: false, roles: undefined }));
+  // Soft delete — set is_active=false. Standalone (bukan wrapper updateUser)
+  // supaya audit action='deactivate' bukan 'update'.
+  try {
+    const auth = requireRole(payload, []);
+    if (!auth.success) return auth;
+
+    const userId = String((payload && payload.user_id) || '').trim();
+    if (!userId) return { success: false, message: 'user_id wajib diisi.' };
+
+    const oldUser = dbFindById_('Users', 'user_id', userId, SETTINGS_OPTS);
+    if (!oldUser) return { success: false, message: 'User tidak ditemukan.' };
+
+    const patch = {
+      is_active: false,
+      updated_at: new Date().toISOString()
+    };
+
+    const updated = dbUpdateById_('Users', 'user_id', userId, patch, SETTINGS_OPTS);
+
+    writeAuditLog_({
+      actor: auth.user,
+      entity_type: 'user',
+      entity_id: userId,
+      action: 'deactivate',
+      old_value: sanitizeUserSnapshotForAudit_(oldUser),
+      new_value: sanitizeUserSnapshotForAudit_(updated)
+    });
+
+    return { success: true, data: updated };
+  } catch (err) {
+    return { success: false, message: err.message || err };
+  }
 }
 
 // =========================================================
@@ -420,6 +555,7 @@ function generateTotpForUser(payload) {
 
     const secret = generateTotpSecret_();
     const nowIso = new Date().toISOString();
+    const hadSecretBefore = !!String(user.totp_secret || '').trim();
 
     dbUpdateById_('Users', 'user_id', userId, {
       totp_secret: secret,
@@ -428,6 +564,17 @@ function generateTotpForUser(payload) {
     }, SETTINGS_OPTS);
 
     const otpauthUri = buildOtpAuthUri_(secret, email);
+
+    writeAuditLog_({
+      actor: auth.user,
+      entity_type: 'user',
+      entity_id: userId,
+      action: hadSecretBefore ? 'reset_totp' : 'generate_totp',
+      // JANGAN log secret — cuma fact bahwa operasi terjadi
+      old_value: { totp_enabled: hadSecretBefore, totp_enabled_at: user.totp_enabled_at || null },
+      new_value: { totp_enabled: true, totp_enabled_at: nowIso },
+      notes: 'TOTP secret di-' + (hadSecretBefore ? 'reset' : 'generate') + ' untuk ' + email
+    });
 
     return {
       success: true,
@@ -509,6 +656,16 @@ function sendTotpSetupEmail(payload) {
       name: 'Klinik Hajar Aswad'
     });
 
+    writeAuditLog_({
+      actor: auth.user,
+      entity_type: 'user',
+      entity_id: userId,
+      action: 'send_totp_setup_email',
+      old_value: null,
+      new_value: { email: user.email, token_expires_at: expiresAt },
+      notes: 'Email setup TOTP dikirim ke ' + user.email
+    });
+
     return {
       success: true,
       message: 'Email setup terkirim ke ' + user.email,
@@ -576,11 +733,23 @@ function disableTotpForUser(payload) {
     const userId = String((payload && payload.user_id) || '').trim();
     if (!userId) return { success: false, message: 'user_id wajib diisi.' };
 
+    const oldUser = dbFindById_('Users', 'user_id', userId, SETTINGS_OPTS);
+    const hadSecretBefore = !!String((oldUser && oldUser.totp_secret) || '').trim();
+
     dbUpdateById_('Users', 'user_id', userId, {
       totp_secret: null,
       totp_enabled_at: null,
       updated_at: new Date().toISOString()
     }, SETTINGS_OPTS);
+
+    writeAuditLog_({
+      actor: auth.user,
+      entity_type: 'user',
+      entity_id: userId,
+      action: 'disable_totp',
+      old_value: { totp_enabled: hadSecretBefore, totp_enabled_at: oldUser ? oldUser.totp_enabled_at || null : null },
+      new_value: { totp_enabled: false, totp_enabled_at: null }
+    });
 
     return { success: true, message: 'Authenticator dinonaktifkan.' };
   } catch (err) {

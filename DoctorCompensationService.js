@@ -288,6 +288,16 @@ function addDoctorCompensationRule(payload) {
     };
 
     const inserted = dbInsert_('DoctorCompensationRules', row, DOCTOR_COMP_OPTIONS);
+
+    writeAuditLog_({
+      actor: auth.user,
+      entity_type: 'doctor_compensation_rule',
+      entity_id: doctorName,
+      action: 'create',
+      old_value: null,
+      new_value: inserted
+    });
+
     return { success: true, data: inserted };
   } catch (err) {
     return { success: false, message: 'Gagal menyimpan: ' + (err.message || err) };
@@ -301,6 +311,8 @@ function updateDoctorCompensationRule(payload) {
 
     const doctorName = String((payload && payload.doctor_name) || '').trim();
     if (!doctorName) return { success: false, message: 'doctor_name wajib diisi.' };
+
+    const oldRule = dbFindById_('DoctorCompensationRules', 'doctor_name', doctorName, DOCTOR_COMP_OPTIONS);
 
     const patch = {};
     const fields = [
@@ -324,6 +336,23 @@ function updateDoctorCompensationRule(payload) {
     const updated = dbUpdateById_(
       'DoctorCompensationRules', 'doctor_name', doctorName, patch, DOCTOR_COMP_OPTIONS
     );
+
+    // Deteksi semantik action: pure is_active toggle → activate/deactivate, else update.
+    const patchKeysExcludingMeta = Object.keys(patch).filter(function(k) { return k !== 'updated_at'; });
+    let auditAction = 'update';
+    if (patchKeysExcludingMeta.length === 1 && patchKeysExcludingMeta[0] === 'is_active') {
+      auditAction = patch.is_active === false ? 'deactivate' : 'activate';
+    }
+
+    writeAuditLog_({
+      actor: auth.user,
+      entity_type: 'doctor_compensation_rule',
+      entity_id: doctorName,
+      action: auditAction,
+      old_value: oldRule,
+      new_value: updated
+    });
+
     return { success: true, data: updated };
   } catch (err) {
     return { success: false, message: 'Gagal update: ' + (err.message || err) };
@@ -400,6 +429,16 @@ function addDoctorMaterialDeduction(payload) {
 
     const row = buildDeductionRow_(payload);
     const inserted = dbInsert_('DoctorMaterialDeductions', row, DOCTOR_COMP_OPTIONS);
+
+    writeAuditLog_({
+      actor: auth.user,
+      entity_type: 'doctor_material_deduction',
+      entity_id: String((inserted && inserted.id) || ''),
+      action: 'create',
+      old_value: null,
+      new_value: inserted
+    });
+
     return { success: true, data: inserted };
   } catch (err) {
     return { success: false, message: 'Gagal menyimpan: ' + (err.message || err) };
@@ -420,6 +459,8 @@ function updateDoctorMaterialDeduction(payload) {
       if (!v.ok) return { success: false, message: v.message };
     }
 
+    const oldRow = dbFindById_('DoctorMaterialDeductions', 'id', id, DOCTOR_COMP_OPTIONS);
+
     const patch = {};
     const fields = [
       'service_id', 'category', 'deduction_type',
@@ -434,6 +475,22 @@ function updateDoctorMaterialDeduction(payload) {
     const updated = dbUpdateById_(
       'DoctorMaterialDeductions', 'id', id, patch, DOCTOR_COMP_OPTIONS
     );
+
+    const patchKeysExcludingMeta = Object.keys(patch).filter(function(k) { return k !== 'updated_at'; });
+    let auditAction = 'update';
+    if (patchKeysExcludingMeta.length === 1 && patchKeysExcludingMeta[0] === 'is_active') {
+      auditAction = patch.is_active === false ? 'deactivate' : 'activate';
+    }
+
+    writeAuditLog_({
+      actor: auth.user,
+      entity_type: 'doctor_material_deduction',
+      entity_id: String(id),
+      action: auditAction,
+      old_value: oldRow,
+      new_value: updated
+    });
+
     return { success: true, data: updated };
   } catch (err) {
     return { success: false, message: 'Gagal update: ' + (err.message || err) };
@@ -441,7 +498,8 @@ function updateDoctorMaterialDeduction(payload) {
 }
 
 function deleteDoctorMaterialDeduction(payload) {
-  // Soft delete — set is_active = false
+  // Soft delete — set is_active = false. Audit log dihasilkan oleh
+  // updateDoctorMaterialDeduction (action='deactivate' karena pure is_active toggle).
   return updateDoctorMaterialDeduction(Object.assign({}, payload, { is_active: false }));
 }
 
@@ -579,6 +637,16 @@ function confirmDoctorFeeToExpenses(payload) {
       const inserted = dbInsert_('Expenses', expenseRow, DOCTOR_COMP_OPTIONS);
       createdExpenses.push(inserted || expenseRow);
       created++;
+
+      writeAuditLog_({
+        actor: auth.user,
+        entity_type: 'expense',
+        entity_id: expenseId,
+        action: 'confirm_doctor_fee',
+        old_value: null,
+        new_value: inserted || expenseRow,
+        notes: 'Konfirmasi fee dokter ' + dName + ' tanggal ' + date
+      });
     });
 
     return { success: true, data: { expenses_created: created, expenses: createdExpenses } };
