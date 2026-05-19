@@ -297,7 +297,7 @@ function buildPatientOrthoRecallSummary(row, options) {
   };
 }
 
-function getPatientOrthoRecallSummary(patientId, options) {
+function getPatientOrthoRecallSummary_(patientId, options) {
   const normalizedPatientId = String(patientId || '').trim();
   const opts = getOrthoRecallServiceUiReadOptions_(options);
 
@@ -316,7 +316,15 @@ function getPatientOrthoRecallSummary(patientId, options) {
   };
 }
 
-function getOrthoRecallById(orthoRecallId, options) {
+function getPatientOrthoRecallSummary(payload) {
+  const auth = requireRole(payload, ['admin_appointment']);
+  if (!auth.success) return auth;
+
+  const patientId = String((payload && payload.patient_id) || '').trim();
+  return getPatientOrthoRecallSummary_(patientId);
+}
+
+function getOrthoRecallById_(orthoRecallId, options) {
   const opts = getOrthoRecallServiceUiReadOptions_(options);
   const row = findOrthoRecallById(orthoRecallId, opts);
 
@@ -335,6 +343,14 @@ function getOrthoRecallById(orthoRecallId, options) {
     success: true,
     data: normalizeOrthoRecallRow(enrichedRow)
   };
+}
+
+function getOrthoRecallById(payload) {
+  const auth = requireRole(payload, ['admin_appointment']);
+  if (!auth.success) return auth;
+
+  const orthoRecallId = String((payload && payload.ortho_recall_id) || '').trim();
+  return getOrthoRecallById_(orthoRecallId);
 }
 
 function sortOrthoRecallRowsForPatient(rows) {
@@ -572,7 +588,7 @@ function upsertOrthoRecallFromControl(payload) {
 }
 
 function saveOrthoRecallContact(payload) {
-  const auth = readAuthSession_(payload);
+  const auth = requireRole(payload, ['admin_appointment']);
   if (!auth.success) return auth;
 
   const freezeCheck = repoCheckProductionMutationAllowed_({
@@ -659,7 +675,7 @@ function buildOrthoRecallProgramNote(existingNote, actionLabel, reason) {
 }
 
 function completeOrthoRecallProgram(payload) {
-  const auth = readAuthSession_(payload);
+  const auth = requireRole(payload, ['admin_appointment']);
   if (!auth.success) return auth;
 
   const freezeCheck = repoCheckProductionMutationAllowed_({
@@ -743,7 +759,7 @@ function completeOrthoRecallProgram(payload) {
 }
 
 function cancelOrthoRecallProgram(payload) {
-  const auth = readAuthSession_(payload);
+  const auth = requireRole(payload, ['admin_appointment']);
   if (!auth.success) return auth;
 
   const freezeCheck = repoCheckProductionMutationAllowed_({
@@ -898,7 +914,7 @@ function refreshAllOrthoRecallStatuses(options) {
   };
 }
 
-function getOrthoRecallList(options) {
+function getOrthoRecallList_(options) {
   const opts = getOrthoRecallServiceUiReadOptions_(options);
 
   if (!isOrthoRecallServiceUiReadSupabaseMode_(opts)) {
@@ -926,6 +942,13 @@ function getOrthoRecallList(options) {
     success: true,
     data: rows
   };
+}
+
+function getOrthoRecallList(payload) {
+  const auth = requireRole(payload, ['admin_appointment']);
+  if (!auth.success) return auth;
+
+  return getOrthoRecallList_();
 }
 
 function syncOrthoRecallPhonesFromPatients(options) {
@@ -1269,7 +1292,7 @@ function testOrthoRecallServiceReadLog() {
     const opts = getOrthoRecallServiceUiReadOptions_();
 
     const raw = getOrthoRecallRaw(opts);
-    const listRes = getOrthoRecallList(opts);
+    const listRes = getOrthoRecallList_(opts);
 
     result.probe.recall_count = Array.isArray(raw) ? raw.length : -1;
     result.probe.list_success = !!(listRes && listRes.success);
@@ -1296,7 +1319,7 @@ function testOrthoRecallServiceReadLog() {
 
     if (recallId) {
       const found = findOrthoRecallById(recallId, opts);
-      const detail = getOrthoRecallById(recallId, opts);
+      const detail = getOrthoRecallById_(recallId, opts);
 
       result.probe.find_success = !!found;
       result.probe.detail_success = !!(detail && detail.success);
@@ -1319,7 +1342,7 @@ function testOrthoRecallServiceReadLog() {
     if (patientId) {
       const rowsByPatient = getOrthoRecallRowsByPatientId(patientId, opts);
       const active = findActiveOrthoRecallByPatientId(patientId, opts);
-      const summary = getPatientOrthoRecallSummary(patientId, opts);
+      const summary = getPatientOrthoRecallSummary_(patientId, opts);
 
       result.probe.recall_by_patient_count = Array.isArray(rowsByPatient) ? rowsByPatient.length : -1;
       result.probe.has_active_recall = !!active;

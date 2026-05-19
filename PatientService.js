@@ -443,7 +443,7 @@ function getPatientDetailBundle(payloadOrId) {
     };
   }
 
-  const orthoRecallResult = getPatientOrthoRecallSummary(normalizedPatientId);
+  const orthoRecallResult = getPatientOrthoRecallSummary_(normalizedPatientId);
   const orthoRecallSummary =
     orthoRecallResult && orthoRecallResult.success && orthoRecallResult.data
       ? orthoRecallResult.data
@@ -511,7 +511,7 @@ function getPatientDetailPrimary(payloadOrId) {
     };
   }
 
-  const orthoRecallResult = getPatientOrthoRecallSummary(normalizedPatientId);
+  const orthoRecallResult = getPatientOrthoRecallSummary_(normalizedPatientId);
   const orthoRecallSummary =
     orthoRecallResult && orthoRecallResult.success && orthoRecallResult.data
       ? orthoRecallResult.data

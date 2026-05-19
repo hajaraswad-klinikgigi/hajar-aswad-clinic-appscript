@@ -339,7 +339,7 @@
 
         showToast('Error: ' + (err && err.message ? err.message : err), 'error');
       })
-      .getOrthoRecallList();
+      .getOrthoRecallList(attachAuthContext({}));
   }
 
   function handleRecallSearch() {
