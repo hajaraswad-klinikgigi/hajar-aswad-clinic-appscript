@@ -608,10 +608,24 @@ function generateBillingFromTreatment(payload) {
     return String(row.treatment_id || '').trim() === normalizedTreatmentId;
   });
 
-  return createDraftBillingFromTreatment(treatment, items, {
+  const res = createDraftBillingFromTreatment(treatment, items, {
     use_lock: true,
     internal_call: true
   });
+
+  if (res && res.success && res.data && res.data.billing && permission.user) {
+    writeAuditLog_({
+      actor: permission.user,
+      entity_type: 'billing',
+      entity_id: String(res.data.billing.billing_id || ''),
+      action: 'create',
+      old_value: null,
+      new_value: res.data.billing,
+      notes: 'Manual generate billing dari treatment ' + normalizedTreatmentId
+    });
+  }
+
+  return res;
 }
 
 /* =========================================================
@@ -1454,6 +1468,18 @@ function addBillingDiscount(payload) {
         invoiceStaleRes.data.invoice_delivery_status || ''
       );
     }
+
+    // Audit dicatat SEKARANG (setelah adjustment + totals confirmed). Sync
+    // cicilan di bawah masih bisa fail, tetapi diskon sudah persisten.
+    writeAuditLog_({
+      actor: permission.user,
+      entity_type: 'billing_adjustment',
+      entity_id: adjustment.adjustment_id,
+      action: 'create',
+      old_value: null,
+      new_value: adjustment,
+      notes: 'Diskon untuk billing ' + billingId + (adjustment.label ? ' label=' + adjustment.label : '')
+    });
 
     let installmentSyncRes = {
       success: true,

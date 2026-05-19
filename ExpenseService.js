@@ -227,6 +227,15 @@ function addExpense(payload) {
 
     const inserted = dbInsert_('Expenses', row, EXPENSE_OPTIONS);
 
+    writeAuditLog_({
+      actor: auth.user,
+      entity_type: 'expense',
+      entity_id: expenseId,
+      action: 'create',
+      old_value: null,
+      new_value: row
+    });
+
     return { success: true, data: inserted };
 
   } catch (err) {
@@ -292,6 +301,15 @@ function updateExpense(payload) {
 
     const updated = dbUpdateById_('Expenses', 'expense_id', expenseId, patch, EXPENSE_OPTIONS);
 
+    writeAuditLog_({
+      actor: auth.user,
+      entity_type: 'expense',
+      entity_id: expenseId,
+      action: 'update',
+      old_value: existing,
+      new_value: Object.assign({}, existing, patch)
+    });
+
     return { success: true, data: updated };
 
   } catch (err) {
@@ -317,6 +335,15 @@ function deleteExpense(payload) {
     }
 
     dbDeleteById_('Expenses', 'expense_id', expenseId, EXPENSE_OPTIONS);
+
+    writeAuditLog_({
+      actor: auth.user,
+      entity_type: 'expense',
+      entity_id: expenseId,
+      action: 'delete',
+      old_value: existing,
+      new_value: null
+    });
 
     return { success: true };
 

@@ -555,6 +555,16 @@ function createOrReplaceBillingInstallmentPlan(payload) {
       };
     }
 
+    writeAuditLog_({
+      actor: permission.user,
+      entity_type: 'billing_installment_plan',
+      entity_id: billingId,
+      action: existingInstallments.length > 0 ? 'replace' : 'create',
+      old_value: existingInstallments.length > 0 ? { installments: existingInstallments } : null,
+      new_value: { installments: rows, billing_patch: billingPatch },
+      notes: 'Plan ' + rows.length + ' termin'
+    });
+
     let latestBilling = Object.assign({}, billing, billingPatch);
 
     let invoiceStaleRes = null;
@@ -678,6 +688,8 @@ function clearBillingInstallmentPlan(payload) {
       };
     }
 
+    const existingInstallments = getBillingInstallmentRowsByBillingId(billingId);
+
     const deleted = deleteBillingInstallmentsByBillingId_(billingId, {
       ensure_setup: false
     });
@@ -703,6 +715,16 @@ function clearBillingInstallmentPlan(payload) {
         message: 'Jadwal cicilan terhapus, tetapi update metadata billing gagal'
       };
     }
+
+    writeAuditLog_({
+      actor: permission.user,
+      entity_type: 'billing_installment_plan',
+      entity_id: billingId,
+      action: 'clear',
+      old_value: { installments: existingInstallments },
+      new_value: null,
+      notes: 'Plan cicilan dihapus, ' + existingInstallments.length + ' termin'
+    });
 
     let latestBilling = Object.assign({}, billing, billingPatch);
 

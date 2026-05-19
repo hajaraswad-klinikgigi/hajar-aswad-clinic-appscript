@@ -812,9 +812,23 @@ function generateBillingInvoicePdf(payload) {
 
     const billingId = String((payload && payload.billing_id) || '').trim();
 
-    return generateBillingInvoicePdfUnlocked_(billingId, {
+    const res = generateBillingInvoicePdfUnlocked_(billingId, {
       ensure_setup: false
     });
+
+    if (res && res.success) {
+      writeAuditLog_({
+        actor: permission.user,
+        entity_type: 'billing_invoice',
+        entity_id: billingId,
+        action: 'generate_pdf',
+        old_value: null,
+        new_value: res.data && res.data.billing ? res.data.billing : null,
+        notes: 'Invoice PDF di-generate'
+      });
+    }
+
+    return res;
 
   } catch (err) {
     return {
@@ -1217,6 +1231,16 @@ function sendBillingInvoiceEmail(payload) {
       ),
       attachments: [pdfData.blob],
       name: 'Klinik Hajar Aswad'
+    });
+
+    writeAuditLog_({
+      actor: permission.user,
+      entity_type: 'billing_invoice',
+      entity_id: billingId,
+      action: 'send_email',
+      old_value: null,
+      new_value: { email_to: emailTo, file_id: pdfData.file_id, subject: subject },
+      notes: 'Invoice billing ' + billingId + ' dikirim ke ' + emailTo
     });
 
     const now = nowIso();

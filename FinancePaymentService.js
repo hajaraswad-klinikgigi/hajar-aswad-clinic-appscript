@@ -713,6 +713,19 @@ function recordBillingPayment(payload) {
     let latestBilling = Object.assign({}, billing, updateTotalsRes.data || {});
     const invoiceStaleRes = updateTotalsRes.invoice_stale_update || null;
 
+    // Audit dicatat SEKARANG (setelah payment + totals confirmed). Installment
+    // recalc di bawah masih bisa fail, tetapi payment row sudah persisten.
+    writeAuditLog_({
+      actor: permission.user,
+      entity_type: 'payment',
+      entity_id: payment.payment_id,
+      action: 'create',
+      old_value: null,
+      new_value: payment,
+      notes: 'Pembayaran billing ' + billingId + ' scope=' + paymentScope
+             + (installmentId ? ' installment=' + installmentId : '')
+    });
+
     if (
       invoiceStaleRes &&
       invoiceStaleRes.success &&

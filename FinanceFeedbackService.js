@@ -540,6 +540,19 @@ function submitBillingFeedback(payload) {
 
     const savedFeedback = Object.assign({}, feedback, updated);
 
+    // Feedback patient di-submit via token publik (tidak ada auth.user).
+    // Actor: pseudo-user PATIENT-FEEDBACK supaya jelas asal entri di audit log.
+    writeAuditLog_({
+      actor: { user_id: 'PATIENT-FEEDBACK', roles: ['public_feedback'] },
+      entity_type: 'billing_feedback',
+      entity_id: String(feedback.feedback_id || ''),
+      action: 'submit',
+      old_value: feedback,
+      new_value: savedFeedback,
+      clinic_id: String(feedback.clinic_id || ''),
+      notes: 'Submit feedback billing ' + String(feedback.billing_id || '') + ' rating=' + updated.rating
+    });
+
     if (typeof hardenFinanceTextColumnsForObjectRow_ === 'function' && !repoIsSupabaseBackendMode_()) {
       const hardenSubmittedFeedbackRes = hardenFinanceTextColumnsForObjectRow_(
         'BillingFeedbacks',
