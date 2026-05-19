@@ -28,7 +28,8 @@ const REPO_TABLES = Object.freeze({
   DOCTOR_MATERIAL_DEDUCTIONS: 'DoctorMaterialDeductions',
   CLINIC_INFO: 'ClinicInfo',
   APP_USER_ROLES: 'AppUserRoles',
-  TOTP_SETUP_TOKENS: 'TotpSetupTokens'
+  TOTP_SETUP_TOKENS: 'TotpSetupTokens',
+  AUDIT_LOG: 'AuditLog'
 });
 
 /**
@@ -55,7 +56,8 @@ const REPO_TARGET_TABLES = Object.freeze({
   DoctorMaterialDeductions: 'doctor_material_deductions',
   ClinicInfo: 'clinic_info',
   AppUserRoles: 'app_user_roles',
-  TotpSetupTokens: 'totp_setup_tokens'
+  TotpSetupTokens: 'totp_setup_tokens',
+  AuditLog: 'audit_log'
 });
 
 /**
@@ -82,7 +84,8 @@ const REPO_PRIMARY_KEYS = Object.freeze({
   DoctorMaterialDeductions: 'id',
   ClinicInfo: 'id',
   AppUserRoles: 'user_id',
-  TotpSetupTokens: 'token'
+  TotpSetupTokens: 'token',
+  AuditLog: 'id'
 });
 
 /* =========================================================
