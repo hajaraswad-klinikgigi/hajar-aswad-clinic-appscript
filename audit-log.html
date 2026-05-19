@@ -1,0 +1,43 @@
+<script>
+/* =========================================================
+   AUDIT LOG (AKTIVITAS) PAGE — STATE
+   Diisi bertahap: P3c.2 stub, P3c.3 layout dasar + load data,
+   P3c.4 filter UI, P3c.5 detail modal.
+   ========================================================= */
+var activityRows = [];
+var activityPageNumber = 1;
+var activityPageSize = 50;
+var activityHasNext = false;
+var activityHasPrev = false;
+var activityAllowedEntityTypes = null;
+var activityActiveSince = '2026-05-19';
+var activityFiltersApplied = {};
+var activityLoading = false;
+
+/* =========================================================
+   ENTRY POINT
+   ========================================================= */
+function showActivityPage() {
+  document.querySelectorAll('.sidebar-menu').forEach(function(b) { b.classList.remove('active'); });
+  var btn = document.getElementById('menuActivity');
+  if (btn) btn.classList.add('active');
+
+  var contentArea = document.getElementById('contentArea');
+  if (!contentArea) return;
+
+  contentArea.innerHTML =
+    '<div class="settings-shell">' +
+      '<div class="settings-header">' +
+        '<div class="owner-eyebrow">Aktivitas</div>' +
+        '<h1 class="owner-title">Log Aktivitas Sistem</h1>' +
+        '<div class="owner-subtitle">Rekam jejak perubahan data oleh seluruh pengguna staff klinik</div>' +
+      '</div>' +
+      '<div id="activityPageBody">' +
+        '<div class="settings-empty" style="padding:32px 12px;text-align:center;color:#64748b;font-size:13px">' +
+          'Halaman Aktivitas sedang disiapkan.<br>' +
+          '<span style="font-size:11.5px;color:#94a3b8">Tabel + filter akan tersedia pada step P3c.3 berikutnya.</span>' +
+        '</div>' +
+      '</div>' +
+    '</div>';
+}
+</script>

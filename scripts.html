@@ -350,7 +350,7 @@
     var roles = (user && Array.isArray(user.roles)) ? user.roles : [];
     var allMenuIds = [
       'menuDashboard', 'menuPatients', 'menuAppointments',
-      'menuRecall', 'menuFinance', 'menuSettings'
+      'menuRecall', 'menuFinance', 'menuActivity', 'menuSettings'
     ];
 
     // Legacy fallback: kalau user belum punya roles[] (akun bootstrap pre-migrate),
@@ -372,6 +372,7 @@
       menuAppointments: ['admin_appointment', 'doctor'],
       menuRecall:       ['admin_appointment'],
       menuFinance:      ['admin_finance'],
+      menuActivity:     ['admin_appointment', 'admin_finance'],
       menuSettings:     []   // owner-only via fully_privileged
     };
 
