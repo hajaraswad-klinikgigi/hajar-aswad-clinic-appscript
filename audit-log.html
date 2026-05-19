@@ -479,7 +479,7 @@ function activityFormatTimestamp_(iso) {
   var d = new Date(iso);
   if (isNaN(d.getTime())) return escapeAppHtml(String(iso));
   var pad = function(n) { return ('0' + n).slice(-2); };
-  var dateStr = pad(d.getDate()) + '/' + pad(d.getMonth() + 1) + '/' + d.getFullYear();
+  var dateStr = pad(d.getDate()) + '-' + pad(d.getMonth() + 1) + '-' + d.getFullYear();
   var timeStr = pad(d.getHours()) + ':' + pad(d.getMinutes());
   return '<div class="activity-time-main">' + dateStr + '</div>' +
          '<div class="activity-time-sub">' + timeStr + '</div>';
@@ -750,7 +750,7 @@ function activityFormatTimestampLong_(iso) {
   var d = new Date(iso);
   if (isNaN(d.getTime())) return String(iso);
   var pad = function(n) { return ('0' + n).slice(-2); };
-  return pad(d.getDate()) + '/' + pad(d.getMonth() + 1) + '/' + d.getFullYear() + ' ' +
+  return pad(d.getDate()) + '-' + pad(d.getMonth() + 1) + '-' + d.getFullYear() + ' ' +
     pad(d.getHours()) + ':' + pad(d.getMinutes()) + ':' + pad(d.getSeconds());
 }
 
