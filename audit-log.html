@@ -117,6 +117,7 @@ function showActivityPage() {
       '</div>' +
     '</div>';
 
+  activityRenderFilterUI_();
   activityPageNumber = 1;
   activityLoadPage_();
 }
@@ -153,6 +154,7 @@ function activityLoadPage_() {
       activityActiveSince = data.active_since || activityActiveSince;
       activityFiltersApplied = data.filters_applied || {};
       activityRenderBody_();
+      activitySyncEntityTypeOptions_();
     })
     .withFailureHandler(function(err) {
       activityLoading = false;
@@ -266,6 +268,164 @@ function activityFormatRoles_(roles) {
     return '<span style="font-style:italic">-</span>';
   }
   return roles.map(function(r) { return escapeAppHtml(String(r || '')); }).join(', ');
+}
+
+/* =========================================================
+   FILTER UI
+   ========================================================= */
+function activityRenderFilterUI_() {
+  var filterArea = document.getElementById('activityFilterArea');
+  if (!filterArea) return;
+
+  var startVal = String(activityFiltersApplied.start_date || '');
+  var endVal   = String(activityFiltersApplied.end_date || '');
+  var actorVal = (Array.isArray(activityFiltersApplied.actor_user_ids) && activityFiltersApplied.actor_user_ids.length)
+    ? String(activityFiltersApplied.actor_user_ids[0])
+    : '';
+
+  filterArea.innerHTML =
+    '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px;padding:12px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px">' +
+      '<div>' +
+        '<label style="font-size:11px;color:#64748b;margin-bottom:4px;display:block;font-weight:500">Dari tanggal</label>' +
+        '<input type="date" id="activityFilterStartDate" value="' + escapeAppHtml(startVal) + '" ' +
+          'style="width:100%;padding:7px 10px;border:1px solid #cbd5e1;border-radius:6px;font-size:12px;background:white">' +
+      '</div>' +
+      '<div>' +
+        '<label style="font-size:11px;color:#64748b;margin-bottom:4px;display:block;font-weight:500">Sampai tanggal</label>' +
+        '<input type="date" id="activityFilterEndDate" value="' + escapeAppHtml(endVal) + '" ' +
+          'style="width:100%;padding:7px 10px;border:1px solid #cbd5e1;border-radius:6px;font-size:12px;background:white">' +
+      '</div>' +
+      '<div>' +
+        '<label style="font-size:11px;color:#64748b;margin-bottom:4px;display:block;font-weight:500">Entitas</label>' +
+        '<select id="activityFilterEntityType" ' +
+          'style="width:100%;padding:7px 10px;border:1px solid #cbd5e1;border-radius:6px;font-size:12px;background:white">' +
+          '<option value="">Semua entitas</option>' +
+          activityBuildEntityTypeOptions_() +
+        '</select>' +
+      '</div>' +
+      '<div>' +
+        '<label style="font-size:11px;color:#64748b;margin-bottom:4px;display:block;font-weight:500">Aksi</label>' +
+        '<select id="activityFilterAction" ' +
+          'style="width:100%;padding:7px 10px;border:1px solid #cbd5e1;border-radius:6px;font-size:12px;background:white">' +
+          '<option value="">Semua aksi</option>' +
+          activityBuildActionOptions_() +
+        '</select>' +
+      '</div>' +
+      '<div>' +
+        '<label style="font-size:11px;color:#64748b;margin-bottom:4px;display:block;font-weight:500">Aktor (user_id)</label>' +
+        '<input type="text" id="activityFilterActor" value="' + escapeAppHtml(actorVal) + '" placeholder="mis. usr-fikri" ' +
+          'style="width:100%;padding:7px 10px;border:1px solid #cbd5e1;border-radius:6px;font-size:12px" ' +
+          'onkeydown="if(event.key===\'Enter\'){activityApplyFilter_();event.preventDefault();}">' +
+      '</div>' +
+      '<div style="display:flex;align-items:flex-end;gap:6px">' +
+        '<button type="button" onclick="activityApplyFilter_()" ' +
+          'style="flex:1;padding:8px 12px;background:#1e40af;color:white;border:none;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer">Terapkan</button>' +
+        '<button type="button" onclick="activityResetFilter_()" ' +
+          'style="padding:8px 12px;background:white;color:#64748b;border:1px solid #cbd5e1;border-radius:6px;font-size:12px;cursor:pointer">Reset</button>' +
+      '</div>' +
+    '</div>';
+}
+
+function activityBuildEntityTypeOptions_() {
+  var list;
+  if (Array.isArray(activityAllowedEntityTypes) && activityAllowedEntityTypes.length > 0) {
+    list = activityAllowedEntityTypes.slice();
+  } else {
+    // null (full access) atau belum tahu — pakai semua label keys
+    list = Object.keys(ACTIVITY_ENTITY_TYPE_LABELS);
+  }
+  // Sort by label Bahasa Indonesia
+  list.sort(function(a, b) {
+    var la = ACTIVITY_ENTITY_TYPE_LABELS[a] || a;
+    var lb = ACTIVITY_ENTITY_TYPE_LABELS[b] || b;
+    return la.localeCompare(lb);
+  });
+  var selected = (Array.isArray(activityFiltersApplied.entity_types) && activityFiltersApplied.entity_types.length === 1)
+    ? String(activityFiltersApplied.entity_types[0])
+    : '';
+  return list.map(function(t) {
+    var label = ACTIVITY_ENTITY_TYPE_LABELS[t] || t;
+    var sel = String(selected) === String(t) ? ' selected' : '';
+    return '<option value="' + escapeAppHtml(t) + '"' + sel + '>' + escapeAppHtml(label) + '</option>';
+  }).join('');
+}
+
+function activityBuildActionOptions_() {
+  var keys = Object.keys(ACTIVITY_ACTION_LABELS);
+  keys.sort(function(a, b) {
+    return (ACTIVITY_ACTION_LABELS[a] || a).localeCompare(ACTIVITY_ACTION_LABELS[b] || b);
+  });
+  var selected = (Array.isArray(activityFiltersApplied.actions) && activityFiltersApplied.actions.length === 1)
+    ? String(activityFiltersApplied.actions[0])
+    : '';
+  return keys.map(function(a) {
+    var label = ACTIVITY_ACTION_LABELS[a];
+    var sel = String(selected) === String(a) ? ' selected' : '';
+    return '<option value="' + escapeAppHtml(a) + '"' + sel + '>' + escapeAppHtml(label) + '</option>';
+  }).join('');
+}
+
+/**
+ * Sinkronkan opsi entity_type dropdown dengan allowed_entity_types
+ * setelah data load (kalau awalnya pakai fallback semua label keys).
+ * Preserve selected value kalau masih valid.
+ */
+function activitySyncEntityTypeOptions_() {
+  var sel = document.getElementById('activityFilterEntityType');
+  if (!sel) return;
+  if (!Array.isArray(activityAllowedEntityTypes)) return; // null = full access, no need sync
+
+  var currentValue = sel.value;
+  sel.innerHTML = '<option value="">Semua entitas</option>' + activityBuildEntityTypeOptions_();
+  // Restore selection kalau masih ada di opsi baru
+  var matched = false;
+  for (var i = 0; i < sel.options.length; i++) {
+    if (sel.options[i].value === currentValue) { matched = true; break; }
+  }
+  if (matched) sel.value = currentValue;
+}
+
+function activityApplyFilter_() {
+  var startEl  = document.getElementById('activityFilterStartDate');
+  var endEl    = document.getElementById('activityFilterEndDate');
+  var entityEl = document.getElementById('activityFilterEntityType');
+  var actionEl = document.getElementById('activityFilterAction');
+  var actorEl  = document.getElementById('activityFilterActor');
+
+  var start  = startEl  ? String(startEl.value || '').trim()  : '';
+  var end    = endEl    ? String(endEl.value || '').trim()    : '';
+  var entity = entityEl ? String(entityEl.value || '').trim() : '';
+  var action = actionEl ? String(actionEl.value || '').trim() : '';
+  var actor  = actorEl  ? String(actorEl.value || '').trim()  : '';
+
+  if (start && end && start > end) {
+    showToast('Tanggal mulai tidak boleh lebih besar dari tanggal akhir', 'error');
+    return;
+  }
+
+  activityFiltersApplied = {
+    start_date:     start || null,
+    end_date:       end || null,
+    entity_types:   entity ? [entity] : [],
+    actions:        action ? [action] : [],
+    actor_user_ids: actor ? [actor] : []
+  };
+  activityPageNumber = 1;
+  activityLoadPage_();
+}
+
+function activityResetFilter_() {
+  activityFiltersApplied = {};
+  activityPageNumber = 1;
+
+  var ids = ['activityFilterStartDate', 'activityFilterEndDate', 'activityFilterEntityType',
+             'activityFilterAction', 'activityFilterActor'];
+  ids.forEach(function(id) {
+    var el = document.getElementById(id);
+    if (el) el.value = '';
+  });
+
+  activityLoadPage_();
 }
 
 /* =========================================================
