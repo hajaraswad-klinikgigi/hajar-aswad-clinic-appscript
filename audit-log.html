@@ -226,11 +226,13 @@ function showActivityPage() {
   if (!contentArea) return;
 
   contentArea.innerHTML =
-    '<div class="settings-shell">' +
-      '<div class="settings-header">' +
-        '<div class="owner-eyebrow">Aktivitas</div>' +
-        '<h1 class="owner-title">Log Aktivitas Sistem</h1>' +
-        '<div class="owner-subtitle">Rekam jejak perubahan data oleh seluruh pengguna staff klinik</div>' +
+    '<div class="patients-shell">' +
+      '<div class="patients-header">' +
+        '<div>' +
+          '<div class="patients-eyebrow">Aktivitas</div>' +
+          '<h1 class="patients-title">Log Aktivitas Sistem</h1>' +
+          '<div class="patients-subtitle">Rekam jejak perubahan data oleh seluruh pengguna staff klinik</div>' +
+        '</div>' +
       '</div>' +
 
       '<div class="content-card patients-toolbar-card">' +
@@ -399,9 +401,9 @@ function activityRenderBody_() {
       : 'Belum ada catatan aktivitas pada periode/filter yang dipilih';
     tbody.innerHTML =
       '<tr><td colspan="6">' +
-        '<div class="settings-empty-state">' +
-          '<div class="settings-empty-state-title">' + emptyTitle + '</div>' +
-          '<div class="settings-empty-state-subtitle">' + emptySub + '</div>' +
+        '<div class="patients-empty-state">' +
+          '<div class="patients-empty-title">' + emptyTitle + '</div>' +
+          '<div class="patients-empty-subtitle">' + emptySub + '</div>' +
         '</div>' +
       '</td></tr>';
   } else {
@@ -486,19 +488,19 @@ function activityFormatTimestamp_(iso) {
 function activityFormatEntityType_(t) {
   var raw = String(t || '').trim();
   var label = ACTIVITY_ENTITY_TYPE_LABELS[raw] || (raw || '-');
-  return '<span class="settings-badge" style="font-size:11px">' + escapeAppHtml(label) + '</span>';
+  return '<span class="status-badge default">' + escapeAppHtml(label) + '</span>';
 }
 
 function activityFormatAction_(a) {
   var key = String(a || '').toLowerCase();
   var label = ACTIVITY_ACTION_LABELS[key] || key || '-';
-  var className = 'settings-badge';
+  var className = 'status-badge default';
   if (ACTIVITY_ACTION_DANGER.indexOf(key) !== -1) {
-    className = 'settings-badge settings-badge-inactive';
+    className = 'status-badge cancelled';
   } else if (ACTIVITY_ACTION_POSITIVE.indexOf(key) !== -1) {
-    className = 'settings-badge settings-badge-active';
+    className = 'status-badge completed';
   }
-  return '<span class="' + className + '" style="font-size:11px">' + escapeAppHtml(label) + '</span>';
+  return '<span class="' + className + '">' + escapeAppHtml(label) + '</span>';
 }
 
 function activityFormatRoles_(roles) {
@@ -714,7 +716,7 @@ function activityOpenDetail_(id) {
   if (entityEl) {
     var entityLabel = ACTIVITY_ENTITY_TYPE_LABELS[String(row.entity_type || '')] || String(row.entity_type || '-');
     entityEl.innerHTML =
-      '<span class="settings-badge" style="font-size:11px">' + escapeAppHtml(entityLabel) + '</span>' +
+      '<span class="status-badge default">' + escapeAppHtml(entityLabel) + '</span>' +
       ' <span class="activity-entity-id" style="display:inline;margin-left:8px">' + escapeAppHtml(String(row.entity_id || '')) + '</span>';
   }
   if (actionEl) actionEl.innerHTML = activityFormatAction_(row.action);
