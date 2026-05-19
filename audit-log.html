@@ -20,6 +20,14 @@
     }
   }
 
+  /* Stale-while-revalidate: dim tabel saat refresh, supaya user paham data
+     sedang diupdate sementara baris lama tetap visible (tidak flash kosong). */
+  #activityTableBody.activity-table-loading {
+    opacity: 0.55;
+    pointer-events: none;
+    transition: opacity 0.15s ease;
+  }
+
   /* Main table cells */
   .activity-time-main {
     font-size: 12px;
@@ -168,7 +176,7 @@ let activityFiltersApplied = {};
 let loadActivityInFlight = false;
 let activityFiltersExpanded = false;
 let activitySearchDebounce = null;
-const ACTIVITY_SEARCH_DEBOUNCE_MS = 280;
+const ACTIVITY_SEARCH_DEBOUNCE_MS = 220;
 
 // Page cache untuk stale-while-revalidate.
 // Key: JSON.stringify(filtersApplied) + '|' + pageNumber.
@@ -396,14 +404,16 @@ function clearActivityPageCache() {
   activityPageCacheOrder = [];
 }
 
-// Set visual loading state pada area pagination supaya user dapat feedback
-// jelas saat round-trip ke server. Tombol prev/next + contenteditable page
-// number didisable, info text jadi "Memuat...".
+// Set visual loading state pada area pagination + tabel supaya user dapat
+// feedback jelas saat round-trip ke server. Tombol prev/next + contenteditable
+// page number didisable, info text jadi "Memuat...", tabel dim opacity (stale-
+// while-revalidate: data lama tetap visible tapi jelas sedang refresh).
 function setActivityPaginationLoading(isLoading) {
   var prevBtn = document.getElementById('activityPrevBtn');
   var nextBtn = document.getElementById('activityNextBtn');
   var pageEl  = document.getElementById('activityCurrentPage');
   var infoEl  = document.getElementById('activityPaginationInfo');
+  var tbody   = document.getElementById('activityTableBody');
 
   if (isLoading) {
     if (prevBtn) prevBtn.disabled = true;
@@ -413,8 +423,10 @@ function setActivityPaginationLoading(isLoading) {
       pageEl.blur();
     }
     if (infoEl) infoEl.textContent = 'Memuat...';
+    if (tbody) tbody.classList.add('activity-table-loading');
   } else {
     if (pageEl) pageEl.setAttribute('contenteditable', 'true');
+    if (tbody) tbody.classList.remove('activity-table-loading');
     // prev/next & info text di-restore oleh renderActivityTable
   }
 }
@@ -438,15 +450,15 @@ function loadActivityPage() {
 
   loadActivityInFlight = true;
 
-  var payload = Object.assign({
-    session_token: getCurrentSessionToken(),
+  var payload = attachAuthContext(Object.assign({
     page_number: activityCurrentPage,
     page_size: activityPageSize
-  }, activityFiltersApplied || {});
+  }, activityFiltersApplied || {}));
 
   google.script.run
     .withSuccessHandler(function(res) {
       loadActivityInFlight = false;
+      setActivityPaginationLoading(false);
       if (!res || !res.success) {
         // Kalau tadi sudah render dari cache, jangan flash error — biarkan
         // user lihat data lama; mereka bisa retry. Toast hanya kalau benar
@@ -484,6 +496,7 @@ function loadActivityPage() {
     })
     .withFailureHandler(function(err) {
       loadActivityInFlight = false;
+      setActivityPaginationLoading(false);
       if (!cached) {
         showToast('Error: ' + ((err && err.message) || err), 'error');
         renderActivityTable();
