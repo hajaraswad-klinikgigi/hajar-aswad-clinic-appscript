@@ -170,6 +170,14 @@ var activityFiltersExpanded = false;
 var activitySearchDebounce = null;
 var ACTIVITY_SEARCH_DEBOUNCE_MS = 280;
 
+// Page cache untuk stale-while-revalidate.
+// Key: JSON.stringify(filtersApplied) + '|' + pageNumber.
+// FIFO eviction, max 10 entry, TTL 30 detik supaya audit log baru kelihatan.
+var activityPageCache = {};
+var activityPageCacheOrder = [];
+var ACTIVITY_PAGE_CACHE_MAX = 10;
+var ACTIVITY_PAGE_CACHE_TTL_MS = 30 * 1000;
+
 var ACTIVITY_ENTITY_TYPE_LABELS = {
   patient:                   'Pasien',
   appointment:               'Appointment',
@@ -347,8 +355,87 @@ function showActivityPage() {
 /* =========================================================
    LOAD & RENDER
    ========================================================= */
+function activityBuildPageCacheKey_() {
+  return JSON.stringify(activityFiltersApplied || {}) + '|' + activityPageNumber;
+}
+
+function activityGetCachedPage_() {
+  var key = activityBuildPageCacheKey_();
+  var entry = activityPageCache[key];
+  if (!entry) return null;
+  if (Date.now() - entry.timestamp > ACTIVITY_PAGE_CACHE_TTL_MS) {
+    delete activityPageCache[key];
+    var idx = activityPageCacheOrder.indexOf(key);
+    if (idx !== -1) activityPageCacheOrder.splice(idx, 1);
+    return null;
+  }
+  return entry;
+}
+
+function activitySetCachedPage_(entry) {
+  var key = activityBuildPageCacheKey_();
+  activityPageCache[key] = {
+    rows: entry.rows,
+    totalCount: entry.totalCount,
+    totalPages: entry.totalPages,
+    hasNext: entry.hasNext,
+    hasPrev: entry.hasPrev,
+    timestamp: Date.now()
+  };
+  var existingIdx = activityPageCacheOrder.indexOf(key);
+  if (existingIdx !== -1) activityPageCacheOrder.splice(existingIdx, 1);
+  activityPageCacheOrder.push(key);
+  while (activityPageCacheOrder.length > ACTIVITY_PAGE_CACHE_MAX) {
+    var evictKey = activityPageCacheOrder.shift();
+    delete activityPageCache[evictKey];
+  }
+}
+
+function activityClearPageCache_() {
+  activityPageCache = {};
+  activityPageCacheOrder = [];
+}
+
+// Set visual loading state pada area pagination supaya user dapat feedback
+// jelas saat round-trip ke server. Tombol prev/next + contenteditable page
+// number didisable, info text jadi "Memuat...".
+function activitySetPaginationLoading_(isLoading) {
+  var prevBtn = document.getElementById('activityPrevBtn');
+  var nextBtn = document.getElementById('activityNextBtn');
+  var pageEl  = document.getElementById('activityCurrentPage');
+  var infoEl  = document.getElementById('activityPaginationInfo');
+
+  if (isLoading) {
+    if (prevBtn) prevBtn.disabled = true;
+    if (nextBtn) nextBtn.disabled = true;
+    if (pageEl) {
+      pageEl.setAttribute('contenteditable', 'false');
+      pageEl.blur();
+    }
+    if (infoEl) infoEl.textContent = 'Memuat...';
+  } else {
+    if (pageEl) pageEl.setAttribute('contenteditable', 'true');
+    // prev/next & info text di-restore oleh activityRenderBody_
+  }
+}
+
 function activityLoadPage_() {
   if (activityLoading) return;
+
+  // Coba serve dari cache supaya prev/next/goTo terasa instan.
+  // Fresh data tetap di-fetch di belakang (stale-while-revalidate).
+  var cached = activityGetCachedPage_();
+  if (cached) {
+    activityRows = cached.rows;
+    activityTotalCount = cached.totalCount;
+    activityTotalPages = cached.totalPages;
+    activityHasNext = cached.hasNext;
+    activityHasPrev = cached.hasPrev;
+    activityRenderBody_();
+  } else {
+    activitySetPaginationLoading_(true);
+  }
+
   activityLoading = true;
 
   var payload = Object.assign({
@@ -361,11 +448,16 @@ function activityLoadPage_() {
     .withSuccessHandler(function(res) {
       activityLoading = false;
       if (!res || !res.success) {
-        showToast(res && res.message || 'Gagal memuat aktivitas', 'error');
-        activityRows = [];
-        activityHasNext = false;
-        activityHasPrev = false;
-        activityRenderBody_();
+        // Kalau tadi sudah render dari cache, jangan flash error — biarkan
+        // user lihat data lama; mereka bisa retry. Toast hanya kalau benar
+        // tidak ada apa pun di layar.
+        if (!cached) {
+          showToast(res && res.message || 'Gagal memuat aktivitas', 'error');
+          activityRows = [];
+          activityHasNext = false;
+          activityHasPrev = false;
+          activityRenderBody_();
+        }
         return;
       }
       var data = res.data || {};
@@ -377,13 +469,26 @@ function activityLoadPage_() {
       activityAllowedEntityTypes = data.allowed_entity_types || null;
       activityActiveSince = data.active_since || activityActiveSince;
       activityFiltersApplied = data.filters_applied || {};
+
+      activitySetCachedPage_({
+        rows: activityRows,
+        totalCount: activityTotalCount,
+        totalPages: activityTotalPages,
+        hasNext: activityHasNext,
+        hasPrev: activityHasPrev
+      });
+
       activityRenderBody_();
       activitySyncEntityTypeOptions_();
       activityUpdateFilterControls_();
     })
     .withFailureHandler(function(err) {
       activityLoading = false;
-      showToast('Error: ' + ((err && err.message) || err), 'error');
+      if (!cached) {
+        showToast('Error: ' + ((err && err.message) || err), 'error');
+        activityRenderBody_();
+      }
+      // Kalau ada cached, biarkan data lama tetap visible — user bisa retry.
     })
     .getAuditLogPage(payload);
 }
@@ -444,29 +549,31 @@ function activityRenderBody_() {
    PAGINATION
    ========================================================= */
 function activityPrevPage_() {
-  if (activityPageNumber > 1) {
-    activityPageNumber--;
-    activityLoadPage_();
-  }
+  if (activityLoading) return;
+  if (!activityHasPrev || activityPageNumber <= 1) return;
+  activityPageNumber--;
+  activityLoadPage_();
 }
 
 function activityNextPage_() {
-  if (activityHasNext) {
-    activityPageNumber++;
-    activityLoadPage_();
-  }
+  if (activityLoading) return;
+  if (!activityHasNext || activityPageNumber >= activityTotalPages) return;
+  activityPageNumber++;
+  activityLoadPage_();
 }
 
 function activityGoToPage_(el) {
+  if (activityLoading) {
+    // Restore tampilan ke page number aktif supaya user tidak bingung
+    if (el) el.textContent = activityPageNumber;
+    return;
+  }
   var raw = el ? String(el.textContent || '').trim() : '';
   var target = parseInt(raw, 10);
   if (isNaN(target) || target < 1) target = 1;
   if (target > activityTotalPages) target = activityTotalPages;
-  if (target === activityPageNumber) {
-    // No change — just sync display in case user typed weird value
-    if (el) el.textContent = activityPageNumber;
-    return;
-  }
+  if (el) el.textContent = target;
+  if (target === activityPageNumber) return;
   activityPageNumber = target;
   activityLoadPage_();
 }
@@ -650,6 +757,7 @@ function activityApplyFilter_() {
     actor_search:   actor || null
   };
   activityPageNumber = 1;
+  activityClearPageCache_();
   activityUpdateFilterControls_();
   activityLoadPage_();
 }
@@ -657,6 +765,7 @@ function activityApplyFilter_() {
 function activityResetFilter_() {
   activityFiltersApplied = {};
   activityPageNumber = 1;
+  activityClearPageCache_();
 
   var ids = ['activityFilterStartDate', 'activityFilterEndDate', 'activityFilterEntityType',
              'activityFilterAction', 'activitySearchActor'];
