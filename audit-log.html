@@ -868,6 +868,37 @@ function activityFormatRolesPlain_(roles) {
   return roles.map(function(r) { return String(r || ''); }).join(', ');
 }
 
+// Field timestamp yang ditampilkan dalam format readable (DD-MM-YYYY HH:MM:SS)
+// di diff table, alih-alih ISO string mentah.
+var ACTIVITY_TIMESTAMP_FIELDS = {
+  updated_at: true,
+  created_at: true,
+  occurred_at: true,
+  deleted_at: true,
+  cancelled_at: true,
+  deactivated_at: true,
+  completed_at: true
+};
+
+function activityIsTimestampField_(key) {
+  return ACTIVITY_TIMESTAMP_FIELDS[key] === true;
+}
+
+function activityComputeDiffStatus_(k, oldData, newData, isCreate, isDelete) {
+  var hasOld = Object.prototype.hasOwnProperty.call(oldData, k);
+  var hasNew = Object.prototype.hasOwnProperty.call(newData, k);
+  if (isCreate) return 'created';
+  if (isDelete) return 'deleted';
+  if (!hasOld && hasNew) return 'added';
+  if (hasOld && !hasNew) return 'removed';
+  if (hasOld && hasNew) {
+    var os = JSON.stringify(oldData[k]);
+    var ns = JSON.stringify(newData[k]);
+    return (os !== ns) ? 'changed' : 'unchanged';
+  }
+  return 'unchanged';
+}
+
 function activityRenderDiff_(oldObj, newObj) {
   var isCreate = (oldObj === null || oldObj === undefined);
   var isDelete = (newObj === null || newObj === undefined);
@@ -878,10 +909,27 @@ function activityRenderDiff_(oldObj, newObj) {
   var keySet = {};
   Object.keys(oldData).forEach(function(k) { keySet[k] = true; });
   Object.keys(newData).forEach(function(k) { keySet[k] = true; });
-  var keys = Object.keys(keySet).sort();
+  var allKeys = Object.keys(keySet).sort();
+
+  // Untuk UPDATE: hanya tampilkan field yang berubah (changed/added/removed)
+  // supaya owner fokus pada perubahan saja. updated_at otomatis ikut karena
+  // selalu berubah saat mutasi.
+  // Untuk CREATE/DELETE: tampilkan semua field (snapshot lengkap entry).
+  var keys;
+  if (isCreate || isDelete) {
+    keys = allKeys;
+  } else {
+    keys = allKeys.filter(function(k) {
+      var st = activityComputeDiffStatus_(k, oldData, newData, false, false);
+      return st === 'changed' || st === 'added' || st === 'removed';
+    });
+  }
 
   if (keys.length === 0) {
-    return '<div class="activity-diff-empty">Tidak ada data old/new yang tersedia untuk entri ini.</div>';
+    if (isCreate || isDelete) {
+      return '<div class="activity-diff-empty">Tidak ada data old/new yang tersedia untuk entri ini.</div>';
+    }
+    return '<div class="activity-diff-empty">Tidak ada field yang berubah pada entri ini.</div>';
   }
 
   var beforeClass = isCreate ? 'activity-header-color-muted' : 'activity-header-color-before';
@@ -902,20 +950,7 @@ function activityRenderDiff_(oldObj, newObj) {
     var oldVal = hasOld ? oldData[k] : undefined;
     var newVal = hasNew ? newData[k] : undefined;
 
-    var status = 'unchanged';
-    if (isCreate) {
-      status = 'created';
-    } else if (isDelete) {
-      status = 'deleted';
-    } else if (!hasOld && hasNew) {
-      status = 'added';
-    } else if (hasOld && !hasNew) {
-      status = 'removed';
-    } else {
-      var os = JSON.stringify(oldVal);
-      var ns = JSON.stringify(newVal);
-      if (os !== ns) status = 'changed';
-    }
+    var status = activityComputeDiffStatus_(k, oldData, newData, isCreate, isDelete);
 
     var oldClass = 'activity-diff-cell-neutral';
     var newClass = 'activity-diff-cell-neutral';
@@ -930,18 +965,30 @@ function activityRenderDiff_(oldObj, newObj) {
 
     return '<div class="activity-diff-row">' +
       '<div class="activity-diff-field">' + escapeAppHtml(k) + '</div>' +
-      '<div class="activity-diff-value ' + oldClass + '">' + activityFormatDiffValue_(oldVal, hasOld) + '</div>' +
-      '<div class="activity-diff-value ' + newClass + '">' + activityFormatDiffValue_(newVal, hasNew) + '</div>' +
+      '<div class="activity-diff-value ' + oldClass + '">' + activityFormatDiffValue_(oldVal, hasOld, k) + '</div>' +
+      '<div class="activity-diff-value ' + newClass + '">' + activityFormatDiffValue_(newVal, hasNew, k) + '</div>' +
     '</div>';
   }).join('');
 
   return '<div class="activity-diff">' + headerHtml + rowsHtml + '</div>';
 }
 
-function activityFormatDiffValue_(v, hasIt) {
+function activityFormatDiffValue_(v, hasIt, fieldKey) {
   if (!hasIt) return '<span class="activity-diff-value-muted">(tidak ada)</span>';
   if (v === null) return '<span class="activity-diff-value-muted">null</span>';
   if (v === undefined) return '<span class="activity-diff-value-muted">undefined</span>';
+
+  // Field timestamp tertentu (updated_at, created_at, dll) ditampilkan dalam
+  // format readable DD-MM-YYYY HH:MM:SS — bukan ISO string mentah — supaya
+  // owner tidak harus parse manual.
+  if (fieldKey && activityIsTimestampField_(fieldKey) &&
+      (typeof v === 'string' || typeof v === 'number')) {
+    var formatted = activityFormatTimestampLong_(v);
+    if (formatted && formatted !== '-' && formatted !== String(v)) {
+      return escapeAppHtml(formatted);
+    }
+  }
+
   if (typeof v === 'object') {
     try {
       return escapeAppHtml(JSON.stringify(v, null, 2));
