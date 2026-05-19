@@ -235,11 +235,8 @@ function groupPatientPhotosByTreatment(patientId) {
 }
 
 function createPatientPhoto(data) {
-  const auth = readAuthSession_(data);
+  const auth = requireRole(data, ['admin_appointment']);
   if (!auth.success) return auth;
-  if (!isPhotoManagerRole(auth.user.role)) {
-    return rejectPhotoUploadAccess();
-  }
 
   const freezeCheck = repoCheckProductionMutationAllowed_({
     operation: 'CREATE_PATIENT_PHOTO',
@@ -387,11 +384,8 @@ function rejectPhotoUploadAccess() {
 }
 
 function createPatientPhotoUpload(payload) {
-  const auth = readAuthSession_(payload);
+  const auth = requireRole(payload, ['admin_appointment']);
   if (!auth.success) return auth;
-  if (!isPhotoManagerRole(auth.user.role)) {
-    return rejectPhotoUploadAccess();
-  }
 
   const freezeCheck = repoCheckProductionMutationAllowed_({
     operation: 'UPLOAD_PATIENT_PHOTO',
@@ -577,11 +571,8 @@ function getPatientPhotoById(photoId) {
 }
 
 function deletePatientPhoto(payload) {
-  const auth = readAuthSession_(payload);
+  const auth = requireRole(payload, ['admin_appointment']);
   if (!auth.success) return auth;
-  if (!isPhotoManagerRole(auth.user.role)) {
-    return rejectPhotoUploadAccess();
-  }
 
   const freezeCheck = repoCheckProductionMutationAllowed_({
     operation: 'DELETE_PATIENT_PHOTO',

@@ -258,35 +258,55 @@ function updateAppointmentRowFromSnapshot(snapshot, appointmentId, updatedObj) {
  * Mengembalikan SEMUA appointment.
  * Filter cancelled / non-cancelled ditangani di frontend.
  */
-function getAppointments(options) {
+function getAppointments(payloadOrOpts) {
+  // Frontend kirim payload {session_token, options?}. Legacy: getAppointments(options).
+  let payload, options, isPayloadMode;
+  if (payloadOrOpts && typeof payloadOrOpts === 'object' && payloadOrOpts.session_token) {
+    payload = payloadOrOpts;
+    options = payload.options || null;
+    isPayloadMode = true;
+  } else {
+    payload = null;
+    options = payloadOrOpts;
+    isPayloadMode = false;
+  }
+
+  if (isPayloadMode) {
+    const auth = requireRole(payload, ['admin_appointment', 'doctor']);
+    if (!auth.success) return auth;
+  }
+
   const opts = getAppointmentServiceUiReadOptions_(options);
   const isSupabaseReadMode = isAppointmentServiceUiReadSupabaseMode_(opts);
 
   const cacheKey = getAppointmentsListCacheKey(opts);
 
+  let result;
+
   if (!isSupabaseReadMode) {
     const cached = getCachedJson(cacheKey);
 
     if (cached) {
-      return cached;
+      result = cached;
     }
   }
 
-  const rows = getAppointmentsRaw(opts);
+  if (!result) {
+    const rows = getAppointmentsRaw(opts);
 
-  const normalized = rows.map(function(row) {
-    return normalizeAppointmentForClient(row);
-  });
+    const normalized = rows.map(function(row) {
+      return normalizeAppointmentForClient(row);
+    });
 
-  const result = sortAppointmentsForClient(normalized);
+    result = sortAppointmentsForClient(normalized);
 
-  // Supabase staging read mode tidak perlu cache list besar,
-  // karena CacheService bisa error: Argument too large: value.
-  if (!isSupabaseReadMode) {
-    putCachedJson(cacheKey, result, 30);
+    // Supabase staging read mode tidak perlu cache list besar.
+    if (!isSupabaseReadMode) {
+      putCachedJson(cacheKey, result, 30);
+    }
   }
 
-  return result;
+  return isPayloadMode ? { success: true, data: result } : result;
 }
 
 function clearAppointmentsListCache() {
@@ -378,7 +398,24 @@ function validateAppointmentData(data) {
   return errors;
 }
 
-function getAppointmentById(appointmentId, options) {
+function getAppointmentById(payloadOrId, optionsArg) {
+  // Frontend: payload {session_token, appointment_id, options?}. Legacy: (id, options).
+  let appointmentId, options, isPayloadMode;
+  if (payloadOrId && typeof payloadOrId === 'object' && payloadOrId.session_token) {
+    isPayloadMode = true;
+    appointmentId = payloadOrId.appointment_id;
+    options = payloadOrId.options || null;
+  } else {
+    isPayloadMode = false;
+    appointmentId = payloadOrId;
+    options = optionsArg;
+  }
+
+  if (isPayloadMode) {
+    const auth = requireRole(payloadOrId, ['admin_appointment', 'doctor']);
+    if (!auth.success) return auth;
+  }
+
   const opts = getAppointmentServiceUiReadOptions_(options);
   const row = findAppointmentRawById(appointmentId, opts);
 
@@ -429,7 +466,27 @@ function hasOpenAppointmentForPatient(patientId, excludeAppointmentId, options) 
   });
 }
 
-function checkPatientOpenAppointment(patientId, excludeAppointmentId, options) {
+function checkPatientOpenAppointment(payloadOrPatientId, excludeAppointmentIdArg, optionsArg) {
+  // Frontend: payload {session_token, patient_id, exclude_appointment_id?, options?}.
+  // Legacy: checkPatientOpenAppointment(patientId, excludeAppointmentId, options).
+  let patientId, excludeAppointmentId, options, isPayloadMode;
+  if (payloadOrPatientId && typeof payloadOrPatientId === 'object' && payloadOrPatientId.session_token) {
+    isPayloadMode = true;
+    patientId = payloadOrPatientId.patient_id;
+    excludeAppointmentId = payloadOrPatientId.exclude_appointment_id || '';
+    options = payloadOrPatientId.options || null;
+  } else {
+    isPayloadMode = false;
+    patientId = payloadOrPatientId;
+    excludeAppointmentId = excludeAppointmentIdArg;
+    options = optionsArg;
+  }
+
+  if (isPayloadMode) {
+    const auth = requireRole(payloadOrPatientId, ['admin_appointment', 'doctor']);
+    if (!auth.success) return auth;
+  }
+
   if (!patientId) {
     return {
       success: false,
@@ -450,11 +507,8 @@ function checkPatientOpenAppointment(patientId, excludeAppointmentId, options) {
 }
 
 function createAppointment(data) {
-  const auth = readAuthSession_(data);
+  const auth = requireRole(data, ['admin_appointment']);
   if (!auth.success) return auth;
-  if (auth.user.role !== 'admin' && auth.user.role !== 'owner') {
-    return { success: false, message: 'Hanya admin atau owner yang dapat menambah appointment.' };
-  }
 
   const freezeCheck = repoCheckProductionMutationAllowed_({
     operation: 'CREATE_APPOINTMENT',
@@ -548,11 +602,8 @@ function createAppointment(data) {
 }
 
 function updateAppointment(data) {
-  const auth = readAuthSession_(data);
+  const auth = requireRole(data, ['admin_appointment']);
   if (!auth.success) return auth;
-  if (auth.user.role !== 'admin' && auth.user.role !== 'owner') {
-    return { success: false, message: 'Hanya admin atau owner yang dapat mengubah appointment.' };
-  }
 
   const freezeCheck = repoCheckProductionMutationAllowed_({
     operation: 'UPDATE_APPOINTMENT',
@@ -675,12 +726,19 @@ function updateAppointment(data) {
   }
 }
 
-function cancelAppointment(id, options) {
-  const auth = readAuthSession_(options || {});
-  if (!auth.success) return auth;
-  if (auth.user.role !== 'admin' && auth.user.role !== 'owner') {
-    return { success: false, message: 'Hanya admin atau owner yang dapat membatalkan appointment.' };
+function cancelAppointment(payloadOrId, optionsArg) {
+  // Frontend: payload {session_token, appointment_id}. Legacy: cancelAppointment(id, options).
+  let id, options;
+  if (payloadOrId && typeof payloadOrId === 'object') {
+    options = payloadOrId;
+    id = payloadOrId.appointment_id;
+  } else {
+    options = optionsArg || {};
+    id = payloadOrId;
   }
+
+  const auth = requireRole(options, ['admin_appointment']);
+  if (!auth.success) return auth;
 
   const freezeCheck = repoCheckProductionMutationAllowed_({
     operation: 'CANCEL_APPOINTMENT',
@@ -756,12 +814,18 @@ function cancelAppointment(id, options) {
   }
 }
 
-function restoreAppointment(id, options) {
-  const auth = readAuthSession_(options || {});
-  if (!auth.success) return auth;
-  if (auth.user.role !== 'admin' && auth.user.role !== 'owner') {
-    return { success: false, message: 'Hanya admin atau owner yang dapat merestore appointment.' };
+function restoreAppointment(payloadOrId, optionsArg) {
+  let id, options;
+  if (payloadOrId && typeof payloadOrId === 'object') {
+    options = payloadOrId;
+    id = payloadOrId.appointment_id;
+  } else {
+    options = optionsArg || {};
+    id = payloadOrId;
   }
+
+  const auth = requireRole(options, ['admin_appointment']);
+  if (!auth.success) return auth;
 
   const freezeCheck = repoCheckProductionMutationAllowed_({
     operation: 'RESTORE_APPOINTMENT',
@@ -859,11 +923,20 @@ function restoreAppointment(id, options) {
  * Spreadsheet mode: fetch snapshot → loop → update satu per satu.
  */
 function autoUpdateOverdueScheduledAppointments(options) {
+  const opts = options || {};
+
+  // Dipanggil dari frontend (admin_appointment) saat buka halaman Appointments.
+  // Kalau dipanggil tanpa session_token (mis. trigger/scheduler), skip auth check.
+  if (opts.session_token) {
+    const auth = requireRole(opts, ['admin_appointment']);
+    if (!auth.success) return auth;
+  }
+
   const freezeCheck = repoCheckProductionMutationAllowed_({
     operation: 'AUTO_CANCEL_OVERDUE_APPOINTMENTS',
     module: 'AppointmentService',
     action: 'autoUpdateOverdueScheduledAppointments',
-    __test_freeze_enabled: options && options.__test_freeze_enabled === true
+    __test_freeze_enabled: opts.__test_freeze_enabled === true
   });
 
   if (!freezeCheck.allowed) {

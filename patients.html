@@ -138,8 +138,16 @@
 
   function loadPatients() {
     google.script.run
-      .withSuccessHandler(function(rows) {
-        allPatients = (rows || []).map(function(row) {
+      .withSuccessHandler(function(res) {
+        if (!res || res.success === false) {
+          const tbody = document.getElementById('patientsTableBody');
+          if (tbody) {
+            tbody.innerHTML = '<tr><td colspan="6">Error: ' + ((res && res.message) || 'Gagal memuat data pasien') + '</td></tr>';
+          }
+          return;
+        }
+        const rows = Array.isArray(res) ? res : (res.data || []);
+        allPatients = rows.map(function(row) {
           const searchText = [
             row.patient_code || '',
             row.full_name || '',
@@ -165,7 +173,7 @@
           tbody.innerHTML = `<tr><td colspan="6">Error: ${err.message}</td></tr>`;
         }
       })
-      .getPatients(showInactivePatients);
+      .getPatients(attachAuthContext({ show_inactive: !!showInactivePatients }));
   }
 
   function handleToggleInactivePatients() {
@@ -553,7 +561,7 @@
       .withFailureHandler(function(err) {
         showToast('Error: ' + err.message, 'error');
       })
-      .getPatientById(patientId);
+      .getPatientById(attachAuthContext({ patient_id: patientId }));
   }
 
   function formatRupiah(value) {
@@ -943,7 +951,7 @@
 
         showToast('Error: ' + (err && err.message ? err.message : err), 'error');
       })
-      .checkPatientOpenAppointment(row.patient_id || '', '');
+      .checkPatientOpenAppointment(attachAuthContext({ patient_id: row.patient_id || '', exclude_appointment_id: '' }));
   }
 
   function formatPatientPhotoVisitDateTime(value) {
@@ -1568,7 +1576,7 @@
           `;
           showToast('Error: ' + (err && err.message ? err.message : err), 'error');
         })
-        .getPatientDetailBundle(patientId);
+        .getPatientDetailBundle(attachAuthContext({ patient_id: patientId }));
     }
 
     google.script.run
@@ -1600,7 +1608,7 @@
         if (requestToken !== patientDetailRequestToken) return;
         fallbackToFullBundle();
       })
-      .getPatientDetailPrimary(patientId);
+      .getPatientDetailPrimary(attachAuthContext({ patient_id: patientId }));
 
     google.script.run
       .withSuccessHandler(function(res) {
@@ -1634,7 +1642,7 @@
         if (requestToken !== patientDetailRequestToken) return;
         fallbackToFullBundle();
       })
-      .getPatientDetailSecondary(patientId);
+      .getPatientDetailSecondary(attachAuthContext({ patient_id: patientId }));
   }
 
   function closePatientDetailModal() {
@@ -2238,6 +2246,6 @@
 
         showToast('Error: ' + (err && err.message ? err.message : err), 'error');
       })
-      .deactivatePatient(targetPatientId, getCurrentAuthContext());
+      .deactivatePatient(attachAuthContext({ patient_id: targetPatientId }));
   }
 </script>

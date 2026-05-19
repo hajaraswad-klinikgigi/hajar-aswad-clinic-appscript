@@ -1,6 +1,16 @@
 <script>
-  let appointmentSubmitInFlight = false;  
-  let appointmentSubmitToken = 0;  
+  // Sort daftar layanan A→Z (Indonesia-friendly) untuk dropdown "Pilih tindakan"
+  // di modal Treatment. Dipanggil saat assignment ke window.treatmentServices.
+  function sortTreatmentServicesByName_(list) {
+    return (Array.isArray(list) ? list : []).slice().sort(function(a, b) {
+      var an = String((a && a.service_name) || '').toLocaleLowerCase('id-ID');
+      var bn = String((b && b.service_name) || '').toLocaleLowerCase('id-ID');
+      return an.localeCompare(bn, 'id-ID');
+    });
+  }
+
+  let appointmentSubmitInFlight = false;
+  let appointmentSubmitToken = 0;
   
   let allAppointments = [];  
   let filteredAppointments = [];  
@@ -337,7 +347,7 @@
     google.script.run
       .withSuccessHandler(function() { loadAppointments(); })
       .withFailureHandler(function() { loadAppointments(); })
-      .autoUpdateOverdueScheduledAppointments();
+      .autoUpdateOverdueScheduledAppointments(attachAuthContext({}));
     syncAppointmentsFullscreenState();
     syncAppointmentsRefreshMode();
   }  
@@ -433,10 +443,12 @@
       appointmentsLiveRefreshInFlight = true;
 
       google.script.run
-        .withSuccessHandler(function(rows) {
+        .withSuccessHandler(function(res) {
           appointmentsLiveRefreshInFlight = false;
 
-          const preparedRows = prepareAppointmentsRows(rows || []);
+          if (res && res.success === false) return;
+          const rows = Array.isArray(res) ? res : (res && res.data) || [];
+          const preparedRows = prepareAppointmentsRows(rows);
           const nextSignature = buildAppointmentsSignature(preparedRows);
 
           if (appointmentsLastSignature === nextSignature) {
@@ -465,7 +477,7 @@
         .withFailureHandler(function() {
           appointmentsLiveRefreshInFlight = false;
         })
-        .getAppointments();
+        .getAppointments(attachAuthContext({}));
     }, getAppointmentsLiveRefreshIntervalMs());
   }
 
@@ -654,10 +666,18 @@
     appointmentsLiveRefreshInFlight = true;
 
     google.script.run
-      .withSuccessHandler(function(rows) {
+      .withSuccessHandler(function(res) {
         appointmentsLiveRefreshInFlight = false;
 
-        const preparedRows = prepareAppointmentsRows(rows || []);
+        if (res && res.success === false) {
+          const tbody = document.getElementById('appointmentsTableBody');
+          if (tbody) {
+            tbody.innerHTML = '<tr><td colspan="6">Error: ' + ((res && res.message) || 'Gagal memuat appointment') + '</td></tr>';
+          }
+          return;
+        }
+        const rows = Array.isArray(res) ? res : (res && res.data) || [];
+        const preparedRows = prepareAppointmentsRows(rows);
         const nextSignature = buildAppointmentsSignature(preparedRows);
 
         allAppointments = preparedRows;
@@ -711,7 +731,7 @@
           tbody.innerHTML = `<tr><td colspan="6">Error: ${err.message}</td></tr>`;
         }
       })
-      .getAppointments();
+      .getAppointments(attachAuthContext({}));
   } 
   
   function applyAppointmentFilters(keepPage) {
@@ -1210,7 +1230,7 @@
       .withFailureHandler(function(err) {
         showToast('Error: ' + err.message, 'error');
       })
-      .getAppointmentById(appointmentId);
+      .getAppointmentById(attachAuthContext({ appointment_id: appointmentId }));
   }
 
   function getLocalAppointmentById(appointmentId) {
@@ -1274,8 +1294,8 @@
       .withFailureHandler(function(err) {
         showToast('Error: ' + err.message, 'error');
       })
-      .getAppointmentById(id);
-  }  
+      .getAppointmentById(attachAuthContext({ appointment_id: id }));
+  }
   
   function closeAppointmentDetailModal() {  
     const modal = document.getElementById('appointmentDetailModal');  
@@ -1612,7 +1632,8 @@
       document.getElementById('treatment_date').value = getTodayYmd();
 
       window.treatmentDoctors = Array.isArray(doctors) ? doctors : [];
-      window.treatmentServices = Array.isArray(services) ? services : [];
+      // Sort services A→Z agar dropdown "Pilih tindakan" mudah dibaca/diketik.
+      window.treatmentServices = sortTreatmentServicesByName_(services);
 
       window.treatmentMasterCache.doctors = window.treatmentDoctors;
       window.treatmentMasterCache.services = window.treatmentServices;
@@ -1707,7 +1728,7 @@
           'error'
         );
       })
-      .getTreatmentInitDataForUi(appointmentId);
+      .getTreatmentInitDataForUi(attachAuthContext({ appointment_id: appointmentId }));
   }
   
   function closeTreatmentModal() {
@@ -2071,16 +2092,22 @@
     }  
   
     appointmentPatientSearchDebounce = setTimeout(function() {  
-      google.script.run  
-        .withSuccessHandler(function(results) {  
-          if (!isAppointmentModalOpen()) return;  
-          renderAppointmentPatientResults(results || []);  
-        })  
-        .withFailureHandler(function(err) {  
-          if (!isAppointmentModalOpen()) return;  
-          console.error('searchPatientsForAppointment error:', err);  
-        })  
-        .searchPatientsForAppointment(keyword);  
+      google.script.run
+        .withSuccessHandler(function(res) {
+          if (!isAppointmentModalOpen()) return;
+          if (res && res.success === false) {
+            console.error('searchPatientsForAppointment error:', res.message);
+            renderAppointmentPatientResults([]);
+            return;
+          }
+          const list = Array.isArray(res) ? res : (res && res.data) || [];
+          renderAppointmentPatientResults(list);
+        })
+        .withFailureHandler(function(err) {
+          if (!isAppointmentModalOpen()) return;
+          console.error('searchPatientsForAppointment error:', err);
+        })
+        .searchPatientsForAppointment(attachAuthContext({ keyword: keyword }));
     }, 300);  
   }  
   
@@ -2171,7 +2198,7 @@
         setAppointmentPatientWarning('');  
         console.error('checkSelectedAppointmentPatientOpenStatus error:', err);  
       })  
-      .checkPatientOpenAppointment(patientId, excludeAppointmentId);  
+      .checkPatientOpenAppointment(attachAuthContext({ patient_id: patientId, exclude_appointment_id: excludeAppointmentId }));
   }  
   
   function setSelectedAppointmentPatientCard(patientName, patientCode, phone, simpleOnly) {  
@@ -2288,7 +2315,7 @@
 
         showToast('Error: ' + (err && err.message ? err.message : err), 'error');
       })
-      .cancelAppointment(targetAppointmentId, getCurrentAuthContext());
+      .cancelAppointment(attachAuthContext({ appointment_id: targetAppointmentId }));
   }  
   
   function confirmRestoreAppointment(id, name) {  
@@ -2362,7 +2389,7 @@
 
         showToast('Error: ' + (err && err.message ? err.message : err), 'error');
       })
-      .restoreAppointment(targetAppointmentId, getCurrentAuthContext());
+      .restoreAppointment(attachAuthContext({ appointment_id: targetAppointmentId }));
   } 
   
   function preloadTreatmentMasters() {  
@@ -2388,13 +2415,11 @@
           ? payload.doctors  
           : [];  
   
-        window.treatmentMasterCache.services = Array.isArray(payload.services)  
-          ? payload.services  
-          : [];  
+        window.treatmentMasterCache.services = sortTreatmentServicesByName_(payload.services);
       })  
       .withFailureHandler(function(err) {  
         console.error('PRELOAD TREATMENT MASTERS ERROR:', err);  
       })  
-      .getTreatmentInitDataPreview();  
+      .getTreatmentInitDataPreview(attachAuthContext({}));
   }  
 </script>

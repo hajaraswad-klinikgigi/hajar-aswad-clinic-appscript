@@ -135,7 +135,27 @@ function normalizePatientForClient(row) {
   return obj;
 }
 
-function getPatients(showInactiveOnly, options) {
+function getPatients(payloadOrFlag, optionsArg) {
+  // Dual signature: frontend kirim payload {session_token, show_inactive, options?}.
+  // Internal/test call: getPatients(showInactiveOnly, options) — return raw array.
+  let payload, showInactiveOnly, options, isPayloadMode;
+  if (typeof payloadOrFlag === 'object' && payloadOrFlag !== null) {
+    payload = payloadOrFlag;
+    showInactiveOnly = payload.show_inactive === true;
+    options = payload.options || null;
+    isPayloadMode = true;
+  } else {
+    payload = null;
+    showInactiveOnly = payloadOrFlag === true;
+    options = optionsArg;
+    isPayloadMode = false;
+  }
+
+  if (isPayloadMode) {
+    const auth = requireRole(payload, ['admin_appointment', 'admin_finance']);
+    if (!auth.success) return auth;
+  }
+
   const rows = getPatientsRaw(options);
 
   const filtered = rows.filter(function(row) {
@@ -152,9 +172,12 @@ function getPatients(showInactiveOnly, options) {
     return normalizePatientForClient(row);
   });
 
-  return normalizedRows.sort(function(a, b) {
+  const sorted = normalizedRows.sort(function(a, b) {
     return String(b.created_at || '').localeCompare(String(a.created_at || ''));
   });
+
+  // Frontend dapat wrapped response, internal/test dapat raw array (backward-compat).
+  return isPayloadMode ? { success: true, data: sorted } : sorted;
 }
 
 function findPatientRawById(patientId, options) {
@@ -202,7 +225,25 @@ function generateNextPatientIdentity() {
   };
 }
 
-function getPatientById(patientId, options) {
+function getPatientById(payloadOrId, optionsArg) {
+  // Dual signature: payload {session_token, patient_id, options?} dari frontend.
+  // Legacy: getPatientById(patientId, options) dari internal/test.
+  let patientId, options, isPayloadMode;
+  if (typeof payloadOrId === 'object' && payloadOrId !== null) {
+    isPayloadMode = true;
+    patientId = payloadOrId.patient_id;
+    options = payloadOrId.options || null;
+  } else {
+    isPayloadMode = false;
+    patientId = payloadOrId;
+    options = optionsArg;
+  }
+
+  if (isPayloadMode) {
+    const auth = requireRole(payloadOrId, ['admin_appointment', 'admin_finance', 'doctor']);
+    if (!auth.success) return auth;
+  }
+
   const patient = findPatientRawById(patientId, options);
 
   if (!patient) {
@@ -359,7 +400,22 @@ function getTreatmentsByPatientId(patientId, options) {
     });
 }
 
-function getPatientDetailBundle(patientId) {
+function getPatientDetailBundle(payloadOrId) {
+  // Frontend kirim payload {session_token, patient_id}. Backward-compat dengan primitive.
+  let patientId, isPayloadMode;
+  if (typeof payloadOrId === 'object' && payloadOrId !== null) {
+    isPayloadMode = true;
+    patientId = payloadOrId.patient_id;
+  } else {
+    isPayloadMode = false;
+    patientId = payloadOrId;
+  }
+
+  if (isPayloadMode) {
+    const auth = requireRole(payloadOrId, ['admin_appointment', 'admin_finance', 'doctor']);
+    if (!auth.success) return auth;
+  }
+
   const normalizedPatientId = String(patientId || '').trim();
   const readOptions = getPatientServiceUiReadOptions_();
   const readBackendMode = getPatientServiceUiReadBackendMode_(readOptions);
@@ -415,7 +471,21 @@ function getPatientDetailBundle(patientId) {
   return result;
 }
 
-function getPatientDetailPrimary(patientId) {
+function getPatientDetailPrimary(payloadOrId) {
+  let patientId, isPayloadMode;
+  if (typeof payloadOrId === 'object' && payloadOrId !== null) {
+    isPayloadMode = true;
+    patientId = payloadOrId.patient_id;
+  } else {
+    isPayloadMode = false;
+    patientId = payloadOrId;
+  }
+
+  if (isPayloadMode) {
+    const auth = requireRole(payloadOrId, ['admin_appointment', 'admin_finance', 'doctor']);
+    if (!auth.success) return auth;
+  }
+
   const normalizedPatientId = String(patientId || '').trim();
 
   if (!normalizedPatientId) {
@@ -465,7 +535,21 @@ function getPatientDetailPrimary(patientId) {
   return result;
 }
 
-function getPatientDetailSecondary(patientId) {
+function getPatientDetailSecondary(payloadOrId) {
+  let patientId, isPayloadMode;
+  if (typeof payloadOrId === 'object' && payloadOrId !== null) {
+    isPayloadMode = true;
+    patientId = payloadOrId.patient_id;
+  } else {
+    isPayloadMode = false;
+    patientId = payloadOrId;
+  }
+
+  if (isPayloadMode) {
+    const auth = requireRole(payloadOrId, ['admin_appointment', 'admin_finance', 'doctor']);
+    if (!auth.success) return auth;
+  }
+
   const normalizedPatientId = String(patientId || '').trim();
 
   if (!normalizedPatientId) {
@@ -527,13 +611,28 @@ function clearPatientDetailBundleCache(patientId) {
   });
 }
 
-function searchPatientsForAppointment(keyword) {
+function searchPatientsForAppointment(payloadOrKeyword) {
+  // Frontend kirim payload {session_token, keyword}. Legacy: string keyword.
+  let keyword, isPayloadMode;
+  if (typeof payloadOrKeyword === 'object' && payloadOrKeyword !== null) {
+    isPayloadMode = true;
+    keyword = payloadOrKeyword.keyword;
+  } else {
+    isPayloadMode = false;
+    keyword = payloadOrKeyword;
+  }
+
+  if (isPayloadMode) {
+    const auth = requireRole(payloadOrKeyword, ['admin_appointment']);
+    if (!auth.success) return auth;
+  }
+
   const q = String(keyword || '').trim().toLowerCase();
-  if (q.length < 2) return [];
+  if (q.length < 2) return isPayloadMode ? { success: true, data: [] } : [];
 
   const rows = getPatientsRaw();
 
-  return rows
+  const matches = rows
     .filter(function(p) {
       return isPatientActiveValue(p.is_active);
     })
@@ -556,6 +655,8 @@ function searchPatientsForAppointment(keyword) {
         has_open_appointment: hasOpenAppointment
       };
     });
+
+  return isPayloadMode ? { success: true, data: matches } : matches;
 }
 
 function convertDmyToYmd(value) {
@@ -867,11 +968,8 @@ function validatePatientData(data, excludePatientId) {
 }
 
 function createPatient(data) {
-  const auth = readAuthSession_(data);
+  const auth = requireRole(data, ['admin_appointment']);
   if (!auth.success) return auth;
-  if (auth.user.role !== 'admin' && auth.user.role !== 'owner') {
-    return { success: false, message: 'Hanya admin atau owner yang dapat menambah pasien.' };
-  }
 
   const freezeCheck = repoCheckProductionMutationAllowed_({
     operation: 'CREATE_PATIENT',
@@ -982,11 +1080,8 @@ function createPatient(data) {
 }
 
 function updatePatient(data) {
-  const auth = readAuthSession_(data);
+  const auth = requireRole(data, ['admin_appointment']);
   if (!auth.success) return auth;
-  if (auth.user.role !== 'admin' && auth.user.role !== 'owner') {
-    return { success: false, message: 'Hanya admin atau owner yang dapat mengubah data pasien.' };
-  }
 
   const freezeCheck = repoCheckProductionMutationAllowed_({
     operation: 'UPDATE_PATIENT',
@@ -1122,12 +1217,19 @@ function updatePatient(data) {
   }
 }
 
-function deactivatePatient(patientId, options) {
-  const auth = readAuthSession_(options || {});
-  if (!auth.success) return auth;
-  if (auth.user.role !== 'admin' && auth.user.role !== 'owner') {
-    return { success: false, message: 'Hanya admin atau owner yang dapat menonaktifkan pasien.' };
+function deactivatePatient(payloadOrId, optionsArg) {
+  // Frontend kirim payload {session_token, patient_id}. Legacy: deactivatePatient(patientId, options).
+  let patientId, options;
+  if (typeof payloadOrId === 'object' && payloadOrId !== null) {
+    options = payloadOrId;
+    patientId = payloadOrId.patient_id;
+  } else {
+    options = optionsArg || {};
+    patientId = payloadOrId;
   }
+
+  const auth = requireRole(options, ['admin_appointment']);
+  if (!auth.success) return auth;
 
   const freezeCheck = repoCheckProductionMutationAllowed_({
     operation: 'DEACTIVATE_PATIENT',

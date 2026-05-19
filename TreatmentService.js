@@ -465,11 +465,8 @@ function syncOrthoRecallAfterTreatment(orthoMode, treatment, patient) {
 }
 
 function createTreatment(payload) {
-  const auth = readAuthSession_(payload);
+  const auth = requireRole(payload, ['doctor']);
   if (!auth.success) return auth;
-  if (!isTreatmentManagerRole(auth.user.role)) {
-    return rejectTreatmentAccess();
-  }
 
   const freezeCheck = repoCheckProductionMutationAllowed_({
     operation: 'CREATE_TREATMENT',
@@ -782,7 +779,22 @@ function normalizeTreatmentUiBoolean_(value) {
   return text === 'true' || text === '1' || text === 'yes' || text === 'ya';
 }
 
-function getTreatmentInitDataForUi(appointmentId) {
+function getTreatmentInitDataForUi(payloadOrId) {
+  // Frontend: payload {session_token, appointment_id}. Legacy: appointmentId string.
+  let appointmentId, isPayloadMode;
+  if (payloadOrId && typeof payloadOrId === 'object' && payloadOrId.session_token) {
+    isPayloadMode = true;
+    appointmentId = payloadOrId.appointment_id;
+  } else {
+    isPayloadMode = false;
+    appointmentId = payloadOrId;
+  }
+
+  if (isPayloadMode) {
+    const auth = requireRole(payloadOrId, ['doctor']);
+    if (!auth.success) return auth;
+  }
+
   try {
     const res = getTreatmentInitData(appointmentId);
 
@@ -839,9 +851,17 @@ function getTreatmentInitDataForUi(appointmentId) {
 }
 
 function getTreatmentInitDataPreview(options) {
-  const opts = getTreatmentServiceUiReadOptions_(options);
-  const doctorsRes = getActiveDoctors(opts);
-  const servicesRes = getTreatmentServiceActiveServices_(opts);
+  const opts = options || {};
+
+  // Frontend kirim payload {session_token}; legacy/test call kirim options polos.
+  if (opts.session_token) {
+    const auth = requireRole(opts, ['doctor']);
+    if (!auth.success) return auth;
+  }
+
+  const readOpts = getTreatmentServiceUiReadOptions_(opts);
+  const doctorsRes = getActiveDoctors(readOpts);
+  const servicesRes = getTreatmentServiceActiveServices_(readOpts);
 
   return {
     success: true,

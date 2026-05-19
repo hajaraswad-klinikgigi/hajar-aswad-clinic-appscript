@@ -1329,6 +1329,6 @@ function handleRecallProgramActionFailure(err) {
 
         showToast('Error: ' + (err && err.message ? err.message : err), 'error');
       })
-      .checkPatientOpenAppointment(row.patient_id || '', '');
+      .checkPatientOpenAppointment(attachAuthContext({ patient_id: row.patient_id || '', exclude_appointment_id: '' }));
   }
 </script>
