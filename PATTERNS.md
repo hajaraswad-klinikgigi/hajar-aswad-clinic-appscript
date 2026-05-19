@@ -376,8 +376,7 @@ function executeDeleteX() {
 function prevXPage() {
   if (xCurrentPage > 1) {
     xCurrentPage--;
-    renderXTable();   // client-side
-    // ATAU loadXPage();  untuk server-side (Aktivitas)
+    renderXTable();   // client-side — slice array, instan
   }
 }
 
@@ -408,17 +407,32 @@ function renderXPaginationState(current, total, count) {
 **Aturan**: Jangan overwrite `textContent` `pagination-current` saat user sedang
 mengetik (`document.activeElement !== inp` guard).
 
-### 4.3 Client-side vs Server-side pagination
+### 4.3 Client-side pagination — pola CANONICAL untuk semua halaman list
 
-| Pola | Client-side (canonical) | Server-side |
-|---|---|---|
-| Dipakai oleh | Patients, Appointments, Recall, Finance | **Aktivitas** (audit_log bisa jutaan row) |
-| Data flow | Backend kirim semua → frontend slice per page | Backend kirim per-page + has_next/has_prev |
-| Filter | Apply di frontend (`filteredX`) | Apply di backend payload |
-| Search | Pakai `_search_text` precomputed | Pakai `actor_search` param ke backend |
+Semua halaman list di app (Patients, Appointments, Recall, Finance, **Aktivitas**)
+pakai pola yang sama: **fetch sekali, paginate client-side via `array.slice()`** supaya
+navigasi prev/next/goTo INSTAN.
 
-**Aktivitas WAJIB server-side** karena volume audit log besar (>10K row dalam beberapa
-bulan). Tapi UI/handler harus tetap match canonical struktur.
+| Aspek | Pola |
+|---|---|
+| Data flow | Backend kirim semua row sesuai filter (cap kalau perlu) → frontend slice per page |
+| Filter "scope" (date/role/clinic) | Apply di backend payload — trigger fetch ulang saat berubah |
+| Filter "narrow" (search substring) | Apply di frontend dari `_search_text` precomputed |
+| Pagination | Pure `array.slice()` di handler prev/next/goTo |
+| State | `xAllRows[]` + `xFilteredRows[]` + `xCurrentPage` + `xPageSize` |
+
+**Aktivitas — handling volume jutaan row (multi-klinik)**: backend cap response ke
+`AUDIT_LOG_MAX_LIST_LIMIT = 2000` row, dengan default `start_date` = 7 hari lalu.
+Kalau hasil hit cap → banner UI: *"Hasil dibatasi 2000 aktivitas terbaru. Persempit
+rentang tanggal..."*. Volume realistis multi-klinik dalam 1 minggu fit di cap.
+Untuk arsip > 7 hari, user wajib filter date — expected behavior, sama seperti
+tools enterprise (Sentry, Datadog).
+
+**JANGAN refactor balik ke server-side pagination** dengan offset/has_next.
+Pengalaman 2026-05-19: Aktivitas pernah server-side dengan `getAuditLogPage(page_number)`
+— hasilnya navigasi 1-3 detik per klik karena round-trip Apps Script + Supabase.
+Owner protes, di-revisi ke pola canonical 2026-05-20. Konsistensi UX > optimasi
+antisipatif yang tidak perlu.
 
 ---
 
@@ -852,7 +866,7 @@ const safePatientId = String(row.patient_id || '').replace(/'/g, "\\'");
 | Update | `update{Entity}` | `updatePatient`, `updateAppointment` |
 | Delete | `delete{Entity}` | `deletePatient`, `deletePatientPhoto` |
 | State change | `{verb}{Entity}` | `cancelAppointment`, `restoreAppointment`, `deactivatePatient` |
-| Audit-specific | (cuma 1, sudah ada) | `getAuditLogPage` |
+| Audit-specific | (cuma 1, sudah ada) | `getAuditLogList` |
 
 ### 11.2 Signature
 
@@ -1180,17 +1194,17 @@ Berikut **inkonsistensi terverifikasi** yang ditemukan di `audit-log.html` /
 | H1 | Debounce 280 ms | `audit-log.html:171` | 220 ms (Patients/Appointments/Recall) | Turunkan ke 220 ms (optional — debatable karena server-roundtrip lebih mahal; bisa juga **diskusi**: tetap 280 untuk Aktivitas?) |
 | H2 | Filter date `<input type="date">` tanpa label format ID | `audit-log.html:261, 265` | Canonical date inputs di Patients juga pakai `type="date"` (OK) — tapi label “Dari tanggal” / “Sampai tanggal” formatnya konsisten | OK, no fix needed |
 
-### I. Server-side pagination (KEPT, but ensure consistency)
+### I. Server-side pagination — **OBSOLETE (2026-05-20)**
 
-Server-side pagination Aktivitas adalah **trade-off yang OK** (audit_log bisa
-jutaan row), tapi:
+Section ini OBSOLETE setelah Aktivitas di-refactor ke client-side pagination 2026-05-20
+(lihat Section 4.3 + Section 16 Q2). Item I1-I4 di bawah tidak lagi berlaku.
 
 | # | Item | Status |
 |---|---|---|
-| I1 | UI handler `prev/next/goTo` tetap match canonical signature | ✓ Sudah |
-| I2 | DOM struktur pagination tetap pakai canonical class | ✓ Sudah |
-| I3 | Response shape `has_next`/`has_prev`/`total_pages` valid | ✓ Sudah (well-designed) |
-| I4 | **Belum ada stale-while-revalidate untuk filter change** | ✗ Saat ganti filter, langsung flash loading. Pertimbangkan tetap render data lama dengan opacity dimmed sampai response masuk |
+| I1 | ~~UI handler match canonical~~ | OBSOLETE — sekarang fully canonical (slice array) |
+| I2 | ~~DOM struktur pagination canonical class~~ | OBSOLETE — tetap sama, tapi tidak lagi sebagai exception |
+| I3 | ~~Response shape `has_next`/`has_prev`/`total_pages`~~ | OBSOLETE — backend tidak lagi kirim field ini, diganti `hit_cap`/`cap_limit` |
+| I4 | ~~Stale-while-revalidate untuk filter change~~ | OBSOLETE — sudah ditambahkan + nantinya hanya relevan saat fetch filter berubah, tidak per-halaman lagi |
 
 ### J. Backend pattern
 
@@ -1224,22 +1238,40 @@ DAN tidak ada di Finance. Berikut keputusan final setelah diskusi owner
 **Future polish (non-blocker)**: Grid `170px 1fr 1fr` sebaiknya tambah breakpoint
 untuk layar sempit (mobile). Tapi ini optional.
 
-### Q2. Server-side pagination shape (`has_next`, `has_prev`, `total_count`, `total_pages`) — **KEEP**
+### Q2. Server-side pagination shape (`has_next`, `has_prev`, `total_count`, `total_pages`) — **REVISED 2026-05-20: HAPUS, pakai client-side canonical**
 
-**Status**: Aktivitas pakai struktur boolean explicit dari backend. Canonical
-(client-side) tidak punya konsep ini.
+**Status awal (2026-05-19)**: Aktivitas pakai struktur boolean explicit dari backend.
+Setelah deploy, owner protes navigasi 1-3 detik per klik karena round-trip Apps Script
++ Supabase. Pengalaman ini menunjukkan keputusan "KEEP" salah.
 
-**Keputusan**: **PERTAHANKAN struktur boolean explicit** — tidak ada change.
+**Keputusan revisi (2026-05-20)**: **HAPUS field pagination meta**. Backend kirim
+semua row sesuai filter (cap `AUDIT_LOG_MAX_LIST_LIMIT = 2000`). Frontend paginate
+via `array.slice()`. Response shape baru:
 
-**Justifikasi**:
-- Boolean `has_next` memang **redundant** secara matematis dengan
-  `page_number < total_pages`, TAPI:
-  - **Server-of-truth**: Race condition aman — backend kasih state terkini
-    berdasarkan data nyata, bukan derive di frontend yang bisa drift.
-  - **Reduce bug surface**: Hitung sekali di backend (yang sudah punya total
-    count), bukan berulang di setiap render.
-  - **Standar REST pagination**: Banyak API enterprise kirim flag eksplisit.
-- Payload cost ±8 byte — negligible.
+```js
+{
+  rows: [...],            // ≤ 2000
+  total_returned: N,
+  cap_limit: 2000,
+  hit_cap: boolean,       // true → banner UI peringatan
+  active_since, allowed_entity_types, filters_applied,
+  effective_start_date    // resolved setelah default 7 hari applied
+}
+```
+
+**Justifikasi revisi**:
+- **Konsistensi UX > antisipasi performa**: Patients/Appointments/Recall/Finance
+  semua client-side dengan pagination instan. Owner expect pola yang sama.
+- **Volume realistis dengan filter date 7 hari**: bahkan multi-klinik 5 cabang
+  dengan 300 row/hari per klinik = 10.500/minggu — fit di cap 2000? Tidak.
+  Solusi: default window 7 hari + owner narrow ke 1-3 hari kalau hit cap.
+  Banner UI memandu user.
+- **Migrasi ke hybrid hanya kalau benar perlu**: kalau window 1 hari pun overflow
+  cap 2000 (= >2000 aktivitas per HARI per klinik), baru tambah server-side untuk
+  arsip lama. Estimasi: paling cepat 2-3 tahun pasca-multi-klinik.
+- **Boolean `has_next` rationale (server-of-truth) salah konteks**: pagination
+  state itu bukan domain data — derivable dari `filteredRows.length`. Race
+  condition tidak relevan karena rows sudah di client.
 
 ### Q3. Detail modal footer (tombol "Tutup" di luar body) — **FIX**
 
@@ -1263,27 +1295,32 @@ untuk layar sempit (mobile). Tapi ini optional.
 </div>
 ```
 
-### Q4. Actor search via lookup ke `app_users` — **KEEP**
+### Q4. Actor search — **REVISED 2026-05-20: pindah ke CLIENT-SIDE**
 
-**Status**: Backend `querySupabaseAuditLogActors_` lookup `app_users` dulu (cari by
-nama/username/user_id), baru filter `audit_log` pakai user_ids hasil lookup.
+**Status awal (2026-05-19)**: Backend `querySupabaseAuditLogActors_` lookup
+`app_users` dulu untuk dapat user_ids matching nama, baru filter `audit_log`.
+Setiap keystroke → roundtrip 1-2 detik.
 
-**Keputusan**: **PERTAHANKAN pola 2-step lookup** — tidak ada change.
+**Status revisi (2026-05-20)**: Owner protes search lambat — beda dari Recall
+yang instan. Solusinya: backend ENRICH setiap row dengan `actor_full_name` +
+`actor_username` via bulk lookup `app_users` (1 query batched per request),
+frontend precompute `_search_text` per row, search substring murni di client.
 
 **Justifikasi**:
-- **Performa**: User mau search "by nama", tapi `audit_log.actor_user_id` cuma
-  simpan ID (mis. `USR-0042`). Tanpa lookup ke `app_users`, tidak ada cara cari by
-  nama tanpa data redundancy yang lebih buruk.
-- **Separation of concerns**: `audit_log` simpan minimal columns (immutable,
-  append-only, growth tinggi). `app_users` punya nama lengkap.
-- **Keamanan**: Sudah ada sanitization input di line 308
-  (`replace(/[(),.*%_]/g, '')`) untuk cegah PostgREST injection. Bagus.
-- Trade-off: 1 extra query, tapi search jarang dipakai dibanding pagination
-  navigation.
+- **Konsistensi UX**: Search di Patients/Recall semua instan client-side.
+  Aktivitas exception bikin owner bingung.
+- **Performa lebih baik**: 1 batched lookup `app_users` per fetch (max <50 unique
+  user_id dalam 2000 row) jauh lebih murah dari N keystroke roundtrip.
+- **Trade-off acceptable**: Search hanya bekerja dalam dataset yang sudah load
+  (max 2000 row sesuai filter date). User yang ingin search arsip lama wajib
+  ubah filter date dulu — expected behavior, sama dengan Patients/Recall.
+- **Helper `querySupabaseAuditLogActors_` dihapus**, diganti
+  `enrichAuditLogRowsWithActorNames_` (bulk lookup, defensive: failure tidak
+  menggagalkan request — row tetap dikembalikan dengan nama kosong).
 
 **Aturan future**: Kalau nanti butuh "cari semua aktivitas pasien X" (search by
 entity), bikin endpoint **terpisah** (`getAuditLogByEntity`). JANGAN overload
-`getAuditLogPage`.
+`getAuditLogList`.
 
 ### Q5. `allowed_entity_types` dikirim ke frontend — **KEEP & PROMOTE jadi canonical**
 

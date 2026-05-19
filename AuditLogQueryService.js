@@ -4,7 +4,13 @@
 
    Filter: date range (occurred_at), entity_type[], action[],
            actor_user_id[].
-   Pagination: page_number + page_size (default 50, max 200).
+   Search aktor by nama: di FRONTEND substring match (backend
+           enrich rows dengan actor_full_name + actor_username
+           supaya client punya field untuk search).
+   Mode: client-side pagination. Backend kirim sampai
+         AUDIT_LOG_MAX_LIST_LIMIT row sekaligus, frontend
+         yang slice per halaman. Konsisten dengan
+         Patients/Recall/Appointments canonical.
    Visibility per role: owner/super_admin = all,
            admin_appointment = patient/appointment/treatment/ortho_recall,
            admin_finance = billing/payment/expense/etc,
@@ -32,8 +38,50 @@ const AUDIT_LOG_ROLE_ALLOWED_ENTITY_TYPES = {
   doctor:            []
 };
 
-const AUDIT_LOG_DEFAULT_PAGE_SIZE = 50;
-const AUDIT_LOG_MAX_PAGE_SIZE = 200;
+// Hard cap jumlah row per query. Di atas ini user wajib persempit
+// filter date — sengaja ditampilkan banner di UI. Dipilih 2000 supaya
+// payload tetap <~500KB untuk volume realistis multi-klinik produksi.
+const AUDIT_LOG_MAX_LIST_LIMIT = 2000;
+
+// Default window date kalau user tidak set start_date. 7 hari mencakup
+// pemakaian harian normal (audit aktivitas minggu ini) dan tetap fit
+// di cap meski multi-klinik volume tinggi.
+const AUDIT_LOG_DEFAULT_WINDOW_DAYS = 7;
+
+// Whitelist `action` values yang sah. Sinkron dengan ACTIVITY_ACTION_LABELS
+// di audit-log.html. Input dari user yang tidak ada di whitelist akan
+// di-drop diam-diam (defensive — cegah injection error message ke
+// PostgREST `in.()` syntax).
+const AUDIT_LOG_VALID_ACTIONS = {
+  create: true, update: true, delete: true, deactivate: true,
+  activate: true, cancel: true, restore: true, complete: true,
+  submit: true, replace: true, clear: true, save_contact: true,
+  confirm_doctor_fee: true, generate_totp: true, reset_totp: true,
+  disable_totp: true, send_totp_setup_email: true,
+  generate_pdf: true, send_email: true
+};
+
+// Whitelist semua entity_type yang valid. Subset role-specific di-handle
+// terpisah via AUDIT_LOG_ROLE_ALLOWED_ENTITY_TYPES. Input di luar list ini
+// di-drop (defensive guard).
+const AUDIT_LOG_VALID_ENTITY_TYPES = {
+  patient: true, appointment: true, treatment: true, ortho_recall: true,
+  billing: true, billing_adjustment: true, payment: true,
+  billing_installment_plan: true, billing_invoice: true,
+  billing_feedback: true, expense: true, doctor_compensation_rule: true,
+  doctor_material_deduction: true, service_catalog: true,
+  clinic_info: true, user: true
+};
+
+// Regex strict untuk date input — kalau tidak match, value di-drop dan
+// fallback ke default 7 hari. Cegah PostgREST error message leak dari
+// string aneh yang inject ke filter `gte.`/`lte.`.
+const AUDIT_LOG_DATE_REGEX = /^\d{4}-\d{2}-\d{2}$/;
+
+// Regex untuk user_id (alfanumerik + dash/underscore, max 64 char).
+// User_id existing format: USR-xxxx, OWNER-xxxx, dll. Tolerant tapi
+// mencegah karakter PostgREST seperti paren, comma, dot.
+const AUDIT_LOG_USER_ID_REGEX = /^[A-Za-z0-9_-]{1,64}$/;
 
 /**
  * Hitung daftar entity_type yang boleh dilihat user, berdasarkan
@@ -62,33 +110,59 @@ function computeAuditLogAllowedEntityTypesForUser_(user) {
 }
 
 /**
- * Endpoint utama untuk halaman "Aktivitas".
+ * Hitung default start_date kalau user tidak set: hari ini - 7 hari,
+ * dalam format 'YYYY-MM-DD'.
+ *
+ * @returns {string}  'YYYY-MM-DD'
+ */
+function computeAuditLogDefaultStartDate_() {
+  const now = new Date();
+  const past = new Date(now.getTime() - AUDIT_LOG_DEFAULT_WINDOW_DAYS * 24 * 60 * 60 * 1000);
+  const pad = function(n) { return ('0' + n).slice(-2); };
+  return past.getFullYear() + '-' + pad(past.getMonth() + 1) + '-' + pad(past.getDate());
+}
+
+/**
+ * Endpoint utama untuk halaman "Aktivitas" (client-side pagination + search).
+ *
+ * Search aktor (by nama / username) dilakukan di FRONTEND substring match
+ * di `_search_text` precomputed. Backend tidak handle actor_search — alasan:
+ * pola canonical Patients/Recall (search instan client-side). Backend tetap
+ * enrich setiap row dengan actor_full_name + actor_username supaya frontend
+ * punya field untuk match.
  *
  * Payload:
  *   {
  *     session_token: string,
  *     start_date?:     'YYYY-MM-DD' atau ISO datetime,
+ *                      Default: 7 hari sebelum hari ini.
  *     end_date?:       'YYYY-MM-DD' atau ISO datetime,
  *     entity_types?:   string[],   // multi-select
  *     actions?:        string[],   // multi-select
- *     actor_user_ids?: string[],   // multi-select
- *     page_number?:    number (default 1),
- *     page_size?:      number (default 50, max 200)
+ *     actor_user_ids?: string[]    // multi-select (jarang dipakai; UI tidak expose)
  *   }
  *
  * Return:
  *   {
  *     success: true,
  *     data: {
- *       rows: [...audit_log rows],
- *       page_number, page_size, has_next, has_prev,
- *       active_since: '2026-05-19',
+ *       rows: [
+ *         { ...audit_log row, actor_full_name, actor_username },
+ *         ...
+ *       ],   // max AUDIT_LOG_MAX_LIST_LIMIT
+ *       total_returned: number,
+ *       cap_limit:      number,
+ *       hit_cap:        boolean,   // true → UI tampilkan banner peringatan
+ *       active_since:   '2026-05-19',
  *       allowed_entity_types: null | string[],
- *       filters_applied: { ... }
+ *       filters_applied: {
+ *         start_date, end_date, entity_types, actions, actor_user_ids
+ *       },
+ *       effective_start_date: 'YYYY-MM-DD'   // setelah default applied
  *     }
  *   }
  */
-function getAuditLogPage(payload) {
+function getAuditLogList(payload) {
   try {
     const auth = requireRole(payload, ['admin_appointment', 'admin_finance']);
     if (!auth.success) return auth;
@@ -102,16 +176,6 @@ function getAuditLogPage(payload) {
     }
 
     const p = payload || {};
-
-    // Pagination
-    const requestedPageSize = parseInt(p.page_size, 10);
-    const pageSize = Math.min(
-      Math.max(isNaN(requestedPageSize) ? AUDIT_LOG_DEFAULT_PAGE_SIZE : requestedPageSize, 1),
-      AUDIT_LOG_MAX_PAGE_SIZE
-    );
-    const requestedPageNumber = parseInt(p.page_number, 10);
-    const pageNumber = Math.max(isNaN(requestedPageNumber) ? 1 : requestedPageNumber, 1);
-    const offset = (pageNumber - 1) * pageSize;
 
     // Build PostgREST filter pairs (array of [key, value] tuples agar
     // mendukung dua filter pada kolom yang sama, mis. occurred_at
@@ -127,25 +191,40 @@ function getAuditLogPage(payload) {
       filterPairs.push(['clinic_id', 'eq.' + clinicId]);
     }
 
-    // Date range — auto-convert YYYY-MM-DD ke ISO with day boundary
-    const startDate = String(p.start_date || '').trim();
-    if (startDate) {
-      const startIso = startDate.length === 10 ? (startDate + 'T00:00:00Z') : startDate;
-      filterPairs.push(['occurred_at', 'gte.' + startIso]);
+    // Date range — auto-convert YYYY-MM-DD ke ISO with day boundary.
+    // Default start_date = 7 hari lalu supaya window tidak unbounded.
+    // VALIDASI strict regex YYYY-MM-DD: kalau tidak match → drop value
+    // dan fallback ke default. Cegah string aneh inject ke PostgREST
+    // filter `gte.`/`lte.` yang bisa leak error message ke UI.
+    let startDate = String(p.start_date || '').trim();
+    if (startDate && !AUDIT_LOG_DATE_REGEX.test(startDate)) {
+      startDate = '';
     }
-    const endDate = String(p.end_date || '').trim();
+    if (!startDate) {
+      startDate = computeAuditLogDefaultStartDate_();
+    }
+    filterPairs.push(['occurred_at', 'gte.' + startDate + 'T00:00:00Z']);
+
+    let endDate = String(p.end_date || '').trim();
+    if (endDate && !AUDIT_LOG_DATE_REGEX.test(endDate)) {
+      endDate = '';
+    }
     if (endDate) {
-      const endIso = endDate.length === 10 ? (endDate + 'T23:59:59Z') : endDate;
-      filterPairs.push(['occurred_at', 'lte.' + endIso]);
+      filterPairs.push(['occurred_at', 'lte.' + endDate + 'T23:59:59Z']);
     }
 
-    // entity_type — intersect dengan allowed list (role-based visibility)
+    // entity_type — intersect dengan allowed list (role-based visibility).
+    // Whitelist validation: hanya nilai di AUDIT_LOG_VALID_ENTITY_TYPES yang
+    // diterima — input aneh di-drop diam-diam supaya PostgREST tidak terima
+    // string aneh di `in.()` syntax.
     const requestedEntityTypes = Array.isArray(p.entity_types)
       ? p.entity_types
       : (p.entity_type ? [p.entity_type] : []);
     const cleanedEntityTypes = requestedEntityTypes
       .map(function(t) { return String(t || '').trim(); })
-      .filter(function(t) { return t.length > 0; });
+      .filter(function(t) {
+        return t.length > 0 && AUDIT_LOG_VALID_ENTITY_TYPES[t] === true;
+      });
 
     let effectiveEntityTypes = cleanedEntityTypes;
     if (Array.isArray(allowedEntityTypes)) {
@@ -163,12 +242,9 @@ function getAuditLogPage(payload) {
           success: true,
           data: {
             rows: [],
-            page_number: pageNumber,
-            page_size: pageSize,
-            total_count: 0,
-            total_pages: 1,
-            has_next: false,
-            has_prev: pageNumber > 1,
+            total_returned: 0,
+            cap_limit: AUDIT_LOG_MAX_LIST_LIMIT,
+            hit_cap: false,
             active_since: AUDIT_LOG_ACTIVE_SINCE,
             allowed_entity_types: allowedEntityTypes,
             filters_applied: {
@@ -177,7 +253,8 @@ function getAuditLogPage(payload) {
               entity_types: [],
               actions: [],
               actor_user_ids: []
-            }
+            },
+            effective_start_date: startDate
           }
         };
       }
@@ -187,89 +264,63 @@ function getAuditLogPage(payload) {
       filterPairs.push(['entity_type', 'in.(' + effectiveEntityTypes.join(',') + ')']);
     }
 
-    // action filter
+    // action filter — whitelist validation (hanya value di
+    // AUDIT_LOG_VALID_ACTIONS yang diterima)
     const requestedActions = Array.isArray(p.actions)
       ? p.actions
       : (p.action ? [p.action] : []);
     const cleanedActions = requestedActions
       .map(function(a) { return String(a || '').trim(); })
-      .filter(function(a) { return a.length > 0; });
+      .filter(function(a) {
+        return a.length > 0 && AUDIT_LOG_VALID_ACTIONS[a] === true;
+      });
     if (cleanedActions.length > 0) {
       filterPairs.push(['action', 'in.(' + cleanedActions.join(',') + ')']);
     }
 
-    // actor filter (multi-select user_id, exact match)
+    // actor filter (multi-select user_id, exact match).
+    // Search by nama dilakukan di FRONTEND substring match. Field
+    // actor_user_ids tetap supported untuk future use case (dropdown).
+    // VALIDASI regex format user_id [A-Za-z0-9_-]{1,64} — cegah char
+    // PostgREST aneh inject ke `in.()`.
     const requestedActors = Array.isArray(p.actor_user_ids)
       ? p.actor_user_ids
       : (p.actor_user_id ? [p.actor_user_id] : []);
     const cleanedActors = requestedActors
       .map(function(a) { return String(a || '').trim(); })
-      .filter(function(a) { return a.length > 0; });
-
-    // actor_search: fuzzy match by full_name / username / user_id via lookup
-    // ke tabel app_users. Hasilnya digabung (union) dengan cleanedActors.
-    const actorSearchRaw = String(p.actor_search || '').trim();
-    let effectiveActors = cleanedActors.slice();
-
-    if (actorSearchRaw) {
-      const matchedUserIds = querySupabaseAuditLogActors_(actorSearchRaw, clinicId);
-      if (matchedUserIds.length === 0) {
-        return {
-          success: true,
-          data: {
-            rows: [],
-            page_number: pageNumber,
-            page_size: pageSize,
-            total_count: 0,
-            total_pages: 1,
-            has_next: false,
-            has_prev: pageNumber > 1,
-            active_since: AUDIT_LOG_ACTIVE_SINCE,
-            allowed_entity_types: allowedEntityTypes,
-            filters_applied: {
-              start_date: startDate || null,
-              end_date: endDate || null,
-              entity_types: effectiveEntityTypes,
-              actions: cleanedActions,
-              actor_user_ids: cleanedActors,
-              actor_search: actorSearchRaw
-            }
-          }
-        };
-      }
-      matchedUserIds.forEach(function(uid) {
-        if (effectiveActors.indexOf(uid) === -1) effectiveActors.push(uid);
+      .filter(function(a) {
+        return a.length > 0 && AUDIT_LOG_USER_ID_REGEX.test(a);
       });
-    }
 
-    if (effectiveActors.length > 0) {
-      filterPairs.push(['actor_user_id', 'in.(' + effectiveActors.join(',') + ')']);
+    if (cleanedActors.length > 0) {
+      filterPairs.push(['actor_user_id', 'in.(' + cleanedActors.join(',') + ')']);
     }
 
     // Query via custom URL builder. supabaseSelect_ pakai single-key
     // object jadi tidak bisa untuk occurred_at gte+lte.
+    // Cap +1 supaya bisa deteksi hit_cap tanpa Prefer count=exact
+    // (count=exact mahal di tabel besar — full table scan).
     const queryResult = querySupabaseAuditLog_(filterPairs, {
-      limit: pageSize,
-      offset: offset,
-      order: 'occurred_at.desc,id.desc',
-      count_exact: true
+      limit: AUDIT_LOG_MAX_LIST_LIMIT + 1,
+      order: 'occurred_at.desc,id.desc'
     });
 
-    const rows = queryResult.rows;
-    const totalCount = queryResult.total_count;
-    const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
-    const hasNext = pageNumber < totalPages;
+    const rawRows = queryResult.rows;
+    const hitCap = rawRows.length > AUDIT_LOG_MAX_LIST_LIMIT;
+    const truncated = hitCap ? rawRows.slice(0, AUDIT_LOG_MAX_LIST_LIMIT) : rawRows;
+
+    // Enrich rows dengan actor_full_name + actor_username supaya frontend
+    // bisa search substring by nama tanpa roundtrip. Bulk lookup app_users
+    // untuk semua unique actor_user_id di hasil (typical <50 unique).
+    const rows = enrichAuditLogRowsWithActorNames_(truncated, clinicId);
 
     return {
       success: true,
       data: {
         rows: rows,
-        page_number: pageNumber,
-        page_size: pageSize,
-        total_count: totalCount,
-        total_pages: totalPages,
-        has_next: hasNext,
-        has_prev: pageNumber > 1,
+        total_returned: rows.length,
+        cap_limit: AUDIT_LOG_MAX_LIST_LIMIT,
+        hit_cap: hitCap,
         active_since: AUDIT_LOG_ACTIVE_SINCE,
         allowed_entity_types: allowedEntityTypes,
         filters_applied: {
@@ -277,9 +328,9 @@ function getAuditLogPage(payload) {
           end_date: endDate || null,
           entity_types: effectiveEntityTypes,
           actions: cleanedActions,
-          actor_user_ids: cleanedActors,
-          actor_search: actorSearchRaw || null
-        }
+          actor_user_ids: cleanedActors
+        },
+        effective_start_date: startDate
       }
     };
 
@@ -290,50 +341,80 @@ function getAuditLogPage(payload) {
 }
 
 /**
- * Cari user_ids dari tabel app_users berdasarkan substring nama / username
- * / user_id (case-insensitive). Dipakai untuk fitur "Cari nama pengguna"
- * di halaman Aktivitas.
+ * Bulk lookup app_users untuk semua unique actor_user_id di rows, lalu
+ * inject actor_full_name + actor_username ke setiap row. Dipakai supaya
+ * frontend bisa search substring by nama tanpa roundtrip per ketikan.
  *
- * @param {string} searchTerm
- * @param {string} clinicId    Optional. Kalau ada, scope ke clinic ini.
- * @returns {string[]} user_ids matched
+ * Strategi: 1 batched query PostgREST `user_id=in.(uid1,uid2,...)` —
+ * jauh lebih murah dari N queries individual. Typical 2000 row punya
+ * <50 unique user_id (admin staff klinik).
+ *
+ * @param {Array<object>} rows  audit_log rows
+ * @param {string} clinicId     Optional. Kalau ada, scope ke clinic ini.
+ * @returns {Array<object>} rows dengan actor_full_name + actor_username
  */
-function querySupabaseAuditLogActors_(searchTerm, clinicId) {
-  const raw = String(searchTerm || '').trim();
-  if (!raw) return [];
+function enrichAuditLogRowsWithActorNames_(rows, clinicId) {
+  if (!Array.isArray(rows) || rows.length === 0) return rows || [];
 
-  // Hapus karakter yang punya arti khusus di PostgREST filter syntax
-  // (parens, comma, dot, star, percent, underscore) — supaya tidak bisa
-  // dipakai untuk inject syntax baru. Sisanya safe untuk substring match.
-  const sanitized = raw.replace(/[(),.*%_]/g, '');
-  if (!sanitized) return [];
+  const uniqueIdsMap = {};
+  rows.forEach(function(r) {
+    const uid = String((r && r.actor_user_id) || '').trim();
+    if (uid) uniqueIdsMap[uid] = true;
+  });
+  const uniqueIds = Object.keys(uniqueIdsMap);
+  if (uniqueIds.length === 0) return rows;
 
-  const pattern = '*' + sanitized + '*';
+  // Sanitize user_id untuk PostgREST in.() syntax — hapus karakter yang
+  // bisa break parsing (paren, comma). User_id sudah generated id, jarang
+  // mengandung karakter aneh, tapi safety check.
+  const safeIds = uniqueIds
+    .map(function(u) { return u.replace(/[(),]/g, ''); })
+    .filter(function(u) { return u.length > 0; });
+  if (safeIds.length === 0) return rows;
+
   const config = getSupabaseConfig_();
-
-  const parts = ['select=user_id'];
-  // or=(full_name.ilike.*x*,username.ilike.*x*,user_id.ilike.*x*)
-  // Tidak di-encodeURIComponent — paren & comma di or= harus literal.
-  parts.push('or=(full_name.ilike.' + pattern +
-             ',username.ilike.' + pattern +
-             ',user_id.ilike.' + pattern + ')');
-  parts.push('limit=500');
+  const parts = ['select=user_id,full_name,username'];
+  parts.push('user_id=in.(' + safeIds.join(',') + ')');
+  parts.push('limit=' + safeIds.length);
   if (clinicId) parts.push('clinic_id=eq.' + encodeURIComponent(clinicId));
 
   const url = config.url + '/rest/v1/app_users?' + parts.join('&');
-  const response = UrlFetchApp.fetch(url, {
-    method: 'GET',
-    headers: buildSupabaseHeaders_(),
-    muteHttpExceptions: true
-  });
-  const result = parseSupabaseResponse_(response);
-  if (!result.success) {
-    throw new Error('Audit actor search failed: HTTP ' + result.status_code + ' - ' + JSON.stringify(result.body));
+  let userMap = {};
+  try {
+    const response = UrlFetchApp.fetch(url, {
+      method: 'GET',
+      headers: buildSupabaseHeaders_(),
+      muteHttpExceptions: true
+    });
+    const result = parseSupabaseResponse_(response);
+    if (result.success) {
+      const users = Array.isArray(result.body) ? result.body : [];
+      users.forEach(function(u) {
+        const uid = String((u && u.user_id) || '').trim();
+        if (uid) {
+          userMap[uid] = {
+            full_name: String((u && u.full_name) || '').trim(),
+            username: String((u && u.username) || '').trim()
+          };
+        }
+      });
+    }
+    // Kalau lookup gagal (HTTP error), fallback ke empty userMap supaya
+    // row tetap dikembalikan dengan nama kosong — UI handle gracefully.
+  } catch (e) {
+    // Defensive: jangan biarkan enrichment failure menggagalkan seluruh
+    // query audit_log. Log saja & lanjut tanpa enrichment.
+    Logger.log('enrichAuditLogRowsWithActorNames_ failed: ' + (e && e.message ? e.message : e));
   }
-  const rows = Array.isArray(result.body) ? result.body : [];
-  return rows
-    .map(function(r) { return String((r && r.user_id) || '').trim(); })
-    .filter(function(u) { return u.length > 0; });
+
+  return rows.map(function(r) {
+    const uid = String((r && r.actor_user_id) || '').trim();
+    const info = uid && userMap[uid] ? userMap[uid] : null;
+    return Object.assign({}, r, {
+      actor_full_name: info ? info.full_name : '',
+      actor_username:  info ? info.username  : ''
+    });
+  });
 }
 
 /**
@@ -343,8 +424,8 @@ function querySupabaseAuditLogActors_(searchTerm, clinicId) {
  * oleh supabaseSelect_ (single-key object).
  *
  * @param {Array<[string,string]>} filterPairs
- * @param {object} options  { limit, offset, order, select, count_exact }
- * @returns {{ rows: Array, total_count: number }}
+ * @param {object} options  { limit, offset, order, select }
+ * @returns {{ rows: Array }}
  */
 function querySupabaseAuditLog_(filterPairs, options) {
   const config = getSupabaseConfig_();
@@ -362,12 +443,9 @@ function querySupabaseAuditLog_(filterPairs, options) {
   });
 
   const url = config.url + '/rest/v1/audit_log?' + parts.join('&');
-  // Pakai 'count=exact' header supaya PostgREST kembalikan total count
-  // di Content-Range header (format: '0-49/123' -> total=123).
-  const extraHeaders = opts.count_exact ? { 'Prefer': 'count=exact' } : null;
   const response = UrlFetchApp.fetch(url, {
     method: 'GET',
-    headers: buildSupabaseHeaders_(extraHeaders),
+    headers: buildSupabaseHeaders_(),
     muteHttpExceptions: true
   });
   const result = parseSupabaseResponse_(response);
@@ -375,33 +453,17 @@ function querySupabaseAuditLog_(filterPairs, options) {
     throw new Error('Audit log SELECT failed: HTTP ' + result.status_code + ' - ' + JSON.stringify(result.body));
   }
   const rows = Array.isArray(result.body) ? result.body : [];
-
-  let totalCount = rows.length;
-  if (opts.count_exact) {
-    try {
-      const headers = response.getAllHeaders ? response.getAllHeaders() : {};
-      const contentRange = headers['Content-Range'] || headers['content-range'] || '';
-      // Format: 'start-end/total' atau '*/total'
-      const match = String(contentRange).match(/\/(\d+|\*)\s*$/);
-      if (match && match[1] !== '*') {
-        totalCount = parseInt(match[1], 10) || rows.length;
-      }
-    } catch (e) {
-      // Fall back ke rows.length kalau header tidak tersedia
-    }
-  }
-
-  return { rows: rows, total_count: totalCount };
+  return { rows: rows };
 }
 
 /* =========================================================
    SMOKE TEST — manual dari Apps Script editor
    ========================================================= */
 
-function testAuditLogQueryPage() {
+function testAuditLogQueryList() {
   const result = {
     success: true,
-    stage: 'P3c.1-AuditLogQueryService',
+    stage: 'P3c.1-AuditLogQueryService-list',
     checked_at: typeof nowIso === 'function' ? nowIso() : new Date().toISOString(),
     issues: []
   };
@@ -447,15 +509,24 @@ function testAuditLogQueryPage() {
       addIssue('DOCTOR_NOT_DENIED', { allowed: doctorAllowed });
     }
 
+    // Verifikasi default start_date helper
+    const defStart = computeAuditLogDefaultStartDate_();
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(defStart)) {
+      addIssue('DEFAULT_START_DATE_FORMAT_WRONG', { value: defStart });
+    }
+
     // Direct query tanpa requireRole (akses Supabase langsung)
-    const rows = querySupabaseAuditLog_([], { limit: 10, order: 'occurred_at.desc,id.desc' });
-    result.row_count = rows.length;
-    result.sample_first_row = rows.length > 0 ? {
-      id: rows[0].id,
-      entity_type: rows[0].entity_type,
-      action: rows[0].action,
-      actor_user_id: rows[0].actor_user_id
+    const q = querySupabaseAuditLog_([], { limit: 10, order: 'occurred_at.desc,id.desc' });
+    result.row_count = q.rows.length;
+    result.sample_first_row = q.rows.length > 0 ? {
+      id: q.rows[0].id,
+      entity_type: q.rows[0].entity_type,
+      action: q.rows[0].action,
+      actor_user_id: q.rows[0].actor_user_id
     } : null;
+    result.cap_limit = AUDIT_LOG_MAX_LIST_LIMIT;
+    result.default_window_days = AUDIT_LOG_DEFAULT_WINDOW_DAYS;
+    result.default_start_date_today = defStart;
 
     Logger.log(JSON.stringify(result, null, 2));
     return result;
