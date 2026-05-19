@@ -139,7 +139,7 @@
         clearLoadingState();
         currentUser = res.data;
         showDashboard(res.data);
-        showDashboardPage();
+        navigateToLandingPage_(res.data);
         maybeStartInactivityWatch_();
       })
       .withFailureHandler(function(err) {
@@ -241,6 +241,8 @@
     // Role badge: tampil role utama (kalau ada roles[], pakai yang pertama).
     var roleDisplay = roles.length ? roles[0] : (role || '-');
     document.getElementById('roleText').innerText = roleDisplay;
+
+    applySidebarRoleVisibility_(user);
   }
 
   function getCurrentUserRole() {
@@ -271,6 +273,102 @@
 
   function isAdmin() {
     return getCurrentUserRole() === 'admin';
+  }
+
+  /* =========================================================
+     PHASE 2C — ROLE-BASED UI HELPER (matrix role rangkap)
+     ========================================================= */
+
+  function getCurrentUserRoles() {
+    return (currentUser && Array.isArray(currentUser.roles)) ? currentUser.roles : [];
+  }
+
+  function hasAppRole(role) {
+    return getCurrentUserRoles().indexOf(String(role || '')) !== -1;
+  }
+
+  function hasAnyAppRole(roles) {
+    var list = getCurrentUserRoles();
+    if (!Array.isArray(roles)) return false;
+    for (var i = 0; i < roles.length; i++) {
+      if (list.indexOf(roles[i]) !== -1) return true;
+    }
+    return false;
+  }
+
+  function isFullyPrivileged() {
+    return hasAnyAppRole(['owner', 'super_admin']);
+  }
+
+  // Apply sidebar visibility per role sesuai matrix §UI Guard.
+  // Backend tetap enforce via requireRole — ini hanya UX.
+  function applySidebarRoleVisibility_(user) {
+    var roles = (user && Array.isArray(user.roles)) ? user.roles : [];
+    var allMenuIds = [
+      'menuDashboard', 'menuPatients', 'menuAppointments',
+      'menuRecall', 'menuFinance', 'menuSettings'
+    ];
+
+    // Legacy fallback: kalau user belum punya roles[] (akun bootstrap pre-migrate),
+    // tampilkan semua menu. Backend tetap reject per endpoint.
+    if (roles.length === 0) {
+      allMenuIds.forEach(function(id) {
+        var btn = document.getElementById(id);
+        if (btn) btn.classList.remove('sidebar-menu-hidden');
+      });
+      return;
+    }
+
+    var isFullyPriv = roles.indexOf('owner') !== -1 || roles.indexOf('super_admin') !== -1;
+
+    // Per matrix: menu allowed untuk role non-fully-privileged
+    var menuAllowedRoles = {
+      menuDashboard:    [],  // owner-only via fully_privileged
+      menuPatients:     ['admin_appointment', 'admin_finance'],
+      menuAppointments: ['admin_appointment', 'doctor'],
+      menuRecall:       ['admin_appointment'],
+      menuFinance:      ['admin_finance'],
+      menuSettings:     []   // owner-only via fully_privileged
+    };
+
+    allMenuIds.forEach(function(menuId) {
+      var btn = document.getElementById(menuId);
+      if (!btn) return;
+
+      var allowed = isFullyPriv || (menuAllowedRoles[menuId] || []).some(function(r) {
+        return roles.indexOf(r) !== -1;
+      });
+
+      if (allowed) {
+        btn.classList.remove('sidebar-menu-hidden');
+      } else {
+        btn.classList.add('sidebar-menu-hidden');
+      }
+    });
+  }
+
+  // Landing page setelah login sesuai matrix Q16:
+  // owner/super_admin → Dashboard, admin_finance → Finance,
+  // admin_appointment → Appointment, doctor → Appointment.
+  // Priority untuk role rangkap: owner > admin_fin > admin_appt > doctor.
+  function navigateToLandingPage_(user) {
+    var roles = (user && Array.isArray(user.roles)) ? user.roles : [];
+
+    if (roles.indexOf('owner') !== -1 || roles.indexOf('super_admin') !== -1) {
+      showDashboardPage();
+      return;
+    }
+    if (roles.indexOf('admin_finance') !== -1) {
+      showFinancePage();
+      return;
+    }
+    if (roles.indexOf('admin_appointment') !== -1 || roles.indexOf('doctor') !== -1) {
+      showAppointmentsPage();
+      return;
+    }
+
+    // Legacy fallback (akun pre-migrate) → Dashboard.
+    showDashboardPage();
   }
 
   function logoutLocal() {
