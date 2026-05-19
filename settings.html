@@ -10,6 +10,19 @@ var settingsDeductions = [];
 var settingsTabLoaded = {};
 var settingsClinicData = null;
 var settingsCurrentDoctorName = null;   // dokter yg sedang di-edit, untuk panel Potongan
+var settingsServiceSearchKeyword = '';  // filter pencarian di tab Katalog Layanan
+var settingsServiceCurrentPage = 1;
+var SETTINGS_SERVICE_PAGE_SIZE = 5;
+var settingsUserCurrentPage = 1;
+var SETTINGS_USER_PAGE_SIZE = 5;
+var settingsUserSearchKeyword = '';  // filter pencarian di tab Pengguna
+var settingsDoctorCurrentPage = 1;
+var SETTINGS_DOCTOR_PAGE_SIZE = 5;
+var settingsDoctorSearchKeyword = '';  // filter pencarian di tab Fee Dokter
+var settingsUserSearchDebounce = null;     // debounce timer search Pengguna
+var settingsDoctorSearchDebounce = null;   // debounce timer search Fee Dokter
+var settingsServiceSearchDebounce = null;  // debounce timer search Katalog Layanan
+var SETTINGS_SEARCH_DEBOUNCE_MS = 220;     // sama dengan Patient/Appointment/Recall
 
 /* =========================================================
    ENTRY POINT
@@ -189,8 +202,13 @@ function settingsSubmitClinic(e) {
     .withSuccessHandler(function(res) {
       if (btn) btn.disabled = false;
       if (!res || !res.success) { showToast(res && res.message || 'Gagal menyimpan', 'error'); return; }
-      // Sinkron state local supaya saat owner pindah tab lalu balik, form tampil data terbaru.
-      if (res.data) settingsClinicData = res.data;
+      // Sinkron state local + re-render form supaya value normalized (trim, dll)
+      // dari backend langsung tampil. Sebelumnya form tetap nampilkan input mentah
+      // sehingga Bapak merasa "form tidak refresh" meski toast sukses.
+      if (res.data) {
+        settingsClinicData = res.data;
+        if (settingsTab === 'clinic') settingsRenderClinicTab(res.data);
+      }
       showToast('Info klinik berhasil disimpan', 'success');
     })
     .withFailureHandler(function(err) {
@@ -209,65 +227,189 @@ function settingsSubmitClinic(e) {
 /* =========================================================
    TAB 2 — FEE DOKTER
    ========================================================= */
+function settingsDoctorMatchesKeyword_(r, keyword) {
+  if (!keyword) return true;
+  var typeLabel = r.fee_type === 'fixed' ? 'gaji tetap fixed' : 'persentase pct';
+  var haystack = [
+    String(r.doctor_name || ''),
+    typeLabel,
+    String(r.notes || '')
+  ].join(' ').toLowerCase();
+  return haystack.indexOf(keyword) !== -1;
+}
+
 function settingsRenderDoctorTab() {
   var el = document.getElementById('settingsTabContent');
   if (!el) return;
 
-  var rows = settingsDoctorRules.map(function(r) {
-    var typeBadge = r.fee_type === 'fixed'
-      ? '<span class="settings-badge settings-badge-fixed">Gaji Tetap</span>'
-      : '<span class="settings-badge settings-badge-pct">Persentase</span>';
-    var activeBadge = r.is_active !== false
-      ? '<span class="settings-badge settings-badge-active">Aktif</span>'
-      : '<span class="settings-badge settings-badge-inactive">Nonaktif</span>';
-    var deductionCount = settingsDeductions.filter(function(d) {
-      return d.doctor_name === r.doctor_name && d.is_active !== false;
-    }).length;
-    var detail = r.fee_type === 'fixed'
-      ? (r.fixed_salary ? formatAppRupiah(r.fixed_salary) + '/bln' : '-')
-      : [
-          r.base_percentage      ? 'Base: ' + (r.base_percentage*100) + '%'        : '',
-          r.control_percentage   ? 'Kontrol: ' + (r.control_percentage*100) + '%'  : '',
-          r.operational_deduction ? 'Operasional: ' + (r.operational_deduction*100) + '%' : '',
-          deductionCount         ? deductionCount + ' aturan potongan'             : 'Tanpa potongan'
-        ].filter(Boolean).join(' &bull; ');
-    return '<tr>' +
-      '<td>' + escapeAppHtml(r.doctor_name) + '</td>' +
-      '<td>' + typeBadge + '</td>' +
-      '<td style="font-size:12px;color:#94a3b8">' + detail + '</td>' +
-      '<td>' + activeBadge + '</td>' +
-      '<td style="text-align:right">' + settingsKebabBtn_([
-        { label: 'Edit aturan fee',
-          onclick: "settingsOpenDoctorModal('" + escapeAppHtml(r.doctor_name) + "')" },
-        { divider: true },
-        r.is_active !== false
-          ? { label: 'Nonaktifkan', danger: true,
-              onclick: "settingsDeactivateDoctor('" + escapeAppHtml(r.doctor_name) + "')" }
-          : { label: 'Aktifkan',
-              onclick: "settingsActivateDoctor('" + escapeAppHtml(r.doctor_name) + "')" }
-      ]) + '</td>' +
-    '</tr>';
-  }).join('');
-
-  el.innerHTML =
-    '<div class="settings-section-card">' +
-      '<div class="settings-table-header">' +
-        '<div class="settings-table-title">Aturan Fee Dokter</div>' +
-        '<button class="btn btn-primary" style="padding:7px 14px;font-size:13px" onclick="settingsOpenDoctorModal(null)">+ Tambah Dokter</button>' +
+  if (!document.getElementById('settingsDoctorsTbody')) {
+    el.innerHTML =
+      '<div class="settings-section-card">' +
+        '<div class="settings-table-header">' +
+          '<div class="settings-table-title">Aturan Fee Dokter</div>' +
+          '<button class="btn btn-primary" style="padding:7px 14px;font-size:13px" onclick="settingsOpenDoctorModal(null)">+ Tambah Dokter</button>' +
+        '</div>' +
+        '<div style="margin:0 0 12px">' +
+          '<input type="text" id="settingsDoctorSearchInput" class="search-box" ' +
+            'placeholder="Cari nama dokter atau tipe fee..." ' +
+            'value="' + escapeAppHtml(settingsDoctorSearchKeyword) + '" ' +
+            'oninput="settingsDoctorSearchChange_(this.value)">' +
+        '</div>' +
+        '<div class="table-wrapper"><table class="table" style="table-layout:fixed;width:100%">' +
+          '<thead><tr>' +
+            '<th style="width:25%">Nama Dokter</th>' +
+            '<th style="width:12%">Tipe</th>' +
+            '<th style="width:33%">Detail</th>' +
+            '<th style="width:13%">Status</th>' +
+            '<th style="width:17%;text-align:right">Aksi</th>' +
+          '</tr></thead>' +
+          '<tbody id="settingsDoctorsTbody"></tbody>' +
+        '</table></div>' +
+        '<div class="pagination">' +
+          '<div class="pagination-nav">' +
+            '<button type="button" class="pagination-arrow" id="settingsDoctorPrevBtn" onclick="settingsDoctorPrevPage_()" aria-label="Halaman sebelumnya">' +
+              '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"></polyline></svg>' +
+            '</button>' +
+            '<span class="pagination-label">Page</span>' +
+            '<span class="pagination-current" id="settingsDoctorCurrentPage" contenteditable="true" ' +
+              'onkeydown="if(event.key===\'Enter\'){settingsDoctorGoToPage_(this);this.blur();event.preventDefault();}" ' +
+              'onblur="settingsDoctorGoToPage_(this)" ' +
+              'onfocus="var r=document.createRange(),s=window.getSelection();r.selectNodeContents(this);s.removeAllRanges();s.addRange(r);">1</span>' +
+            '<span class="pagination-sep">of</span>' +
+            '<span class="pagination-total" id="settingsDoctorTotalPages">1</span>' +
+            '<button type="button" class="pagination-arrow" id="settingsDoctorNextBtn" onclick="settingsDoctorNextPage_()" aria-label="Halaman berikutnya">' +
+              '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"></polyline></svg>' +
+            '</button>' +
+          '</div>' +
+          '<div class="pagination-meta">' +
+            '<span class="pagination-rows-chip">' + SETTINGS_DOCTOR_PAGE_SIZE + ' rows</span>' +
+            '<span class="pagination-count" id="settingsDoctorPaginationInfo">-</span>' +
+          '</div>' +
+        '</div>' +
       '</div>' +
-      '<div class="table-wrapper"><table class="table" style="table-layout:fixed;width:100%">' +
-        '<thead><tr>' +
-          '<th style="width:25%">Nama Dokter</th>' +
-          '<th style="width:12%">Tipe</th>' +
-          '<th style="width:33%">Detail</th>' +
-          '<th style="width:13%">Status</th>' +
-          '<th style="width:17%;text-align:right">Aksi</th>' +
-        '</tr></thead>' +
-        '<tbody>' + (rows || '<tr><td colspan="5" class="settings-empty">Belum ada data</td></tr>') + '</tbody>' +
-      '</table></div>' +
-    '</div>' +
-    settingsDoctorModalHtml() +
-    settingsDeductionModalHtml();
+      settingsDoctorModalHtml() +
+      settingsDeductionModalHtml();
+  }
+  settingsRenderDoctorBody_();
+}
+
+function settingsRenderDoctorBody_() {
+  var tbody = document.getElementById('settingsDoctorsTbody');
+  if (!tbody) return;
+
+  var keyword = String(settingsDoctorSearchKeyword || '').trim().toLowerCase();
+  var filtered = keyword
+    ? (settingsDoctorRules || []).filter(function(r) { return settingsDoctorMatchesKeyword_(r, keyword); })
+    : (settingsDoctorRules || []);
+
+  var totalPages = Math.ceil(filtered.length / SETTINGS_DOCTOR_PAGE_SIZE) || 1;
+  if (settingsDoctorCurrentPage > totalPages) settingsDoctorCurrentPage = totalPages;
+  if (settingsDoctorCurrentPage < 1) settingsDoctorCurrentPage = 1;
+
+  var startIdx = (settingsDoctorCurrentPage - 1) * SETTINGS_DOCTOR_PAGE_SIZE;
+  var pageRows = filtered.slice(startIdx, startIdx + SETTINGS_DOCTOR_PAGE_SIZE);
+
+  if (!pageRows.length) {
+    var emptyTitle = keyword ? 'Dokter tidak ditemukan' : 'Belum ada aturan fee';
+    var emptySub   = keyword ? 'Coba ubah kata kunci pencarian' : 'Tambahkan aturan fee dokter lewat tombol di atas';
+    tbody.innerHTML =
+      '<tr><td colspan="5">' +
+        '<div class="settings-empty-state">' +
+          '<div class="settings-empty-state-title">' + emptyTitle + '</div>' +
+          '<div class="settings-empty-state-subtitle">' + emptySub + '</div>' +
+        '</div>' +
+      '</td></tr>';
+  } else {
+    tbody.innerHTML = pageRows.map(function(r) {
+      var typeBadge = r.fee_type === 'fixed'
+        ? '<span class="settings-badge settings-badge-fixed">Gaji Tetap</span>'
+        : '<span class="settings-badge settings-badge-pct">Persentase</span>';
+      var activeBadge = r.is_active !== false
+        ? '<span class="settings-badge settings-badge-active">Aktif</span>'
+        : '<span class="settings-badge settings-badge-inactive">Nonaktif</span>';
+      var deductionCount = settingsDeductions.filter(function(d) {
+        return d.doctor_name === r.doctor_name && d.is_active !== false;
+      }).length;
+      var detail = r.fee_type === 'fixed'
+        ? (r.fixed_salary ? formatAppRupiah(r.fixed_salary) + '/bln' : '-')
+        : [
+            r.base_percentage      ? 'Base: ' + (r.base_percentage*100) + '%'        : '',
+            r.control_percentage   ? 'Kontrol: ' + (r.control_percentage*100) + '%'  : '',
+            r.operational_deduction ? 'Operasional: ' + (r.operational_deduction*100) + '%' : '',
+            deductionCount         ? deductionCount + ' aturan potongan'             : 'Tanpa potongan'
+          ].filter(Boolean).join(' &bull; ');
+      return '<tr>' +
+        '<td>' + escapeAppHtml(r.doctor_name) + '</td>' +
+        '<td>' + typeBadge + '</td>' +
+        '<td style="font-size:12px;color:#94a3b8">' + detail + '</td>' +
+        '<td>' + activeBadge + '</td>' +
+        '<td style="text-align:right">' + settingsKebabBtn_([
+          { label: 'Edit aturan fee',
+            onclick: "settingsOpenDoctorModal('" + escapeAppHtml(r.doctor_name) + "')" },
+          { divider: true },
+          r.is_active !== false
+            ? { label: 'Nonaktifkan', danger: true,
+                onclick: "settingsDeactivateDoctor('" + escapeAppHtml(r.doctor_name) + "')" }
+            : { label: 'Aktifkan',
+                onclick: "settingsActivateDoctor('" + escapeAppHtml(r.doctor_name) + "')" }
+        ]) + '</td>' +
+      '</tr>';
+    }).join('');
+  }
+
+  var pageEl  = document.getElementById('settingsDoctorCurrentPage');
+  var totalEl = document.getElementById('settingsDoctorTotalPages');
+  var infoEl  = document.getElementById('settingsDoctorPaginationInfo');
+  var prevBtn = document.getElementById('settingsDoctorPrevBtn');
+  var nextBtn = document.getElementById('settingsDoctorNextBtn');
+  if (pageEl)  pageEl.textContent  = settingsDoctorCurrentPage;
+  if (totalEl) totalEl.textContent = totalPages;
+  if (infoEl)  infoEl.textContent  = filtered.length + ' records';
+  if (prevBtn) prevBtn.disabled = settingsDoctorCurrentPage <= 1;
+  if (nextBtn) nextBtn.disabled = settingsDoctorCurrentPage >= totalPages;
+}
+
+function settingsDoctorSearchChange_(value) {
+  settingsDoctorSearchKeyword = String(value || '');
+  if (settingsDoctorSearchDebounce) clearTimeout(settingsDoctorSearchDebounce);
+  settingsDoctorSearchDebounce = setTimeout(function() {
+    settingsDoctorCurrentPage = 1;
+    if (settingsTab === 'doctor') settingsRenderDoctorBody_();
+  }, SETTINGS_SEARCH_DEBOUNCE_MS);
+}
+
+function settingsDoctorPrevPage_() {
+  if (settingsDoctorCurrentPage > 1) {
+    settingsDoctorCurrentPage--;
+    if (settingsTab === 'doctor') settingsRenderDoctorBody_();
+  }
+}
+
+function settingsDoctorNextPage_() {
+  var keyword = String(settingsDoctorSearchKeyword || '').trim().toLowerCase();
+  var total = keyword
+    ? (settingsDoctorRules || []).filter(function(r) { return settingsDoctorMatchesKeyword_(r, keyword); }).length
+    : (settingsDoctorRules || []).length;
+  var totalPages = Math.ceil(total / SETTINGS_DOCTOR_PAGE_SIZE) || 1;
+  if (settingsDoctorCurrentPage < totalPages) {
+    settingsDoctorCurrentPage++;
+    if (settingsTab === 'doctor') settingsRenderDoctorBody_();
+  }
+}
+
+function settingsDoctorGoToPage_(el) {
+  var keyword = String(settingsDoctorSearchKeyword || '').trim().toLowerCase();
+  var total = keyword
+    ? (settingsDoctorRules || []).filter(function(r) { return settingsDoctorMatchesKeyword_(r, keyword); }).length
+    : (settingsDoctorRules || []).length;
+  var totalPages = Math.ceil(total / SETTINGS_DOCTOR_PAGE_SIZE) || 1;
+  var page = parseInt(el.textContent, 10);
+  if (isNaN(page) || page < 1) page = 1;
+  if (page > totalPages) page = totalPages;
+  el.textContent = page;
+  if (settingsDoctorCurrentPage === page) return;
+  settingsDoctorCurrentPage = page;
+  if (settingsTab === 'doctor') settingsRenderDoctorBody_();
 }
 
 function settingsDoctorModalHtml() {
@@ -354,7 +496,15 @@ function settingsRenderDeductionTable() {
     })
     .map(function(d) {
       var svc = settingsServices.find(function(s) { return s.service_id === d.service_id; });
-      var svcName = svc ? svc.service_name : ('? ' + d.service_id);
+      return { _d: d, _svcName: svc ? svc.service_name : ('? ' + d.service_id) };
+    })
+    .sort(function(a, b) {
+      return String(a._svcName).toLocaleLowerCase('id-ID')
+        .localeCompare(String(b._svcName).toLocaleLowerCase('id-ID'), 'id-ID');
+    })
+    .map(function(item) {
+      var d = item._d;
+      var svcName = item._svcName;
       var catBadge = d.category === 'lab'
         ? '<span class="settings-badge settings-badge-lab">Lab</span>'
         : '<span class="settings-badge settings-badge-material">Bahan</span>';
@@ -380,9 +530,10 @@ function settingsRenderDeductionTable() {
 }
 
 function settingsDeductionModalHtml() {
-  // Build service options dari layanan aktif
-  var serviceOptions = settingsServices
-    .filter(function(s) { return s.is_active !== false; })
+  // Build service options dari layanan aktif, urut A→Z.
+  var serviceOptions = settingsServiceSortByName_(
+      settingsServices.filter(function(s) { return s.is_active !== false; })
+    )
     .map(function(s) {
       return '<option value="' + escapeAppHtml(s.service_id) + '">' +
               escapeAppHtml(s.service_name) + '</option>';
@@ -699,54 +850,183 @@ function settingsActivateDoctor(doctorName) {
 /* =========================================================
    TAB 3 — KATALOG LAYANAN
    ========================================================= */
+function settingsServiceSortByName_(list) {
+  // Sort A→Z berdasarkan service_name. Tidak mutate array asli.
+  return (list || []).slice().sort(function(a, b) {
+    var an = String((a && a.service_name) || '').toLocaleLowerCase('id-ID');
+    var bn = String((b && b.service_name) || '').toLocaleLowerCase('id-ID');
+    return an.localeCompare(bn, 'id-ID');
+  });
+}
+
 function settingsRenderServiceTab() {
   var el = document.getElementById('settingsTabContent');
   if (!el) return;
 
-  var rows = settingsServices.map(function(s) {
-    var activeBadge = s.is_active !== false
-      ? '<span class="settings-badge settings-badge-active">Aktif</span>'
-      : '<span class="settings-badge settings-badge-inactive">Nonaktif</span>';
-    var flags = [
-      s.is_ortho_install ? '<span class="settings-badge settings-badge-pct">Pasang</span>' : '',
-      s.is_ortho_control ? '<span class="settings-badge settings-badge-fixed">Kontrol</span>' : ''
-    ].filter(Boolean).join(' ');
-    return '<tr>' +
-      '<td>' + escapeAppHtml(s.service_name||'') + '</td>' +
-      '<td>' + formatAppRupiah(s.default_price) + '</td>' +
-      '<td>' + (flags || '-') + '</td>' +
-      '<td>' + activeBadge + '</td>' +
-      '<td style="text-align:right">' + settingsKebabBtn_([
-        { label: 'Edit layanan',
-          onclick: "settingsOpenServiceModal('" + escapeAppHtml(s.service_id) + "')" },
-        { divider: true },
-        s.is_active !== false
-          ? { label: 'Nonaktifkan', danger: true,
-              onclick: "settingsDeactivateService('" + escapeAppHtml(s.service_id) + "')" }
-          : { label: 'Aktifkan',
-              onclick: "settingsActivateService('" + escapeAppHtml(s.service_id) + "')" }
-      ]) + '</td>' +
-    '</tr>';
-  }).join('');
-
-  el.innerHTML =
-    '<div class="settings-section-card">' +
-      '<div class="settings-table-header">' +
-        '<div class="settings-table-title">Katalog Layanan</div>' +
-        '<button class="btn btn-primary" style="padding:7px 14px;font-size:13px" onclick="settingsOpenServiceModal(null)">+ Tambah Layanan</button>' +
+  if (!document.getElementById('settingsServicesTbody')) {
+    el.innerHTML =
+      '<div class="settings-section-card">' +
+        '<div class="settings-table-header">' +
+          '<div class="settings-table-title">Katalog Layanan</div>' +
+          '<button class="btn btn-primary" style="padding:7px 14px;font-size:13px" onclick="settingsOpenServiceModal(null)">+ Tambah Layanan</button>' +
+        '</div>' +
+        '<div style="margin:0 0 12px">' +
+          '<input type="text" id="settingsServiceSearchInput" class="search-box" ' +
+            'placeholder="Cari nama layanan..." ' +
+            'value="' + escapeAppHtml(settingsServiceSearchKeyword) + '" ' +
+            'oninput="settingsServiceSearchChange_(this.value)">' +
+        '</div>' +
+        '<div class="table-wrapper"><table class="table" style="table-layout:fixed;width:100%">' +
+          '<thead><tr>' +
+            '<th style="width:42%">Nama Layanan</th>' +
+            '<th style="width:18%">Harga Default</th>' +
+            '<th style="width:12%">Flag Ortho</th>' +
+            '<th style="width:12%">Status</th>' +
+            '<th style="width:16%;text-align:right">Aksi</th>' +
+          '</tr></thead>' +
+          '<tbody id="settingsServicesTbody"></tbody>' +
+        '</table></div>' +
+        '<div class="pagination">' +
+          '<div class="pagination-nav">' +
+            '<button type="button" class="pagination-arrow" id="settingsServicePrevBtn" onclick="settingsServicePrevPage_()" aria-label="Halaman sebelumnya">' +
+              '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"></polyline></svg>' +
+            '</button>' +
+            '<span class="pagination-label">Page</span>' +
+            '<span class="pagination-current" id="settingsServiceCurrentPage" contenteditable="true" ' +
+              'onkeydown="if(event.key===\'Enter\'){settingsServiceGoToPage_(this);this.blur();event.preventDefault();}" ' +
+              'onblur="settingsServiceGoToPage_(this)" ' +
+              'onfocus="var r=document.createRange(),s=window.getSelection();r.selectNodeContents(this);s.removeAllRanges();s.addRange(r);">1</span>' +
+            '<span class="pagination-sep">of</span>' +
+            '<span class="pagination-total" id="settingsServiceTotalPages">1</span>' +
+            '<button type="button" class="pagination-arrow" id="settingsServiceNextBtn" onclick="settingsServiceNextPage_()" aria-label="Halaman berikutnya">' +
+              '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"></polyline></svg>' +
+            '</button>' +
+          '</div>' +
+          '<div class="pagination-meta">' +
+            '<span class="pagination-rows-chip">' + SETTINGS_SERVICE_PAGE_SIZE + ' rows</span>' +
+            '<span class="pagination-count" id="settingsServicePaginationInfo">-</span>' +
+          '</div>' +
+        '</div>' +
       '</div>' +
-      '<div class="table-wrapper"><table class="table" style="table-layout:fixed;width:100%">' +
-        '<thead><tr>' +
-          '<th style="width:42%">Nama Layanan</th>' +
-          '<th style="width:18%">Harga Default</th>' +
-          '<th style="width:12%">Flag Ortho</th>' +
-          '<th style="width:12%">Status</th>' +
-          '<th style="width:16%;text-align:right">Aksi</th>' +
-        '</tr></thead>' +
-        '<tbody>' + (rows || '<tr><td colspan="5" class="settings-empty">Belum ada data</td></tr>') + '</tbody>' +
-      '</table></div>' +
-    '</div>' +
-    settingsServiceModalHtml();
+      settingsServiceModalHtml();
+  }
+  settingsRenderServiceBody_();
+}
+
+function settingsRenderServiceBody_() {
+  var tbody = document.getElementById('settingsServicesTbody');
+  if (!tbody) return;
+
+  var keyword = String(settingsServiceSearchKeyword || '').trim().toLowerCase();
+  var sorted = settingsServiceSortByName_(settingsServices);
+  var filtered = keyword
+    ? sorted.filter(function(s) {
+        return String(s.service_name || '').toLowerCase().indexOf(keyword) !== -1;
+      })
+    : sorted;
+
+  var totalPages = Math.ceil(filtered.length / SETTINGS_SERVICE_PAGE_SIZE) || 1;
+  if (settingsServiceCurrentPage > totalPages) settingsServiceCurrentPage = totalPages;
+  if (settingsServiceCurrentPage < 1) settingsServiceCurrentPage = 1;
+
+  var startIdx = (settingsServiceCurrentPage - 1) * SETTINGS_SERVICE_PAGE_SIZE;
+  var pageRows = filtered.slice(startIdx, startIdx + SETTINGS_SERVICE_PAGE_SIZE);
+
+  if (!pageRows.length) {
+    var emptyTitle = keyword ? 'Layanan tidak ditemukan' : 'Belum ada layanan';
+    var emptySub   = keyword ? 'Coba ubah kata kunci pencarian' : 'Tambahkan layanan lewat tombol di atas';
+    tbody.innerHTML =
+      '<tr><td colspan="5">' +
+        '<div class="settings-empty-state">' +
+          '<div class="settings-empty-state-title">' + emptyTitle + '</div>' +
+          '<div class="settings-empty-state-subtitle">' + emptySub + '</div>' +
+        '</div>' +
+      '</td></tr>';
+  } else {
+    tbody.innerHTML = pageRows.map(function(s) {
+      var activeBadge = s.is_active !== false
+        ? '<span class="settings-badge settings-badge-active">Aktif</span>'
+        : '<span class="settings-badge settings-badge-inactive">Nonaktif</span>';
+      var flags = [
+        s.is_ortho_install ? '<span class="settings-badge settings-badge-pct">Pasang</span>' : '',
+        s.is_ortho_control ? '<span class="settings-badge settings-badge-fixed">Kontrol</span>' : ''
+      ].filter(Boolean).join(' ');
+      return '<tr>' +
+        '<td>' + escapeAppHtml(s.service_name||'') + '</td>' +
+        '<td>' + formatAppRupiah(s.default_price) + '</td>' +
+        '<td>' + (flags || '-') + '</td>' +
+        '<td>' + activeBadge + '</td>' +
+        '<td style="text-align:right">' + settingsKebabBtn_([
+          { label: 'Edit layanan',
+            onclick: "settingsOpenServiceModal('" + escapeAppHtml(s.service_id) + "')" },
+          { divider: true },
+          s.is_active !== false
+            ? { label: 'Nonaktifkan', danger: true,
+                onclick: "settingsDeactivateService('" + escapeAppHtml(s.service_id) + "')" }
+            : { label: 'Aktifkan',
+                onclick: "settingsActivateService('" + escapeAppHtml(s.service_id) + "')" }
+        ]) + '</td>' +
+      '</tr>';
+    }).join('');
+  }
+
+  var pageEl  = document.getElementById('settingsServiceCurrentPage');
+  var totalEl = document.getElementById('settingsServiceTotalPages');
+  var infoEl  = document.getElementById('settingsServicePaginationInfo');
+  var prevBtn = document.getElementById('settingsServicePrevBtn');
+  var nextBtn = document.getElementById('settingsServiceNextBtn');
+  if (pageEl)  pageEl.textContent  = settingsServiceCurrentPage;
+  if (totalEl) totalEl.textContent = totalPages;
+  if (infoEl)  infoEl.textContent  = filtered.length + ' records';
+  if (prevBtn) prevBtn.disabled = settingsServiceCurrentPage <= 1;
+  if (nextBtn) nextBtn.disabled = settingsServiceCurrentPage >= totalPages;
+}
+
+function settingsServiceSearchChange_(value) {
+  settingsServiceSearchKeyword = String(value || '');
+  if (settingsServiceSearchDebounce) clearTimeout(settingsServiceSearchDebounce);
+  settingsServiceSearchDebounce = setTimeout(function() {
+    settingsServiceCurrentPage = 1;
+    if (settingsTab === 'service') settingsRenderServiceBody_();
+  }, SETTINGS_SEARCH_DEBOUNCE_MS);
+}
+
+function settingsServicePrevPage_() {
+  if (settingsServiceCurrentPage > 1) {
+    settingsServiceCurrentPage--;
+    if (settingsTab === 'service') settingsRenderServiceBody_();
+  }
+}
+
+function settingsServiceNextPage_() {
+  var keyword = String(settingsServiceSearchKeyword || '').trim().toLowerCase();
+  var total = keyword
+    ? settingsServices.filter(function(s) {
+        return String(s.service_name || '').toLowerCase().indexOf(keyword) !== -1;
+      }).length
+    : settingsServices.length;
+  var totalPages = Math.ceil(total / SETTINGS_SERVICE_PAGE_SIZE) || 1;
+  if (settingsServiceCurrentPage < totalPages) {
+    settingsServiceCurrentPage++;
+    if (settingsTab === 'service') settingsRenderServiceBody_();
+  }
+}
+
+function settingsServiceGoToPage_(el) {
+  var keyword = String(settingsServiceSearchKeyword || '').trim().toLowerCase();
+  var total = keyword
+    ? settingsServices.filter(function(s) {
+        return String(s.service_name || '').toLowerCase().indexOf(keyword) !== -1;
+      }).length
+    : settingsServices.length;
+  var totalPages = Math.ceil(total / SETTINGS_SERVICE_PAGE_SIZE) || 1;
+  var page = parseInt(el.textContent, 10);
+  if (isNaN(page) || page < 1) page = 1;
+  if (page > totalPages) page = totalPages;
+  el.textContent = page;
+  if (settingsServiceCurrentPage === page) return;
+  settingsServiceCurrentPage = page;
+  if (settingsTab === 'service') settingsRenderServiceBody_();
 }
 
 function settingsServiceModalHtml() {
@@ -1007,39 +1287,39 @@ var SETTINGS_ROLE_INFO = [
     persona: 'Pemilik klinik',
     scope: 'Akses penuh ke semua modul. Bisa kelola pengguna, konfirmasi Fee Dokter ke pengeluaran, lihat semua laporan.',
     status: 'active',
-    statusLabel: 'Aktif sekarang'
+    statusLabel: 'Role aktif'
   },
   {
     key: 'super_admin',
     label: 'Super Admin',
-    persona: 'Manajer yang sangat dipercaya',
+    persona: 'Pengelola aplikasi',
     scope: 'Identik dengan Owner (akses penuh). Digunakan kalau ingin mendelegasikan kontrol penuh tanpa memberi label "owner".',
     status: 'active',
-    statusLabel: 'Aktif sekarang'
+    statusLabel: 'Role aktif'
   },
   {
     key: 'admin_appointment',
     label: 'Admin Appointment',
     persona: 'Resepsionis / front office',
-    scope: 'Target: kelola Pasien, Appointment, dan Treatment. Tidak boleh akses Finance sensitif, kelola pengguna, atau konfirmasi Fee Dokter.',
-    status: 'soon',
-    statusLabel: 'Sebagian — masih setara admin lama'
+    scope: 'Kelola Pasien, Appointment, dan Treatment. Tidak boleh akses Finance sensitif, kelola pengguna, atau konfirmasi Fee Dokter.',
+    status: 'active',
+    statusLabel: 'Role aktif'
   },
   {
     key: 'admin_finance',
     label: 'Admin Finance',
     persona: 'Staff keuangan',
-    scope: 'Target: kelola Billing, Pembayaran, Pengeluaran, dan Setting Layanan & Tarif. Lihat Owner Report. Tidak boleh kelola pengguna atau konfirmasi Fee Dokter.',
-    status: 'soon',
-    statusLabel: 'Sebagian — masih setara admin lama'
+    scope: 'Kelola Billing, Pembayaran, Pengeluaran, dan Setting Layanan & Tarif. Lihat Owner Report. Tidak boleh kelola pengguna atau konfirmasi Fee Dokter.',
+    status: 'active',
+    statusLabel: 'Role aktif'
   },
   {
     key: 'doctor',
     label: 'Doctor',
     persona: 'Dokter klinik',
-    scope: 'Target: akses Treatment untuk pasien yang dia tangani, lihat fee miliknya sendiri di Owner Report. Login dokter belum dibuka di fase ini.',
-    status: 'soon',
-    statusLabel: 'Belum bisa login (Phase 2b)'
+    scope: 'Akses Treatment untuk pasien yang dia tangani, lihat fee miliknya sendiri di Owner Report.',
+    status: 'active',
+    statusLabel: 'Role aktif'
   }
 ];
 
@@ -1050,70 +1330,197 @@ function settingsFormatRolesChips_(roles) {
   }).join('');
 }
 
+function settingsUserMatchesKeyword_(u, keyword) {
+  if (!keyword) return true;
+  var haystack = [
+    String(u.full_name || ''),
+    String(u.username || ''),
+    String(u.email || ''),
+    (Array.isArray(u.roles) ? u.roles.join(' ') : '')
+  ].join(' ').toLowerCase();
+  return haystack.indexOf(keyword) !== -1;
+}
+
 function settingsRenderUserTab() {
   var el = document.getElementById('settingsTabContent');
   if (!el) return;
 
-  var rows = settingsUsers.map(function(u) {
-    var emailDisplay = u.email
-      ? '<span style="word-break:break-all">' + escapeAppHtml(u.email) + '</span>'
-      : '<span class="settings-empty" style="font-style:italic;font-size:11.5px">belum ada</span>';
-    var totpBadge = u.totp_enabled
-      ? '<span class="settings-badge settings-badge-active">Aktif</span>'
-      : '<span class="settings-badge settings-badge-inactive">Belum</span>';
-    var inactiveTag = u.is_active === false
-      ? ' <span class="settings-badge settings-badge-inactive" style="margin-left:6px;font-size:10px">Nonaktif</span>'
-      : '';
-    var rolesJsArg = JSON.stringify(u.roles || []).replace(/"/g, '&quot;');
-    var emailJsArg = "'" + escapeAppHtml(u.email || '') + "'";
-    var fullNameJsArg = "'" + escapeAppHtml(u.full_name || u.username || '') + "'";
-    var kebabItems = [
-      { label: 'Edit pengguna',
-        onclick: "settingsOpenEditRolesModal('" + escapeAppHtml(u.user_id) + "','" + escapeAppHtml(u.username) + "'," + rolesJsArg + ',' + emailJsArg + ')' },
-      { label: u.totp_enabled ? 'Reset Authenticator (HP staff baru)' : 'Setup Authenticator (tampil QR)',
-        onclick: "settingsOpenTotpModal('" + escapeAppHtml(u.user_id) + "'," + fullNameJsArg + ',' + (u.totp_enabled ? 'true' : 'false') + ')' }
-    ];
-    if (u.email) {
-      kebabItems.push({ label: 'Kirim link setup ke email',
-        onclick: "settingsSendTotpSetupEmail('" + escapeAppHtml(u.user_id) + "'," + fullNameJsArg + ')' });
-    }
-    kebabItems.push({ divider: true });
-    kebabItems.push(u.is_active !== false
-      ? { label: 'Nonaktifkan pengguna', danger: true,
-          onclick: "settingsDeactivateUser('" + escapeAppHtml(u.user_id) + "','" + escapeAppHtml(u.username) + "')" }
-      : { label: 'Aktifkan pengguna',
-          onclick: "settingsActivateUser('" + escapeAppHtml(u.user_id) + "')" });
-
-    return '<tr>' +
-      '<td>' + escapeAppHtml(u.full_name||'') + inactiveTag + '</td>' +
-      '<td>' + emailDisplay + '</td>' +
-      '<td>' + settingsFormatRolesChips_(u.roles) + '</td>' +
-      '<td style="text-align:center">' + totpBadge + '</td>' +
-      '<td style="text-align:right">' + settingsKebabBtn_(kebabItems) + '</td>' +
-    '</tr>';
-  }).join('');
-
-  el.innerHTML =
-    '<div class="settings-section-card">' +
-      '<div class="settings-table-header">' +
-        '<div class="settings-table-title">Pengguna</div>' +
-        '<button class="btn btn-primary" style="padding:7px 14px;font-size:13px" onclick="settingsOpenUserModal()">+ Tambah Pengguna</button>' +
+  // Pattern Patient: render scaffold (search + thead + tbody shell + pagination shell + modals)
+  // sekali, lalu re-update body saja. Search input TIDAK ikut re-render → focus tidak lost.
+  if (!document.getElementById('settingsUsersTbody')) {
+    el.innerHTML =
+      '<div class="settings-section-card">' +
+        '<div class="settings-table-header">' +
+          '<div class="settings-table-title">Pengguna</div>' +
+          '<button class="btn btn-primary" style="padding:7px 14px;font-size:13px" onclick="settingsOpenUserModal()">+ Tambah Pengguna</button>' +
+        '</div>' +
+        '<div style="margin:0 0 12px">' +
+          '<input type="text" id="settingsUserSearchInput" class="search-box" ' +
+            'placeholder="Cari nama, username, email, atau role..." ' +
+            'value="' + escapeAppHtml(settingsUserSearchKeyword) + '" ' +
+            'oninput="settingsUserSearchChange_(this.value)">' +
+        '</div>' +
+        '<div class="table-wrapper"><table class="table" style="table-layout:fixed;width:100%">' +
+          '<thead><tr>' +
+            '<th style="width:22%">Nama Lengkap</th>' +
+            '<th style="width:30%">Email Google</th>' +
+            '<th style="width:18%">Roles</th>' +
+            '<th style="width:13%;text-align:center">Authenticator</th>' +
+            '<th style="width:17%;text-align:right">Aksi</th>' +
+          '</tr></thead>' +
+          '<tbody id="settingsUsersTbody"></tbody>' +
+        '</table></div>' +
+        '<div class="pagination">' +
+          '<div class="pagination-nav">' +
+            '<button type="button" class="pagination-arrow" id="settingsUserPrevBtn" onclick="settingsUserPrevPage_()" aria-label="Halaman sebelumnya">' +
+              '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"></polyline></svg>' +
+            '</button>' +
+            '<span class="pagination-label">Page</span>' +
+            '<span class="pagination-current" id="settingsUserCurrentPage" contenteditable="true" ' +
+              'onkeydown="if(event.key===\'Enter\'){settingsUserGoToPage_(this);this.blur();event.preventDefault();}" ' +
+              'onblur="settingsUserGoToPage_(this)" ' +
+              'onfocus="var r=document.createRange(),s=window.getSelection();r.selectNodeContents(this);s.removeAllRanges();s.addRange(r);">1</span>' +
+            '<span class="pagination-sep">of</span>' +
+            '<span class="pagination-total" id="settingsUserTotalPages">1</span>' +
+            '<button type="button" class="pagination-arrow" id="settingsUserNextBtn" onclick="settingsUserNextPage_()" aria-label="Halaman berikutnya">' +
+              '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"></polyline></svg>' +
+            '</button>' +
+          '</div>' +
+          '<div class="pagination-meta">' +
+            '<span class="pagination-rows-chip">' + SETTINGS_USER_PAGE_SIZE + ' rows</span>' +
+            '<span class="pagination-count" id="settingsUserPaginationInfo">-</span>' +
+          '</div>' +
+        '</div>' +
       '</div>' +
-      '<div class="table-wrapper"><table class="table" style="table-layout:fixed;width:100%">' +
-        '<thead><tr>' +
-          '<th style="width:22%">Nama Lengkap</th>' +
-          '<th style="width:30%">Email Google</th>' +
-          '<th style="width:18%">Roles</th>' +
-          '<th style="width:13%;text-align:center">Authenticator</th>' +
-          '<th style="width:17%;text-align:right">Aksi</th>' +
-        '</tr></thead>' +
-        '<tbody>' + (rows || '<tr><td colspan="5" class="settings-empty">Belum ada data</td></tr>') + '</tbody>' +
-      '</table></div>' +
-    '</div>' +
-    settingsUserModalHtml() +
-    settingsEditRolesModalHtml() +
-    settingsRoleInfoModalHtml() +
-    settingsTotpModalHtml();
+      settingsUserModalHtml() +
+      settingsEditRolesModalHtml() +
+      settingsRoleInfoModalHtml() +
+      settingsTotpModalHtml();
+  }
+  settingsRenderUserBody_();
+}
+
+function settingsRenderUserBody_() {
+  var tbody = document.getElementById('settingsUsersTbody');
+  if (!tbody) return;
+
+  var keyword = String(settingsUserSearchKeyword || '').trim().toLowerCase();
+  var filtered = keyword
+    ? (settingsUsers || []).filter(function(u) { return settingsUserMatchesKeyword_(u, keyword); })
+    : (settingsUsers || []);
+
+  var totalPages = Math.ceil(filtered.length / SETTINGS_USER_PAGE_SIZE) || 1;
+  if (settingsUserCurrentPage > totalPages) settingsUserCurrentPage = totalPages;
+  if (settingsUserCurrentPage < 1) settingsUserCurrentPage = 1;
+
+  var startIdx = (settingsUserCurrentPage - 1) * SETTINGS_USER_PAGE_SIZE;
+  var pageRows = filtered.slice(startIdx, startIdx + SETTINGS_USER_PAGE_SIZE);
+
+  if (!pageRows.length) {
+    var emptyTitle = keyword ? 'Pengguna tidak ditemukan' : 'Belum ada pengguna';
+    var emptySub   = keyword ? 'Coba ubah kata kunci pencarian' : 'Tambahkan pengguna baru lewat tombol di atas';
+    tbody.innerHTML =
+      '<tr><td colspan="5">' +
+        '<div class="settings-empty-state">' +
+          '<div class="settings-empty-state-title">' + emptyTitle + '</div>' +
+          '<div class="settings-empty-state-subtitle">' + emptySub + '</div>' +
+        '</div>' +
+      '</td></tr>';
+  } else {
+    tbody.innerHTML = pageRows.map(function(u) {
+      var emailDisplay = u.email
+        ? '<span style="word-break:break-all">' + escapeAppHtml(u.email) + '</span>'
+        : '<span class="settings-empty" style="font-style:italic;font-size:11.5px">belum ada</span>';
+      var totpBadge = u.totp_enabled
+        ? '<span class="settings-badge settings-badge-active">Aktif</span>'
+        : '<span class="settings-badge settings-badge-inactive">Belum</span>';
+      var inactiveTag = u.is_active === false
+        ? ' <span class="settings-badge settings-badge-inactive" style="margin-left:6px;font-size:10px">Nonaktif</span>'
+        : '';
+      var rolesJsArg = JSON.stringify(u.roles || []).replace(/"/g, '&quot;');
+      var emailJsArg = "'" + escapeAppHtml(u.email || '') + "'";
+      var fullNameJsArg = "'" + escapeAppHtml(u.full_name || u.username || '') + "'";
+      var kebabItems = [
+        { label: 'Edit pengguna',
+          onclick: "settingsOpenEditRolesModal('" + escapeAppHtml(u.user_id) + "','" + escapeAppHtml(u.username) + "'," + rolesJsArg + ',' + emailJsArg + ')' },
+        { label: u.totp_enabled ? 'Reset Authenticator (HP staff baru)' : 'Setup Authenticator (tampil QR)',
+          onclick: "settingsOpenTotpModal('" + escapeAppHtml(u.user_id) + "'," + fullNameJsArg + ',' + (u.totp_enabled ? 'true' : 'false') + ')' }
+      ];
+      if (u.email) {
+        kebabItems.push({ label: 'Kirim link setup ke email',
+          onclick: "settingsSendTotpSetupEmail('" + escapeAppHtml(u.user_id) + "'," + fullNameJsArg + ')' });
+      }
+      kebabItems.push({ divider: true });
+      kebabItems.push(u.is_active !== false
+        ? { label: 'Nonaktifkan pengguna', danger: true,
+            onclick: "settingsDeactivateUser('" + escapeAppHtml(u.user_id) + "','" + escapeAppHtml(u.username) + "')" }
+        : { label: 'Aktifkan pengguna',
+            onclick: "settingsActivateUser('" + escapeAppHtml(u.user_id) + "')" });
+
+      return '<tr>' +
+        '<td>' + escapeAppHtml(u.full_name||'') + inactiveTag + '</td>' +
+        '<td>' + emailDisplay + '</td>' +
+        '<td>' + settingsFormatRolesChips_(u.roles) + '</td>' +
+        '<td style="text-align:center">' + totpBadge + '</td>' +
+        '<td style="text-align:right">' + settingsKebabBtn_(kebabItems) + '</td>' +
+      '</tr>';
+    }).join('');
+  }
+
+  // Update pagination state (text + disabled).
+  var pageEl  = document.getElementById('settingsUserCurrentPage');
+  var totalEl = document.getElementById('settingsUserTotalPages');
+  var infoEl  = document.getElementById('settingsUserPaginationInfo');
+  var prevBtn = document.getElementById('settingsUserPrevBtn');
+  var nextBtn = document.getElementById('settingsUserNextBtn');
+  if (pageEl)  pageEl.textContent  = settingsUserCurrentPage;
+  if (totalEl) totalEl.textContent = totalPages;
+  if (infoEl)  infoEl.textContent  = filtered.length + ' records';
+  if (prevBtn) prevBtn.disabled = settingsUserCurrentPage <= 1;
+  if (nextBtn) nextBtn.disabled = settingsUserCurrentPage >= totalPages;
+}
+
+function settingsUserSearchChange_(value) {
+  settingsUserSearchKeyword = String(value || '');
+  if (settingsUserSearchDebounce) clearTimeout(settingsUserSearchDebounce);
+  settingsUserSearchDebounce = setTimeout(function() {
+    settingsUserCurrentPage = 1;
+    if (settingsTab === 'user') settingsRenderUserBody_();
+  }, SETTINGS_SEARCH_DEBOUNCE_MS);
+}
+
+function settingsUserPrevPage_() {
+  if (settingsUserCurrentPage > 1) {
+    settingsUserCurrentPage--;
+    if (settingsTab === 'user') settingsRenderUserBody_();
+  }
+}
+
+function settingsUserNextPage_() {
+  var keyword = String(settingsUserSearchKeyword || '').trim().toLowerCase();
+  var total = keyword
+    ? (settingsUsers || []).filter(function(u) { return settingsUserMatchesKeyword_(u, keyword); }).length
+    : (settingsUsers || []).length;
+  var totalPages = Math.ceil(total / SETTINGS_USER_PAGE_SIZE) || 1;
+  if (settingsUserCurrentPage < totalPages) {
+    settingsUserCurrentPage++;
+    if (settingsTab === 'user') settingsRenderUserBody_();
+  }
+}
+
+function settingsUserGoToPage_(el) {
+  var keyword = String(settingsUserSearchKeyword || '').trim().toLowerCase();
+  var total = keyword
+    ? (settingsUsers || []).filter(function(u) { return settingsUserMatchesKeyword_(u, keyword); }).length
+    : (settingsUsers || []).length;
+  var totalPages = Math.ceil(total / SETTINGS_USER_PAGE_SIZE) || 1;
+  var page = parseInt(el.textContent, 10);
+  if (isNaN(page) || page < 1) page = 1;
+  if (page > totalPages) page = totalPages;
+  el.textContent = page;
+  if (settingsUserCurrentPage === page) return;
+  settingsUserCurrentPage = page;
+  if (settingsTab === 'user') settingsRenderUserBody_();
 }
 
 function settingsRoleInfoButtonHtml_() {
