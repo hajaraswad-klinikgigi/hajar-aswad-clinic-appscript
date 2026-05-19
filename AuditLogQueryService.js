@@ -165,6 +165,8 @@ function getAuditLogPage(payload) {
             rows: [],
             page_number: pageNumber,
             page_size: pageSize,
+            total_count: 0,
+            total_pages: 1,
             has_next: false,
             has_prev: pageNumber > 1,
             active_since: AUDIT_LOG_ACTIVE_SINCE,
@@ -218,6 +220,8 @@ function getAuditLogPage(payload) {
             rows: [],
             page_number: pageNumber,
             page_size: pageSize,
+            total_count: 0,
+            total_pages: 1,
             has_next: false,
             has_prev: pageNumber > 1,
             active_since: AUDIT_LOG_ACTIVE_SINCE,
@@ -244,21 +248,26 @@ function getAuditLogPage(payload) {
 
     // Query via custom URL builder. supabaseSelect_ pakai single-key
     // object jadi tidak bisa untuk occurred_at gte+lte.
-    const rows = querySupabaseAuditLog_(filterPairs, {
-      limit: pageSize + 1, // +1 untuk has_next detection
+    const queryResult = querySupabaseAuditLog_(filterPairs, {
+      limit: pageSize,
       offset: offset,
-      order: 'occurred_at.desc,id.desc'
+      order: 'occurred_at.desc,id.desc',
+      count_exact: true
     });
 
-    const hasNext = rows.length > pageSize;
-    const sliced = hasNext ? rows.slice(0, pageSize) : rows;
+    const rows = queryResult.rows;
+    const totalCount = queryResult.total_count;
+    const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
+    const hasNext = pageNumber < totalPages;
 
     return {
       success: true,
       data: {
-        rows: sliced,
+        rows: rows,
         page_number: pageNumber,
         page_size: pageSize,
+        total_count: totalCount,
+        total_pages: totalPages,
         has_next: hasNext,
         has_prev: pageNumber > 1,
         active_since: AUDIT_LOG_ACTIVE_SINCE,
@@ -334,8 +343,8 @@ function querySupabaseAuditLogActors_(searchTerm, clinicId) {
  * oleh supabaseSelect_ (single-key object).
  *
  * @param {Array<[string,string]>} filterPairs
- * @param {object} options  { limit, offset, order, select }
- * @returns {Array} rows
+ * @param {object} options  { limit, offset, order, select, count_exact }
+ * @returns {{ rows: Array, total_count: number }}
  */
 function querySupabaseAuditLog_(filterPairs, options) {
   const config = getSupabaseConfig_();
@@ -353,16 +362,36 @@ function querySupabaseAuditLog_(filterPairs, options) {
   });
 
   const url = config.url + '/rest/v1/audit_log?' + parts.join('&');
+  // Pakai 'count=exact' header supaya PostgREST kembalikan total count
+  // di Content-Range header (format: '0-49/123' -> total=123).
+  const extraHeaders = opts.count_exact ? { 'Prefer': 'count=exact' } : null;
   const response = UrlFetchApp.fetch(url, {
     method: 'GET',
-    headers: buildSupabaseHeaders_(),
+    headers: buildSupabaseHeaders_(extraHeaders),
     muteHttpExceptions: true
   });
   const result = parseSupabaseResponse_(response);
   if (!result.success) {
     throw new Error('Audit log SELECT failed: HTTP ' + result.status_code + ' - ' + JSON.stringify(result.body));
   }
-  return Array.isArray(result.body) ? result.body : [];
+  const rows = Array.isArray(result.body) ? result.body : [];
+
+  let totalCount = rows.length;
+  if (opts.count_exact) {
+    try {
+      const headers = response.getAllHeaders ? response.getAllHeaders() : {};
+      const contentRange = headers['Content-Range'] || headers['content-range'] || '';
+      // Format: 'start-end/total' atau '*/total'
+      const match = String(contentRange).match(/\/(\d+|\*)\s*$/);
+      if (match && match[1] !== '*') {
+        totalCount = parseInt(match[1], 10) || rows.length;
+      }
+    } catch (e) {
+      // Fall back ke rows.length kalau header tidak tersedia
+    }
+  }
+
+  return { rows: rows, total_count: totalCount };
 }
 
 /* =========================================================

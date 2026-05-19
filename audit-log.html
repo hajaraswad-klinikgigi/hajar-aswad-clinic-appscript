@@ -158,6 +158,8 @@
 var activityRows = [];
 var activityPageNumber = 1;
 var activityPageSize = 5;
+var activityTotalCount = 0;
+var activityTotalPages = 1;
 var activityHasNext = false;
 var activityHasPrev = false;
 var activityAllowedEntityTypes = null;
@@ -302,7 +304,12 @@ function showActivityPage() {
               '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"></polyline></svg>' +
             '</button>' +
             '<span class="pagination-label">Page</span>' +
-            '<span class="pagination-current" id="activityCurrentPage">1</span>' +
+            '<span class="pagination-current" id="activityCurrentPage" contenteditable="true" ' +
+              'onkeydown="if(event.key===\'Enter\'){activityGoToPage_(this);this.blur();event.preventDefault();}" ' +
+              'onblur="activityGoToPage_(this)" ' +
+              'onfocus="var r=document.createRange(),s=window.getSelection();r.selectNodeContents(this);s.removeAllRanges();s.addRange(r);">1</span>' +
+            '<span class="pagination-sep">of</span>' +
+            '<span class="pagination-total" id="activityTotalPages">1</span>' +
             '<button type="button" class="pagination-arrow" id="activityNextBtn" onclick="activityNextPage_()" aria-label="Halaman berikutnya" disabled>' +
               '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"></polyline></svg>' +
             '</button>' +
@@ -363,6 +370,8 @@ function activityLoadPage_() {
       activityRows = Array.isArray(data.rows) ? data.rows : [];
       activityHasNext = !!data.has_next;
       activityHasPrev = !!data.has_prev;
+      activityTotalCount = Number(data.total_count || 0);
+      activityTotalPages = Number(data.total_pages || 1);
       activityAllowedEntityTypes = data.allowed_entity_types || null;
       activityActiveSince = data.active_since || activityActiveSince;
       activityFiltersApplied = data.filters_applied || {};
@@ -417,14 +426,16 @@ function activityRenderBody_() {
     }).join('');
   }
 
-  var pageEl = document.getElementById('activityCurrentPage');
+  var pageEl  = document.getElementById('activityCurrentPage');
+  var totalEl = document.getElementById('activityTotalPages');
   var prevBtn = document.getElementById('activityPrevBtn');
   var nextBtn = document.getElementById('activityNextBtn');
-  var infoEl = document.getElementById('activityPaginationInfo');
-  if (pageEl) pageEl.textContent = activityPageNumber;
+  var infoEl  = document.getElementById('activityPaginationInfo');
+  if (pageEl)  pageEl.textContent  = activityPageNumber;
+  if (totalEl) totalEl.textContent = activityTotalPages;
   if (prevBtn) prevBtn.disabled = !activityHasPrev;
   if (nextBtn) nextBtn.disabled = !activityHasNext;
-  if (infoEl) infoEl.textContent = activityRows.length + ' di halaman ini';
+  if (infoEl)  infoEl.textContent  = activityTotalCount + ' records';
 }
 
 /* =========================================================
@@ -442,6 +453,20 @@ function activityNextPage_() {
     activityPageNumber++;
     activityLoadPage_();
   }
+}
+
+function activityGoToPage_(el) {
+  var raw = el ? String(el.textContent || '').trim() : '';
+  var target = parseInt(raw, 10);
+  if (isNaN(target) || target < 1) target = 1;
+  if (target > activityTotalPages) target = activityTotalPages;
+  if (target === activityPageNumber) {
+    // No change — just sync display in case user typed weird value
+    if (el) el.textContent = activityPageNumber;
+    return;
+  }
+  activityPageNumber = target;
+  activityLoadPage_();
 }
 
 /* =========================================================
