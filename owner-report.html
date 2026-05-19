@@ -535,10 +535,10 @@ function ownerRenderDaily(data) {
         <div class="owner-kpi-label">Total Pengeluaran</div>
         <div class="owner-kpi-value">${ownerFmtRp(exp.total_expense)}</div>
       </div>
-      <div class="owner-kpi-card ${Number(net.net_cash||0)>=0?'owner-kpi-green':'owner-kpi-red'}">
+      ${canSeeProfit() ? `<div class="owner-kpi-card ${Number(net.net_cash||0)>=0?'owner-kpi-green':'owner-kpi-red'}">
         <div class="owner-kpi-label">Laba Bersih</div>
         <div class="owner-kpi-value">${ownerFmtRp(net.net_cash)}</div>
-      </div>
+      </div>` : ''}
       <div class="owner-kpi-card">
         <div class="owner-kpi-label">Total Omset</div>
         <div class="owner-kpi-value">${ownerFmtRp(rev.total_billing)}</div>
@@ -897,11 +897,11 @@ function ownerRenderMonthly(data) {
         <div class="owner-kpi-value">${ownerFmtRp(exp.total_expense)}</div>
         ${ownerDiffBadge(diff.expense)}
       </div>
-      <div class="owner-kpi-card ${Number(net.net_cash||0)>=0?'owner-kpi-green':'owner-kpi-red'}">
+      ${canSeeProfit() ? `<div class="owner-kpi-card ${Number(net.net_cash||0)>=0?'owner-kpi-green':'owner-kpi-red'}">
         <div class="owner-kpi-label">Laba Bersih</div>
         <div class="owner-kpi-value">${ownerFmtRp(net.net_cash)}</div>
         ${ownerDiffBadge(diff.net)}
-      </div>
+      </div>` : ''}
       <div class="owner-kpi-card">
         <div class="owner-kpi-label">Total Omset</div>
         <div class="owner-kpi-value">${ownerFmtRp(rev.total_billing)}</div>
@@ -948,7 +948,7 @@ function ownerRenderMonthly(data) {
       </div></div>
       <div class="table-wrapper"><table class="owner-trend-table">
         <thead><tr>
-          <th>Tanggal</th><th>Kas Masuk</th><th>Pengeluaran</th><th>Laba Bersih</th>
+          <th>Tanggal</th><th>Kas Masuk</th><th>Pengeluaran</th>${canSeeProfit() ? '<th>Laba Bersih</th>' : ''}
         </tr></thead>
         <tbody>
           ${daily.filter(function(d){ return d.revenue||d.expense||d.net; }).map(function(d){
@@ -956,9 +956,9 @@ function ownerRenderMonthly(data) {
               <td>${ownerFmtDate(d.date)}</td>
               <td>${ownerFmtRp(d.revenue)}</td>
               <td>${ownerFmtRp(d.expense)}</td>
-              <td class="${ownerNetClass(d.net)}">${ownerFmtRp(d.net)}</td>
+              ${canSeeProfit() ? `<td class="${ownerNetClass(d.net)}">${ownerFmtRp(d.net)}</td>` : ''}
             </tr>`;
-          }).join('') || '<tr><td colspan="4" style="text-align:center;color:#94a3b8">Belum ada data</td></tr>'}
+          }).join('') || `<tr><td colspan="${canSeeProfit() ? 4 : 3}" style="text-align:center;color:#94a3b8">Belum ada data</td></tr>`}
         </tbody>
       </table></div>
     </div>
@@ -990,10 +990,10 @@ function ownerRenderYearly(data) {
         <div class="owner-kpi-label">Total Pengeluaran</div>
         <div class="owner-kpi-value">${ownerFmtRp(exp.total_expense)}</div>
       </div>
-      <div class="owner-kpi-card ${Number(net.net_cash||0)>=0?'owner-kpi-green':'owner-kpi-red'}">
+      ${canSeeProfit() ? `<div class="owner-kpi-card ${Number(net.net_cash||0)>=0?'owner-kpi-green':'owner-kpi-red'}">
         <div class="owner-kpi-label">Laba Bersih</div>
         <div class="owner-kpi-value">${ownerFmtRp(net.net_cash)}</div>
-      </div>
+      </div>` : ''}
       <div class="owner-kpi-card">
         <div class="owner-kpi-label">Total Omset</div>
         <div class="owner-kpi-value">${ownerFmtRp(rev.total_billing)}</div>
@@ -1035,7 +1035,7 @@ function ownerRenderYearly(data) {
       </div></div>
       <div class="table-wrapper"><table class="owner-trend-table">
         <thead><tr>
-          <th>Bulan</th><th>Kas Masuk</th><th>Pengeluaran</th><th>Laba Bersih</th>
+          <th>Bulan</th><th>Kas Masuk</th><th>Pengeluaran</th>${canSeeProfit() ? '<th>Laba Bersih</th>' : ''}
         </tr></thead>
         <tbody>
           ${monthly.map(function(m){
@@ -1043,7 +1043,7 @@ function ownerRenderYearly(data) {
               <td>${escapeAppHtml(m.label||'-')}</td>
               <td>${ownerFmtRp(m.revenue)}</td>
               <td>${ownerFmtRp(m.expense)}</td>
-              <td class="${ownerNetClass(m.net)}">${ownerFmtRp(m.net)}</td>
+              ${canSeeProfit() ? `<td class="${ownerNetClass(m.net)}">${ownerFmtRp(m.net)}</td>` : ''}
             </tr>`;
           }).join('')}
         </tbody>

@@ -1569,6 +1569,11 @@
       if (modal) {
         modal.style.display = 'flex';
         modal.classList.remove('hidden');
+        if (typeof canSeeTreatmentPrice === 'function' && !canSeeTreatmentPrice()) {
+          modal.classList.add('treatment-prices-hidden');
+        } else {
+          modal.classList.remove('treatment-prices-hidden');
+        }
       }
     }
 
@@ -1930,8 +1935,8 @@
               oninput="updateTreatmentItemQty(${index}, this.value)"  
             >  
           </td>  
-          <td>${formatCurrencyIdr(unitPrice)}</td>  
-          <td>${formatCurrencyIdr(subtotal)}</td>  
+          <td class="treatment-price-col">${formatCurrencyIdr(unitPrice)}</td>
+          <td class="treatment-price-col">${formatCurrencyIdr(subtotal)}</td>
           <td>  
             <button type="button" class="treatment-remove-btn" onclick="removeTreatmentItemRow(${index})">Hapus</button>  
           </td>  

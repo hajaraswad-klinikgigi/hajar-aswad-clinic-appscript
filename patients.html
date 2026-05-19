@@ -1111,15 +1111,17 @@
         <div class="pt-detail-grid">
           <div class="pt-detail-label">Alamat</div>
           <div class="pt-detail-value">${escapeHtml(p.address || '-')}</div>
-          <div class="pt-detail-label">Alergi</div>
-          <div class="pt-detail-value">${escapeHtml(p.allergy_notes || '-')}</div>
-          <div class="pt-detail-label">Catatan Medis</div>
-          <div class="pt-detail-value">${escapeHtml(p.medical_notes || '-')}</div>
+          ${canSeePatientClinical() ? `
+            <div class="pt-detail-label">Alergi</div>
+            <div class="pt-detail-value">${escapeHtml(p.allergy_notes || '-')}</div>
+            <div class="pt-detail-label">Catatan Medis</div>
+            <div class="pt-detail-value">${escapeHtml(p.medical_notes || '-')}</div>
+          ` : ''}
         </div>
       </div>
     `;
 
-    const medicalHtml = `
+    const medicalHtml = canSeePatientClinical() ? `
       <div class="content-card">
         <div class="pt-section-title">Riwayat Rekam Medis</div>
         ${isLoadingMedical
@@ -1146,7 +1148,7 @@
             : '<div class="pt-empty">Belum ada riwayat rekam medis.</div>'
         }
       </div>
-    `;
+    ` : '';
 
     const orthoRecallHtml = renderPatientOrthoRecallSection(orthoRecall);
 
@@ -1167,12 +1169,14 @@
         </div>
       </div>
 
-      <div id="patientDetailSecondaryWrap" style="margin-top:14px;">
-        <div class="content-card">
-          <div class="pt-section-title">Foto Before / After</div>
-          <div class="pt-loading">Memuat dokumentasi foto...</div>
+      ${canSeePatientClinical() ? `
+        <div id="patientDetailSecondaryWrap" style="margin-top:14px;">
+          <div class="content-card">
+            <div class="pt-section-title">Foto Before / After</div>
+            <div class="pt-loading">Memuat dokumentasi foto...</div>
+          </div>
         </div>
-      </div>
+      ` : '<div id="patientDetailSecondaryWrap"></div>'}
     `;
   }
 
@@ -1222,8 +1226,10 @@
                       <div class="pt-detail-value">${escapeHtml(t.notes || '-')}</div>
                       <div class="pt-detail-label">Keluhan</div>
                       <div class="pt-detail-value">${escapeHtml(t.chief_complaint || '-')}</div>
-                      <div class="pt-detail-label">Biaya</div>
-                      <div class="pt-detail-value">${formatPatientTreatmentBilling(t)}</div>
+                      ${canSeeTreatmentPrice() ? `
+                        <div class="pt-detail-label">Biaya</div>
+                        <div class="pt-detail-value">${formatPatientTreatmentBilling(t)}</div>
+                      ` : ''}
                     </div>
                     ${itemsHtml}
                   </div>
@@ -1362,6 +1368,10 @@
   }
 
   function renderPatientPhotoSection(groups) {
+    if (!canSeePatientClinical()) {
+      return '';
+    }
+
     const uploadBtnHtml = canUploadPatientPhoto()
       ? '<button type="button" class="btn btn-primary" onclick="openPatientPhotoUploadModal()">Tambah Foto</button>'
       : '';

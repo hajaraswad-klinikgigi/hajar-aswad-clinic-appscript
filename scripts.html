@@ -322,6 +322,28 @@
     return isFullyPrivileged();
   }
 
+  // Data visibility per role (matrix §UI Guard / Data Hiding).
+  // Legacy fallback: kalau roles[] empty (akun bootstrap), tampilkan semua.
+  function canSeeProfit() {
+    var roles = getCurrentUserRoles();
+    if (roles.length === 0) return true;
+    return isFullyPrivileged();
+  }
+
+  function canSeePatientClinical() {
+    var roles = getCurrentUserRoles();
+    if (roles.length === 0) return true;
+    if (isFullyPrivileged()) return true;
+    return hasAnyAppRole(['admin_appointment', 'doctor']);
+  }
+
+  function canSeeTreatmentPrice() {
+    var roles = getCurrentUserRoles();
+    if (roles.length === 0) return true;
+    if (isFullyPrivileged()) return true;
+    return hasAnyAppRole(['admin_finance', 'admin_appointment']);
+  }
+
   // Apply sidebar visibility per role sesuai matrix §UI Guard.
   // Backend tetap enforce via requireRole — ini hanya UX.
   function applySidebarRoleVisibility_(user) {
