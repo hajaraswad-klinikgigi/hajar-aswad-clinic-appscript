@@ -51,7 +51,7 @@
     word-break: break-word;
   }
 
-  /* Detail modal info block (inside dark settings-modal-box) */
+  /* Detail modal info block (inside dark detail-modal-box-sticky) */
   .activity-detail-info {
     display: grid;
     grid-template-columns: 100px 1fr;
@@ -673,13 +673,18 @@ function activityResetFilter_() {
    DETAIL MODAL + DIFF HIGHLIGHT
    ========================================================= */
 function activityDetailModalHtml_() {
-  return '<div class="settings-modal-overlay" id="activityDetailModalOverlay">' +
-    '<div class="settings-modal-box settings-modal-box--wide" style="max-width:1000px;width:95vw">' +
-      '<div class="settings-modal-head">' +
-        '<h3 class="settings-modal-title">Detail Aktivitas</h3>' +
-        '<button type="button" class="detail-close-btn" onclick="activityCloseDetail_()" aria-label="Tutup">&#x2715;</button>' +
+  return '<div id="activityDetailModal" class="modal hidden">' +
+    '<div class="modal-box modal-box-sticky detail-modal-box-sticky">' +
+      '<div class="detail-modal-header-sticky">' +
+        '<h2 class="detail-modal-title-sticky">Detail Aktivitas</h2>' +
+        '<button type="button" class="detail-close-btn" onclick="activityCloseDetail_()" aria-label="Tutup modal detail aktivitas" title="Tutup">' +
+          '<svg viewBox="0 0 24 24" fill="none" stroke-width="2">' +
+            '<path d="M6 6l12 12"></path>' +
+            '<path d="M18 6l-12 12"></path>' +
+          '</svg>' +
+        '</button>' +
       '</div>' +
-      '<div class="settings-modal-body">' +
+      '<div class="detail-modal-content-scroll">' +
         '<dl class="activity-detail-info">' +
           '<dt>Waktu</dt><dd id="activityDetailWhen">-</dd>' +
           '<dt>Entitas</dt><dd id="activityDetailEntity">-</dd>' +
@@ -688,9 +693,9 @@ function activityDetailModalHtml_() {
           '<dt>Catatan</dt><dd id="activityDetailNotes" class="activity-notes">-</dd>' +
         '</dl>' +
         '<div id="activityDetailDiff"></div>' +
-      '</div>' +
-      '<div class="settings-modal-footer">' +
-        '<button type="button" class="btn btn-secondary" onclick="activityCloseDetail_()">Tutup</button>' +
+        '<div class="modal-actions modal-actions-right">' +
+          '<button type="button" class="btn btn-secondary" onclick="activityCloseDetail_()">Tutup</button>' +
+        '</div>' +
       '</div>' +
     '</div>' +
   '</div>';
@@ -702,8 +707,8 @@ function activityOpenDetail_(id) {
     showToast('Data tidak ditemukan di halaman ini', 'error');
     return;
   }
-  var overlay = document.getElementById('activityDetailModalOverlay');
-  if (!overlay) return;
+  var modal = document.getElementById('activityDetailModal');
+  if (!modal) return;
 
   var whenEl   = document.getElementById('activityDetailWhen');
   var entityEl = document.getElementById('activityDetailEntity');
@@ -728,12 +733,16 @@ function activityOpenDetail_(id) {
   if (notesEl) notesEl.textContent = row.notes || '-';
   if (diffEl) diffEl.innerHTML = activityRenderDiff_(row.old_value, row.new_value);
 
-  overlay.classList.add('open');
+  modal.style.display = 'flex';
+  modal.classList.remove('hidden');
 }
 
 function activityCloseDetail_() {
-  var overlay = document.getElementById('activityDetailModalOverlay');
-  if (overlay) overlay.classList.remove('open');
+  var modal = document.getElementById('activityDetailModal');
+  if (modal) {
+    modal.classList.add('hidden');
+    modal.style.display = 'none';
+  }
 }
 
 function activityFormatTimestampLong_(iso) {
