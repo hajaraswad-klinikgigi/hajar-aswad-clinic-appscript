@@ -316,9 +316,22 @@ function showActivityPage() {
     '</div>' +
     activityDetailModalHtml_();
 
+  // Reset filter state setiap entry halaman (mirror pola recall:
+  // filter input DOM auto-clear oleh innerHTML replace; sinkronkan
+  // JS state supaya Reset link / chip badge ikut hilang).
+  activityFiltersApplied = {};
   activityFiltersExpanded = false;
-  activityUpdateFilterControls_();
   activityPageNumber = 1;
+
+  activityUpdateFilterControls_();
+
+  // Stale-while-revalidate: render rows yang sudah di-cache (kalau ada)
+  // langsung supaya tidak flash 'Memuat data...' setiap kembali ke halaman.
+  // Fresh data tetap di-fetch di bawah; UI auto-update saat response masuk.
+  if (activityRows && activityRows.length > 0) {
+    activityRenderBody_();
+  }
+
   activityLoadPage_();
 }
 
