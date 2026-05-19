@@ -155,28 +155,28 @@
 /* =========================================================
    AUDIT LOG (AKTIVITAS) PAGE — STATE
    ========================================================= */
-var activityRows = [];
-var activityPageNumber = 1;
-var activityPageSize = 5;
-var activityTotalCount = 0;
-var activityTotalPages = 1;
-var activityHasNext = false;
-var activityHasPrev = false;
-var activityAllowedEntityTypes = null;
-var activityActiveSince = '2026-05-19';
-var activityFiltersApplied = {};
-var activityLoading = false;
-var activityFiltersExpanded = false;
-var activitySearchDebounce = null;
-var ACTIVITY_SEARCH_DEBOUNCE_MS = 280;
+let activityRows = [];
+let activityCurrentPage = 1;
+const activityPageSize = 5;
+let activityTotalCount = 0;
+let activityTotalPages = 1;
+let activityHasNext = false;
+let activityHasPrev = false;
+let activityAllowedEntityTypes = null;
+let activityActiveSince = '2026-05-19';
+let activityFiltersApplied = {};
+let loadActivityInFlight = false;
+let activityFiltersExpanded = false;
+let activitySearchDebounce = null;
+const ACTIVITY_SEARCH_DEBOUNCE_MS = 280;
 
 // Page cache untuk stale-while-revalidate.
 // Key: JSON.stringify(filtersApplied) + '|' + pageNumber.
 // FIFO eviction, max 10 entry, TTL 30 detik supaya audit log baru kelihatan.
-var activityPageCache = {};
-var activityPageCacheOrder = [];
-var ACTIVITY_PAGE_CACHE_MAX = 10;
-var ACTIVITY_PAGE_CACHE_TTL_MS = 30 * 1000;
+let activityPageCache = {};
+let activityPageCacheOrder = [];
+const ACTIVITY_PAGE_CACHE_MAX = 10;
+const ACTIVITY_PAGE_CACHE_TTL_MS = 30 * 1000;
 
 var ACTIVITY_ENTITY_TYPE_LABELS = {
   patient:                   'Pasien',
@@ -250,42 +250,42 @@ function showActivityPage() {
               '<label class="patients-toolbar-label">Cari Pengguna</label>' +
               '<input type="text" id="activitySearchActor" class="search-box" ' +
                 'placeholder="Cari nama / username pengguna..." ' +
-                'oninput="activityOnSearchInput_()">' +
+                'oninput="handleActivitySearch()">' +
             '</div>' +
             '<div class="recall-toolbar-actions">' +
               '<button type="button" id="activityFiltersToggleBtn" class="recall-filter-chip" ' +
-                'onclick="activityToggleFilters_()" aria-label="Toggle filters" title="Filters">' +
+                'onclick="toggleActivityFilters()" aria-label="Toggle filters" title="Filters">' +
                 '<svg viewBox="0 0 24 24" fill="none" stroke-width="2">' +
                   '<path d="M3 5h18"></path><path d="M6 12h12"></path><path d="M10 19h4"></path>' +
                 '</svg>' +
                 '<span class="recall-filter-chip-label">Filters</span>' +
               '</button>' +
               '<button type="button" id="activityFiltersResetBtn" class="recall-reset-link" ' +
-                'onclick="activityResetFilter_()" style="display:none;">Reset</button>' +
+                'onclick="resetActivityFilters()" style="display:none;">Reset</button>' +
             '</div>' +
           '</div>' +
           '<div id="activityFiltersPanel" class="recall-filter-panel">' +
             '<div class="recall-filter-grid">' +
               '<div class="recall-filter-wrap">' +
                 '<label class="patients-toolbar-label">Dari tanggal</label>' +
-                '<input type="date" id="activityFilterStartDate" onchange="activityApplyFilter_()">' +
+                '<input type="date" id="activityFilterStartDate" onchange="applyActivityFilters()">' +
               '</div>' +
               '<div class="recall-filter-wrap">' +
                 '<label class="patients-toolbar-label">Sampai tanggal</label>' +
-                '<input type="date" id="activityFilterEndDate" onchange="activityApplyFilter_()">' +
+                '<input type="date" id="activityFilterEndDate" onchange="applyActivityFilters()">' +
               '</div>' +
               '<div class="recall-filter-wrap">' +
                 '<label class="patients-toolbar-label">Entitas</label>' +
-                '<select id="activityFilterEntityType" onchange="activityApplyFilter_()">' +
+                '<select id="activityFilterEntityType" onchange="applyActivityFilters()">' +
                   '<option value="">Semua entitas</option>' +
-                  activityBuildEntityTypeOptions_() +
+                  buildActivityEntityTypeOptions() +
                 '</select>' +
               '</div>' +
               '<div class="recall-filter-wrap">' +
                 '<label class="patients-toolbar-label">Aksi</label>' +
-                '<select id="activityFilterAction" onchange="activityApplyFilter_()">' +
+                '<select id="activityFilterAction" onchange="applyActivityFilters()">' +
                   '<option value="">Semua aksi</option>' +
-                  activityBuildActionOptions_() +
+                  buildActivityActionOptions() +
                 '</select>' +
               '</div>' +
             '</div>' +
@@ -303,24 +303,24 @@ function showActivityPage() {
             '<th style="width:30%">Catatan</th>' +
             '<th style="width:8%;text-align:right">Detail</th>' +
           '</tr></thead>' +
-          '<tbody id="activityTbody">' +
+          '<tbody id="activityTableBody">' +
             '<tr><td colspan="6">Memuat data...</td></tr>' +
           '</tbody>' +
         '</table></div>' +
 
         '<div class="pagination">' +
           '<div class="pagination-nav">' +
-            '<button type="button" class="pagination-arrow" id="activityPrevBtn" onclick="activityPrevPage_()" aria-label="Halaman sebelumnya" disabled>' +
+            '<button type="button" class="pagination-arrow" id="activityPrevBtn" onclick="prevActivityPage()" aria-label="Halaman sebelumnya" disabled>' +
               '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"></polyline></svg>' +
             '</button>' +
             '<span class="pagination-label">Page</span>' +
             '<span class="pagination-current" id="activityCurrentPage" contenteditable="true" ' +
-              'onkeydown="if(event.key===\'Enter\'){activityGoToPage_(this);this.blur();event.preventDefault();}" ' +
-              'onblur="activityGoToPage_(this)" ' +
+              'onkeydown="if(event.key===\'Enter\'){goToActivityPage(this);this.blur();event.preventDefault();}" ' +
+              'onblur="goToActivityPage(this)" ' +
               'onfocus="var r=document.createRange(),s=window.getSelection();r.selectNodeContents(this);s.removeAllRanges();s.addRange(r);">1</span>' +
             '<span class="pagination-sep">of</span>' +
             '<span class="pagination-total" id="activityTotalPages">1</span>' +
-            '<button type="button" class="pagination-arrow" id="activityNextBtn" onclick="activityNextPage_()" aria-label="Halaman berikutnya" disabled>' +
+            '<button type="button" class="pagination-arrow" id="activityNextBtn" onclick="nextActivityPage()" aria-label="Halaman berikutnya" disabled>' +
               '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"></polyline></svg>' +
             '</button>' +
           '</div>' +
@@ -331,36 +331,36 @@ function showActivityPage() {
         '</div>' +
       '</div>' +
     '</div>' +
-    activityDetailModalHtml_();
+    getActivityDetailModalHtml();
 
   // Reset filter state setiap entry halaman (mirror pola recall:
   // filter input DOM auto-clear oleh innerHTML replace; sinkronkan
   // JS state supaya Reset link / chip badge ikut hilang).
   activityFiltersApplied = {};
   activityFiltersExpanded = false;
-  activityPageNumber = 1;
+  activityCurrentPage = 1;
 
-  activityUpdateFilterControls_();
+  updateActivityFilterControls();
 
   // Stale-while-revalidate: render rows yang sudah di-cache (kalau ada)
   // langsung supaya tidak flash 'Memuat data...' setiap kembali ke halaman.
   // Fresh data tetap di-fetch di bawah; UI auto-update saat response masuk.
   if (activityRows && activityRows.length > 0) {
-    activityRenderBody_();
+    renderActivityTable();
   }
 
-  activityLoadPage_();
+  loadActivityPage();
 }
 
 /* =========================================================
    LOAD & RENDER
    ========================================================= */
-function activityBuildPageCacheKey_() {
-  return JSON.stringify(activityFiltersApplied || {}) + '|' + activityPageNumber;
+function buildActivityPageCacheKey() {
+  return JSON.stringify(activityFiltersApplied || {}) + '|' + activityCurrentPage;
 }
 
-function activityGetCachedPage_() {
-  var key = activityBuildPageCacheKey_();
+function getActivityCachedPage() {
+  var key = buildActivityPageCacheKey();
   var entry = activityPageCache[key];
   if (!entry) return null;
   if (Date.now() - entry.timestamp > ACTIVITY_PAGE_CACHE_TTL_MS) {
@@ -372,8 +372,8 @@ function activityGetCachedPage_() {
   return entry;
 }
 
-function activitySetCachedPage_(entry) {
-  var key = activityBuildPageCacheKey_();
+function setActivityCachedPage(entry) {
+  var key = buildActivityPageCacheKey();
   activityPageCache[key] = {
     rows: entry.rows,
     totalCount: entry.totalCount,
@@ -391,7 +391,7 @@ function activitySetCachedPage_(entry) {
   }
 }
 
-function activityClearPageCache_() {
+function clearActivityPageCache() {
   activityPageCache = {};
   activityPageCacheOrder = [];
 }
@@ -399,7 +399,7 @@ function activityClearPageCache_() {
 // Set visual loading state pada area pagination supaya user dapat feedback
 // jelas saat round-trip ke server. Tombol prev/next + contenteditable page
 // number didisable, info text jadi "Memuat...".
-function activitySetPaginationLoading_(isLoading) {
+function setActivityPaginationLoading(isLoading) {
   var prevBtn = document.getElementById('activityPrevBtn');
   var nextBtn = document.getElementById('activityNextBtn');
   var pageEl  = document.getElementById('activityCurrentPage');
@@ -415,38 +415,38 @@ function activitySetPaginationLoading_(isLoading) {
     if (infoEl) infoEl.textContent = 'Memuat...';
   } else {
     if (pageEl) pageEl.setAttribute('contenteditable', 'true');
-    // prev/next & info text di-restore oleh activityRenderBody_
+    // prev/next & info text di-restore oleh renderActivityTable
   }
 }
 
-function activityLoadPage_() {
-  if (activityLoading) return;
+function loadActivityPage() {
+  if (loadActivityInFlight) return;
 
   // Coba serve dari cache supaya prev/next/goTo terasa instan.
   // Fresh data tetap di-fetch di belakang (stale-while-revalidate).
-  var cached = activityGetCachedPage_();
+  var cached = getActivityCachedPage();
   if (cached) {
     activityRows = cached.rows;
     activityTotalCount = cached.totalCount;
     activityTotalPages = cached.totalPages;
     activityHasNext = cached.hasNext;
     activityHasPrev = cached.hasPrev;
-    activityRenderBody_();
+    renderActivityTable();
   } else {
-    activitySetPaginationLoading_(true);
+    setActivityPaginationLoading(true);
   }
 
-  activityLoading = true;
+  loadActivityInFlight = true;
 
   var payload = Object.assign({
     session_token: getCurrentSessionToken(),
-    page_number: activityPageNumber,
+    page_number: activityCurrentPage,
     page_size: activityPageSize
   }, activityFiltersApplied || {});
 
   google.script.run
     .withSuccessHandler(function(res) {
-      activityLoading = false;
+      loadActivityInFlight = false;
       if (!res || !res.success) {
         // Kalau tadi sudah render dari cache, jangan flash error — biarkan
         // user lihat data lama; mereka bisa retry. Toast hanya kalau benar
@@ -456,7 +456,7 @@ function activityLoadPage_() {
           activityRows = [];
           activityHasNext = false;
           activityHasPrev = false;
-          activityRenderBody_();
+          renderActivityTable();
         }
         return;
       }
@@ -470,7 +470,7 @@ function activityLoadPage_() {
       activityActiveSince = data.active_since || activityActiveSince;
       activityFiltersApplied = data.filters_applied || {};
 
-      activitySetCachedPage_({
+      setActivityCachedPage({
         rows: activityRows,
         totalCount: activityTotalCount,
         totalPages: activityTotalPages,
@@ -478,30 +478,30 @@ function activityLoadPage_() {
         hasPrev: activityHasPrev
       });
 
-      activityRenderBody_();
-      activitySyncEntityTypeOptions_();
-      activityUpdateFilterControls_();
+      renderActivityTable();
+      syncActivityEntityTypeOptions();
+      updateActivityFilterControls();
     })
     .withFailureHandler(function(err) {
-      activityLoading = false;
+      loadActivityInFlight = false;
       if (!cached) {
         showToast('Error: ' + ((err && err.message) || err), 'error');
-        activityRenderBody_();
+        renderActivityTable();
       }
       // Kalau ada cached, biarkan data lama tetap visible — user bisa retry.
     })
     .getAuditLogPage(payload);
 }
 
-function activityRenderBody_() {
-  var tbody = document.getElementById('activityTbody');
+function renderActivityTable() {
+  var tbody = document.getElementById('activityTableBody');
   if (!tbody) return;
 
   if (!activityRows.length) {
-    var emptyTitle = activityPageNumber > 1
+    var emptyTitle = activityCurrentPage > 1
       ? 'Halaman ini kosong'
       : 'Belum ada aktivitas';
-    var emptySub = activityPageNumber > 1
+    var emptySub = activityCurrentPage > 1
       ? 'Tidak ada catatan tambahan di halaman ini'
       : 'Belum ada catatan aktivitas pada periode/filter yang dipilih';
     tbody.innerHTML =
@@ -514,18 +514,18 @@ function activityRenderBody_() {
   } else {
     tbody.innerHTML = activityRows.map(function(r) {
       return '<tr>' +
-        '<td>' + activityFormatTimestamp_(r.occurred_at) + '</td>' +
-        '<td>' + activityFormatEntityType_(r.entity_type) +
+        '<td>' + formatActivityTimestamp(r.occurred_at) + '</td>' +
+        '<td>' + formatActivityEntityType(r.entity_type) +
           '<div class="activity-entity-id">' + escapeAppHtml(r.entity_id || '') + '</div>' +
         '</td>' +
-        '<td>' + activityFormatAction_(r.action) + '</td>' +
+        '<td>' + formatActivityAction(r.action) + '</td>' +
         '<td>' +
           '<div class="activity-actor-id">' + escapeAppHtml(r.actor_user_id || '') + '</div>' +
-          '<div class="activity-actor-roles">' + activityFormatRoles_(r.actor_roles) + '</div>' +
+          '<div class="activity-actor-roles">' + formatActivityRoles(r.actor_roles) + '</div>' +
         '</td>' +
         '<td class="activity-notes-cell">' + escapeAppHtml(r.notes || '') + '</td>' +
         '<td style="text-align:right">' +
-          '<button type="button" class="icon-btn" onclick="activityOpenDetail_(' + Number(r.id) + ')" aria-label="Lihat detail" title="Lihat detail">' +
+          '<button type="button" class="icon-btn" onclick="openActivityDetail(' + Number(r.id) + ')" aria-label="Lihat detail" title="Lihat detail">' +
             '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7z"/></svg>' +
           '</button>' +
         '</td>' +
@@ -538,7 +538,7 @@ function activityRenderBody_() {
   var prevBtn = document.getElementById('activityPrevBtn');
   var nextBtn = document.getElementById('activityNextBtn');
   var infoEl  = document.getElementById('activityPaginationInfo');
-  if (pageEl)  pageEl.textContent  = activityPageNumber;
+  if (pageEl)  pageEl.textContent  = activityCurrentPage;
   if (totalEl) totalEl.textContent = activityTotalPages;
   if (prevBtn) prevBtn.disabled = !activityHasPrev;
   if (nextBtn) nextBtn.disabled = !activityHasNext;
@@ -548,24 +548,24 @@ function activityRenderBody_() {
 /* =========================================================
    PAGINATION
    ========================================================= */
-function activityPrevPage_() {
-  if (activityLoading) return;
-  if (!activityHasPrev || activityPageNumber <= 1) return;
-  activityPageNumber--;
-  activityLoadPage_();
+function prevActivityPage() {
+  if (loadActivityInFlight) return;
+  if (!activityHasPrev || activityCurrentPage <= 1) return;
+  activityCurrentPage--;
+  loadActivityPage();
 }
 
-function activityNextPage_() {
-  if (activityLoading) return;
-  if (!activityHasNext || activityPageNumber >= activityTotalPages) return;
-  activityPageNumber++;
-  activityLoadPage_();
+function nextActivityPage() {
+  if (loadActivityInFlight) return;
+  if (!activityHasNext || activityCurrentPage >= activityTotalPages) return;
+  activityCurrentPage++;
+  loadActivityPage();
 }
 
-function activityGoToPage_(el) {
-  if (activityLoading) {
+function goToActivityPage(el) {
+  if (loadActivityInFlight) {
     // Restore tampilan ke page number aktif supaya user tidak bingung
-    if (el) el.textContent = activityPageNumber;
+    if (el) el.textContent = activityCurrentPage;
     return;
   }
   var raw = el ? String(el.textContent || '').trim() : '';
@@ -573,15 +573,15 @@ function activityGoToPage_(el) {
   if (isNaN(target) || target < 1) target = 1;
   if (target > activityTotalPages) target = activityTotalPages;
   if (el) el.textContent = target;
-  if (target === activityPageNumber) return;
-  activityPageNumber = target;
-  activityLoadPage_();
+  if (target === activityCurrentPage) return;
+  activityCurrentPage = target;
+  loadActivityPage();
 }
 
 /* =========================================================
    FORMAT HELPERS
    ========================================================= */
-function activityFormatTimestamp_(iso) {
+function formatActivityTimestamp(iso) {
   if (!iso) return '-';
   var d = new Date(iso);
   if (isNaN(d.getTime())) return escapeAppHtml(String(iso));
@@ -592,13 +592,13 @@ function activityFormatTimestamp_(iso) {
          '<div class="activity-time-sub">' + timeStr + '</div>';
 }
 
-function activityFormatEntityType_(t) {
+function formatActivityEntityType(t) {
   var raw = String(t || '').trim();
   var label = ACTIVITY_ENTITY_TYPE_LABELS[raw] || (raw || '-');
   return '<span class="status-badge default">' + escapeAppHtml(label) + '</span>';
 }
 
-function activityFormatAction_(a) {
+function formatActivityAction(a) {
   var key = String(a || '').toLowerCase();
   var label = ACTIVITY_ACTION_LABELS[key] || key || '-';
   var className = 'status-badge default';
@@ -610,7 +610,7 @@ function activityFormatAction_(a) {
   return '<span class="' + className + '">' + escapeAppHtml(label) + '</span>';
 }
 
-function activityFormatRoles_(roles) {
+function formatActivityRoles(roles) {
   if (!Array.isArray(roles) || !roles.length) return '<span style="font-style:italic">-</span>';
   return roles.map(function(r) { return escapeAppHtml(String(r || '')); }).join(', ');
 }
@@ -618,7 +618,7 @@ function activityFormatRoles_(roles) {
 /* =========================================================
    FILTER CONTROLS (pola recall.html)
    ========================================================= */
-function activityBuildEntityTypeOptions_() {
+function buildActivityEntityTypeOptions() {
   var list;
   if (Array.isArray(activityAllowedEntityTypes) && activityAllowedEntityTypes.length > 0) {
     list = activityAllowedEntityTypes.slice();
@@ -640,7 +640,7 @@ function activityBuildEntityTypeOptions_() {
   }).join('');
 }
 
-function activityBuildActionOptions_() {
+function buildActivityActionOptions() {
   var keys = Object.keys(ACTIVITY_ACTION_LABELS);
   keys.sort(function(a, b) {
     return (ACTIVITY_ACTION_LABELS[a] || a).localeCompare(ACTIVITY_ACTION_LABELS[b] || b);
@@ -655,13 +655,13 @@ function activityBuildActionOptions_() {
   }).join('');
 }
 
-function activitySyncEntityTypeOptions_() {
+function syncActivityEntityTypeOptions() {
   var sel = document.getElementById('activityFilterEntityType');
   if (!sel) return;
   if (!Array.isArray(activityAllowedEntityTypes)) return;
 
   var currentValue = sel.value;
-  sel.innerHTML = '<option value="">Semua entitas</option>' + activityBuildEntityTypeOptions_();
+  sel.innerHTML = '<option value="">Semua entitas</option>' + buildActivityEntityTypeOptions();
   var matched = false;
   for (var i = 0; i < sel.options.length; i++) {
     if (sel.options[i].value === currentValue) { matched = true; break; }
@@ -669,7 +669,7 @@ function activitySyncEntityTypeOptions_() {
   if (matched) sel.value = currentValue;
 }
 
-function activityGetActiveFilterCount_() {
+function getActiveActivityFilterCount() {
   // Hitung filter di panel saja (date×2, entity, action). Search actor di luar.
   var startEl  = document.getElementById('activityFilterStartDate');
   var endEl    = document.getElementById('activityFilterEndDate');
@@ -683,17 +683,17 @@ function activityGetActiveFilterCount_() {
   return count;
 }
 
-function activityHasActiveSearch_() {
+function hasActiveActivitySearch() {
   var searchEl = document.getElementById('activitySearchActor');
   return !!(searchEl && String(searchEl.value || '').trim());
 }
 
-function activityUpdateFilterControls_() {
+function updateActivityFilterControls() {
   var panel    = document.getElementById('activityFiltersPanel');
   var toggleBtn = document.getElementById('activityFiltersToggleBtn');
   var resetBtn = document.getElementById('activityFiltersResetBtn');
 
-  var activeCount = activityGetActiveFilterCount_();
+  var activeCount = getActiveActivityFilterCount();
 
   if (panel) {
     panel.classList.toggle('show', !!activityFiltersExpanded);
@@ -710,28 +710,28 @@ function activityUpdateFilterControls_() {
   }
 
   if (resetBtn) {
-    var hasAny = activeCount > 0 || activityHasActiveSearch_();
+    var hasAny = activeCount > 0 || hasActiveActivitySearch();
     resetBtn.style.display = hasAny ? 'inline-flex' : 'none';
   }
 }
 
-function activityToggleFilters_() {
+function toggleActivityFilters() {
   activityFiltersExpanded = !activityFiltersExpanded;
-  activityUpdateFilterControls_();
+  updateActivityFilterControls();
 }
 
-function activityOnSearchInput_() {
+function handleActivitySearch() {
   if (activitySearchDebounce) {
     clearTimeout(activitySearchDebounce);
   }
   // Update reset link visibility immediately
-  activityUpdateFilterControls_();
+  updateActivityFilterControls();
   activitySearchDebounce = setTimeout(function() {
-    activityApplyFilter_();
+    applyActivityFilters();
   }, ACTIVITY_SEARCH_DEBOUNCE_MS);
 }
 
-function activityApplyFilter_() {
+function applyActivityFilters() {
   var startEl  = document.getElementById('activityFilterStartDate');
   var endEl    = document.getElementById('activityFilterEndDate');
   var entityEl = document.getElementById('activityFilterEntityType');
@@ -756,16 +756,16 @@ function activityApplyFilter_() {
     actions:        action ? [action] : [],
     actor_search:   actor || null
   };
-  activityPageNumber = 1;
-  activityClearPageCache_();
-  activityUpdateFilterControls_();
-  activityLoadPage_();
+  activityCurrentPage = 1;
+  clearActivityPageCache();
+  updateActivityFilterControls();
+  loadActivityPage();
 }
 
-function activityResetFilter_() {
+function resetActivityFilters() {
   activityFiltersApplied = {};
-  activityPageNumber = 1;
-  activityClearPageCache_();
+  activityCurrentPage = 1;
+  clearActivityPageCache();
 
   var ids = ['activityFilterStartDate', 'activityFilterEndDate', 'activityFilterEntityType',
              'activityFilterAction', 'activitySearchActor'];
@@ -774,19 +774,19 @@ function activityResetFilter_() {
     if (el) el.value = '';
   });
 
-  activityUpdateFilterControls_();
-  activityLoadPage_();
+  updateActivityFilterControls();
+  loadActivityPage();
 }
 
 /* =========================================================
    DETAIL MODAL + DIFF HIGHLIGHT
    ========================================================= */
-function activityDetailModalHtml_() {
+function getActivityDetailModalHtml() {
   return '<div id="activityDetailModal" class="modal hidden">' +
     '<div class="modal-box modal-box-sticky detail-modal-box-sticky">' +
       '<div class="detail-modal-header-sticky">' +
         '<h2 class="detail-modal-title-sticky">Detail Aktivitas</h2>' +
-        '<button type="button" class="detail-close-btn" onclick="activityCloseDetail_()" aria-label="Tutup modal detail aktivitas" title="Tutup">' +
+        '<button type="button" class="detail-close-btn" onclick="closeActivityDetail()" aria-label="Tutup modal detail aktivitas" title="Tutup">' +
           '<svg viewBox="0 0 24 24" fill="none" stroke-width="2">' +
             '<path d="M6 6l12 12"></path>' +
             '<path d="M18 6l-12 12"></path>' +
@@ -803,14 +803,14 @@ function activityDetailModalHtml_() {
         '</dl>' +
         '<div id="activityDetailDiff"></div>' +
         '<div class="modal-actions modal-actions-right">' +
-          '<button type="button" class="btn btn-secondary" onclick="activityCloseDetail_()">Tutup</button>' +
+          '<button type="button" class="btn btn-secondary" onclick="closeActivityDetail()">Tutup</button>' +
         '</div>' +
       '</div>' +
     '</div>' +
   '</div>';
 }
 
-function activityOpenDetail_(id) {
+function openActivityDetail(id) {
   var row = (activityRows || []).find(function(r) { return Number(r.id) === Number(id); });
   if (!row) {
     showToast('Data tidak ditemukan di halaman ini', 'error');
@@ -826,27 +826,27 @@ function activityOpenDetail_(id) {
   var notesEl  = document.getElementById('activityDetailNotes');
   var diffEl   = document.getElementById('activityDetailDiff');
 
-  if (whenEl) whenEl.textContent = activityFormatTimestampLong_(row.occurred_at);
+  if (whenEl) whenEl.textContent = formatActivityTimestampLong(row.occurred_at);
   if (entityEl) {
     var entityLabel = ACTIVITY_ENTITY_TYPE_LABELS[String(row.entity_type || '')] || String(row.entity_type || '-');
     entityEl.innerHTML =
       '<span class="status-badge default">' + escapeAppHtml(entityLabel) + '</span>' +
       ' <span class="activity-entity-id" style="display:inline;margin-left:8px">' + escapeAppHtml(String(row.entity_id || '')) + '</span>';
   }
-  if (actionEl) actionEl.innerHTML = activityFormatAction_(row.action);
+  if (actionEl) actionEl.innerHTML = formatActivityAction(row.action);
   if (actorEl) {
     actorEl.innerHTML =
       escapeAppHtml(String(row.actor_user_id || '-')) +
-      ' <span style="color:#64748b">(' + escapeAppHtml(activityFormatRolesPlain_(row.actor_roles)) + ')</span>';
+      ' <span style="color:#64748b">(' + escapeAppHtml(formatActivityRolesPlain(row.actor_roles)) + ')</span>';
   }
   if (notesEl) notesEl.textContent = row.notes || '-';
-  if (diffEl) diffEl.innerHTML = activityRenderDiff_(row.old_value, row.new_value);
+  if (diffEl) diffEl.innerHTML = renderActivityDiff(row.old_value, row.new_value);
 
   modal.style.display = 'flex';
   modal.classList.remove('hidden');
 }
 
-function activityCloseDetail_() {
+function closeActivityDetail() {
   var modal = document.getElementById('activityDetailModal');
   if (modal) {
     modal.classList.add('hidden');
@@ -854,7 +854,7 @@ function activityCloseDetail_() {
   }
 }
 
-function activityFormatTimestampLong_(iso) {
+function formatActivityTimestampLong(iso) {
   if (!iso) return '-';
   var d = new Date(iso);
   if (isNaN(d.getTime())) return String(iso);
@@ -863,7 +863,7 @@ function activityFormatTimestampLong_(iso) {
     pad(d.getHours()) + ':' + pad(d.getMinutes()) + ':' + pad(d.getSeconds());
 }
 
-function activityFormatRolesPlain_(roles) {
+function formatActivityRolesPlain(roles) {
   if (!Array.isArray(roles) || !roles.length) return '-';
   return roles.map(function(r) { return String(r || ''); }).join(', ');
 }
@@ -880,11 +880,11 @@ var ACTIVITY_TIMESTAMP_FIELDS = {
   completed_at: true
 };
 
-function activityIsTimestampField_(key) {
+function isActivityTimestampField(key) {
   return ACTIVITY_TIMESTAMP_FIELDS[key] === true;
 }
 
-function activityComputeDiffStatus_(k, oldData, newData, isCreate, isDelete) {
+function computeActivityDiffStatus(k, oldData, newData, isCreate, isDelete) {
   var hasOld = Object.prototype.hasOwnProperty.call(oldData, k);
   var hasNew = Object.prototype.hasOwnProperty.call(newData, k);
   if (isCreate) return 'created';
@@ -899,7 +899,7 @@ function activityComputeDiffStatus_(k, oldData, newData, isCreate, isDelete) {
   return 'unchanged';
 }
 
-function activityRenderDiff_(oldObj, newObj) {
+function renderActivityDiff(oldObj, newObj) {
   var isCreate = (oldObj === null || oldObj === undefined);
   var isDelete = (newObj === null || newObj === undefined);
 
@@ -920,7 +920,7 @@ function activityRenderDiff_(oldObj, newObj) {
     keys = allKeys;
   } else {
     keys = allKeys.filter(function(k) {
-      var st = activityComputeDiffStatus_(k, oldData, newData, false, false);
+      var st = computeActivityDiffStatus(k, oldData, newData, false, false);
       return st === 'changed' || st === 'added' || st === 'removed';
     });
   }
@@ -950,7 +950,7 @@ function activityRenderDiff_(oldObj, newObj) {
     var oldVal = hasOld ? oldData[k] : undefined;
     var newVal = hasNew ? newData[k] : undefined;
 
-    var status = activityComputeDiffStatus_(k, oldData, newData, isCreate, isDelete);
+    var status = computeActivityDiffStatus(k, oldData, newData, isCreate, isDelete);
 
     var oldClass = 'activity-diff-cell-neutral';
     var newClass = 'activity-diff-cell-neutral';
@@ -965,15 +965,15 @@ function activityRenderDiff_(oldObj, newObj) {
 
     return '<div class="activity-diff-row">' +
       '<div class="activity-diff-field">' + escapeAppHtml(k) + '</div>' +
-      '<div class="activity-diff-value ' + oldClass + '">' + activityFormatDiffValue_(oldVal, hasOld, k) + '</div>' +
-      '<div class="activity-diff-value ' + newClass + '">' + activityFormatDiffValue_(newVal, hasNew, k) + '</div>' +
+      '<div class="activity-diff-value ' + oldClass + '">' + formatActivityDiffValue(oldVal, hasOld, k) + '</div>' +
+      '<div class="activity-diff-value ' + newClass + '">' + formatActivityDiffValue(newVal, hasNew, k) + '</div>' +
     '</div>';
   }).join('');
 
   return '<div class="activity-diff">' + headerHtml + rowsHtml + '</div>';
 }
 
-function activityFormatDiffValue_(v, hasIt, fieldKey) {
+function formatActivityDiffValue(v, hasIt, fieldKey) {
   if (!hasIt) return '<span class="activity-diff-value-muted">(tidak ada)</span>';
   if (v === null) return '<span class="activity-diff-value-muted">null</span>';
   if (v === undefined) return '<span class="activity-diff-value-muted">undefined</span>';
@@ -981,9 +981,9 @@ function activityFormatDiffValue_(v, hasIt, fieldKey) {
   // Field timestamp tertentu (updated_at, created_at, dll) ditampilkan dalam
   // format readable DD-MM-YYYY HH:MM:SS — bukan ISO string mentah — supaya
   // owner tidak harus parse manual.
-  if (fieldKey && activityIsTimestampField_(fieldKey) &&
+  if (fieldKey && isActivityTimestampField(fieldKey) &&
       (typeof v === 'string' || typeof v === 'number')) {
-    var formatted = activityFormatTimestampLong_(v);
+    var formatted = formatActivityTimestampLong(v);
     if (formatted && formatted !== '-' && formatted !== String(v)) {
       return escapeAppHtml(formatted);
     }
