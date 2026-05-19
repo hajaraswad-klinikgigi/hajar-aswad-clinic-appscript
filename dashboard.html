@@ -1,8 +1,17 @@
 <script>
   let dashboardPeriod = 'today';
+  // Cache shape: { [period]: { data: response, timestamp: ms } }
+  // TTL 5 menit supaya owner lihat data segar setiap balik halaman,
+  // tapi tidak terus-menerus refetch saat rapid switch period.
   let dashboardCache = {};
+  // Request token untuk handle race condition: kalau user cepat
+  // switch period A→B→A, response B yang masuk belakangan akan
+  // discarded karena token sudah berubah.
+  let dashboardRequestToken = 0;
   let dashboardFeedbackPage = 1;
   const DASHBOARD_FEEDBACK_PAGE_SIZE = 5;
+  const DASHBOARD_CACHE_TTL_MS = 5 * 60 * 1000;
+  const DASHBOARD_VALID_PERIODS = ['today', '7days', '30days'];
 
   function formatDashboardRupiah(value) {
     const num = Number(value || 0);
@@ -188,56 +197,71 @@
     const select = document.getElementById('dashboardPeriodSelect');
     if (select) select.value = dashboardPeriod;
 
-    renderDashboardSkeleton();
+    // Tidak panggil renderDashboardSkeleton di sini — biarkan loadDashboard
+    // yang putuskan: kalau cache ada → render cache langsung (no flash),
+    // kalau kosong → render skeleton. Pola sama dengan Patients/Aktivitas.
     loadDashboard();
   }
 
   function changePeriod(el) {
-    dashboardPeriod = el && el.value ? el.value : 'today';
+    const raw = el && el.value ? String(el.value) : 'today';
+    // Whitelist validation — kalau user manipulate via DevTools,
+    // fallback ke default 'today'.
+    const period = DASHBOARD_VALID_PERIODS.indexOf(raw) !== -1 ? raw : 'today';
+    if (period === dashboardPeriod) return;
+    dashboardPeriod = period;
     dashboardFeedbackPage = 1;
     loadDashboard();
   }
 
-  function setDashboardPeriodDisabled(disabled) {
-    const select = document.getElementById('dashboardPeriodSelect');
-    if (!select) return;
-    select.disabled = disabled;
-    if (disabled) {
-      select.classList.add('finance-is-disabled');
-    } else {
-      select.classList.remove('finance-is-disabled');
+  function getDashboardCached_(period) {
+    const entry = dashboardCache[period];
+    if (!entry) return null;
+    if (Date.now() - entry.timestamp > DASHBOARD_CACHE_TTL_MS) {
+      delete dashboardCache[period];
+      return null;
     }
+    return entry.data;
+  }
+
+  function setDashboardCached_(period, data) {
+    dashboardCache[period] = { data: data, timestamp: Date.now() };
   }
 
   function loadDashboard() {
     const period = dashboardPeriod;
+    // Increment token — handler yang in-flight dengan token lama akan
+    // discard hasilnya (race condition fix saat rapid period switch).
+    const myToken = ++dashboardRequestToken;
+    const cached = getDashboardCached_(period);
 
-    if (dashboardCache[period]) {
-      renderDashboard(dashboardCache[period]);
+    if (cached) {
+      renderDashboard(cached);
     } else {
       renderDashboardSkeleton();
     }
 
-    setDashboardPeriodDisabled(true);
+    // Period selector TIDAK PERNAH di-lock — user bisa rapid switch.
+    // Konsisten dengan pola Patients/Aktivitas.
 
     google.script.run
       .withSuccessHandler(function(res) {
-        setDashboardPeriodDisabled(false);
+        // Discard kalau token sudah berubah (user pindah period dulu).
+        if (myToken !== dashboardRequestToken) return;
         if (res && res.success) {
-          dashboardCache[period] = res;
+          setDashboardCached_(period, res);
         }
         renderDashboard(res);
       })
       .withFailureHandler(function(err) {
-        setDashboardPeriodDisabled(false);
+        if (myToken !== dashboardRequestToken) return;
         const msg = 'Error: ' + (err && err.message ? err.message : err);
-        if (!dashboardCache[period]) renderDashboardError(msg);
+        // Render error inline HANYA kalau tidak ada cache — supaya
+        // owner tidak kehilangan data sebelumnya saat fetch background gagal.
+        if (!getDashboardCached_(period)) renderDashboardError(msg);
         showToast(msg, 'error');
       })
-      .getDashboardOwnerSummary({
-        session_token: getCurrentSessionToken(),
-        period: period
-      });
+      .getDashboardOwnerSummary(attachAuthContext({ period: period }));
   }
 
   function renderDashboard(res) {

@@ -1,5 +1,12 @@
 <script>
 let financePeriod = 'today';
+// Cache shape: { [period]: { data: response, timestamp: ms } }
+// TTL 5 menit supaya owner lihat data segar setiap balik halaman,
+// tapi tidak terus-menerus refetch saat rapid switch period.
+const FINANCE_CACHE_TTL_MS = 5 * 60 * 1000;
+const FINANCE_VALID_PERIODS = ['today', '7days', '30days'];
+// Request token untuk discard stale response saat rapid period switch.
+let financeBootstrapRequestToken = 0;
 let financeActiveLaporan = false;
 let financeBootstrapCache = {};
 let allFinanceBillings = [];
@@ -320,6 +327,10 @@ function getFinanceReceivableLoadProcessOptions() {
   };
 }
 
+// DEPRECATED 2026-05-20: lihat getFinanceBootstrapLoadProcessOptionsNoPeriod_
+// Sebelumnya dipakai utk lock period selector + 4 filter saat bootstrap load.
+// Sekarang period selector TIDAK pernah di-lock supaya rapid switch responsif
+// (race condition di-handle via request token, bukan lock UI).
 function getFinanceBootstrapLoadProcessOptions() {
   return {
     disableIds: [
@@ -1055,32 +1066,70 @@ function renderFinancePageBootstrapErrorState(message) {
 }
 
 function changeFinancePeriod(el) {
-  if (financeIsProcessBusy(FINANCE_PROCESS_KEYS.BOOTSTRAP_LOAD)) {
-    if (el) {
-      el.value = financePeriod;
-    }
-    return;
-  }
-
-  financePeriod = el && el.value ? el.value : 'today';
+  const raw = el && el.value ? String(el.value) : 'today';
+  // Whitelist validation — cegah user manipulate via DevTools.
+  const period = FINANCE_VALID_PERIODS.indexOf(raw) !== -1 ? raw : 'today';
+  if (period === financePeriod) return;
+  financePeriod = period;
+  // Period selector TIDAK PERNAH di-lock — user bisa rapid switch.
+  // Request lama yang masih in-flight akan didiscard di handler via
+  // financeBootstrapRequestToken.
   reloadFinancePageData();
+}
+
+function getFinanceBootstrapCached_(period) {
+  const entry = financeBootstrapCache[period];
+  if (!entry) return null;
+  // Entry shape lama (sebelum TTL): langsung response object. Backward-
+  // compat: kalau tidak punya field timestamp, treat sebagai fresh dan
+  // upgrade ke shape baru saat berikutnya disimpan.
+  if (entry && entry.timestamp && entry.data) {
+    if (Date.now() - entry.timestamp > FINANCE_CACHE_TTL_MS) {
+      delete financeBootstrapCache[period];
+      return null;
+    }
+    return entry.data;
+  }
+  return entry;
+}
+
+function setFinanceBootstrapCached_(period, data) {
+  financeBootstrapCache[period] = { data: data, timestamp: Date.now() };
 }
 
 function reloadFinancePageData() {
   loadFinancePageBootstrap();
 }
 
-function loadFinancePageBootstrap() {
-  const processKey = FINANCE_PROCESS_KEYS.BOOTSTRAP_LOAD;
-  const processOptions = getFinanceBootstrapLoadProcessOptions();
+// Controls yang di-lock saat bootstrap fetch dengan cache kosong.
+// Period selector TIDAK termasuk supaya rapid switch tetap responsif
+// (race condition di-handle via request token).
+const FINANCE_BOOTSTRAP_DISABLE_IDS = [
+  'financeBillingSearchInput',
+  'financePaymentStatusFilter',
+  'financeReceivableSearchInput',
+  'financeReceivableStatusFilter'
+];
 
-  if (!financeStartProcess(processKey, processOptions)) {
-    return;
+function loadFinancePageBootstrap() {
+  const period = financePeriod;
+  const cached = getFinanceBootstrapCached_(period);
+  // Increment token — handler dengan token lama akan discard hasil
+  // (race condition fix saat user rapid switch period).
+  const myToken = ++financeBootstrapRequestToken;
+
+  // ALWAYS unlock controls dulu (defensive cleanup) — kalau ada stale
+  // disable dari request lama yang ter-discard, ini bebaskan UI.
+  setFinanceControlsDisabled(FINANCE_BOOTSTRAP_DISABLE_IDS, false);
+
+  // Lock controls HANYA kalau cache kosong (initial load): user tidak
+  // boleh search/filter di state kosong. Saat cache ada, biarkan user
+  // interact dengan data lama selama fetch background.
+  if (!cached) {
+    setFinanceControlsDisabled(FINANCE_BOOTSTRAP_DISABLE_IDS, true);
   }
 
-  const cached = financeBootstrapCache[financePeriod];
   if (cached) {
-    // Stale-while-revalidate: tampilkan cache dulu, skip skeleton
     renderFinanceBootstrap(cached);
   } else {
     renderFinancePageBootstrapLoadingState();
@@ -1088,27 +1137,32 @@ function loadFinancePageBootstrap() {
 
   google.script.run
     .withSuccessHandler(function(res) {
-      financeEndProcess(processKey, processOptions);
+      // Discard kalau token sudah berubah (user pindah period dulu).
+      if (myToken !== financeBootstrapRequestToken) return;
+      setFinanceControlsDisabled(FINANCE_BOOTSTRAP_DISABLE_IDS, false);
       if (res && res.success) {
-        financeBootstrapCache[financePeriod] = res;
+        setFinanceBootstrapCached_(period, res);
       }
       renderFinanceBootstrap(res);
     })
     .withFailureHandler(function(err) {
-      financeEndProcess(processKey, processOptions);
+      if (myToken !== financeBootstrapRequestToken) return;
+      setFinanceControlsDisabled(FINANCE_BOOTSTRAP_DISABLE_IDS, false);
 
       const message = financeGetFailureErrorMessage(
         err,
         'Gagal memuat halaman Finance'
       );
 
-      if (!financeBootstrapCache[financePeriod]) {
+      // Render error inline HANYA kalau tidak ada cache — supaya
+      // owner tidak kehilangan data sebelumnya saat fetch background gagal.
+      if (!getFinanceBootstrapCached_(period)) {
         renderFinancePageBootstrapErrorState(message);
       }
       showToast('Error finance bootstrap: ' + message, 'error');
     })
     .getFinancePageBootstrap(attachAuthContext({
-      period: financePeriod
+      period: period
     }));
 }
 
