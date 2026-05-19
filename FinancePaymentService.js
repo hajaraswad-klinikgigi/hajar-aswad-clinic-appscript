@@ -183,8 +183,18 @@ function getBillingInstallmentTargetForPayment_(billingId, installmentId) {
   };
 }
 
-function getBillingPaymentModeSuggestion(billingId) {
-  const normalizedBillingId = String(billingId || '').trim();
+function getBillingPaymentModeSuggestion(payload) {
+  const permission = requireFinancePermission_(payload, 'read_billing_payment_mode_suggestion');
+
+  if (!permission.success) {
+    return permission;
+  }
+
+  const normalizedBillingId = String(
+    (payload && payload.billing_id) ||
+    payload ||
+    ''
+  ).trim();
 
   if (!normalizedBillingId) {
     return {

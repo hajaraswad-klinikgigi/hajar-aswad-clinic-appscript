@@ -150,7 +150,7 @@ function validateExpenseInput_(data) {
 
 function getExpensesByDate(payload) {
   try {
-    const auth = readAuthSession_(payload);
+    const auth = requireRole(payload, ['admin_finance']);
     if (!auth.success) return auth;
 
     const date = String((payload && payload.date) || '').trim();
@@ -170,7 +170,7 @@ function getExpensesByDate(payload) {
 
 function getExpensesByDateRange(payload) {
   try {
-    const auth = readAuthSession_(payload);
+    const auth = requireRole(payload, ['admin_finance']);
     if (!auth.success) return auth;
 
     const startDate = String((payload && payload.start_date) || '').trim();
@@ -204,7 +204,7 @@ function getExpensesByDateRange(payload) {
 
 function addExpense(payload) {
   try {
-    const auth = readAuthSession_(payload);
+    const auth = requireRole(payload, ['admin_finance']);
     if (!auth.success) return auth;
 
     const validationError = validateExpenseInput_(payload);
@@ -236,7 +236,7 @@ function addExpense(payload) {
 
 function updateExpense(payload) {
   try {
-    const auth = readAuthSession_(payload);
+    const auth = requireRole(payload, ['admin_finance']);
     if (!auth.success) return auth;
 
     const expenseId = String((payload && payload.expense_id) || '').trim();
@@ -301,7 +301,7 @@ function updateExpense(payload) {
 
 function deleteExpense(payload) {
   try {
-    const auth = readAuthSession_(payload);
+    const auth = requireRole(payload, []);
     if (!auth.success) return auth;
 
     const expenseId = String((payload && payload.expense_id) || '').trim();
@@ -331,7 +331,7 @@ function deleteExpense(payload) {
 
 function getExpenseSummary(payload) {
   try {
-    const auth = readAuthSession_(payload);
+    const auth = requireRole(payload, ['admin_finance']);
     if (!auth.success) return auth;
 
     const period = String((payload && payload.period) || 'today').trim();

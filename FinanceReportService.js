@@ -1039,7 +1039,7 @@ function ownerCalcDiffPercent_(current, previous) {
 
 function getOwnerDailyReport(payload) {
   try {
-    const auth = readAuthSession_(payload);
+    const auth = requireRole(payload, ['admin_finance']);
     if (!auth.success) return auth;
 
     const date = String((payload && payload.date) || formatTodayYmd()).trim();
@@ -1095,7 +1095,7 @@ function getOwnerDailyReport(payload) {
 
 function getOwnerMonthlyReport(payload) {
   try {
-    const auth = readAuthSession_(payload);
+    const auth = requireRole(payload, ['admin_finance']);
     if (!auth.success) return auth;
 
     const year  = Number((payload && payload.year)  || new Date().getFullYear());
@@ -1186,7 +1186,7 @@ function getOwnerMonthlyReport(payload) {
 
 function getOwnerYearlyReport(payload) {
   try {
-    const auth = readAuthSession_(payload);
+    const auth = requireRole(payload, ['admin_finance']);
     if (!auth.success) return auth;
 
     const year = Number((payload && payload.year) || new Date().getFullYear());
@@ -1253,7 +1253,7 @@ function getOwnerYearlyReport(payload) {
 
 function getOwnerReportBootstrap(payload) {
   try {
-    const auth = readAuthSession_(payload);
+    const auth = requireRole(payload, ['admin_finance']);
     if (!auth.success) return auth;
 
     const date  = String((payload && payload.date) || formatTodayYmd()).trim();
