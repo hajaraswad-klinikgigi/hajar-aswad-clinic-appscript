@@ -30,6 +30,7 @@
 | **Aturan Fee Dokter** (master) | ✅ Edit | ❌ | 👁️ Read-only | ❌ |
 | **Service Catalog & Tarif** | ✅ Edit | 👁️ Read-only | 👁️ Read-only | — (via treatment) |
 | **Owner Report** | ✅ Full | ❌ | ✅ Tanpa Profit | ❌ |
+| **Aktivitas (Audit Log)** | ✅ Semua entity | ✅ Entity terkait pasien/jadwal/treatment/recall | ✅ Entity terkait finance/master | ❌ |
 | **Settings → Pengguna** | ✅ Full | ❌ | ❌ | ❌ |
 | **Landing page setelah login** | Dashboard | Appointment | Billing | Appointment |
 
@@ -206,7 +207,44 @@
 | `cancelOrthoRecallProgram` | ✅ | ❌ | ❌ | admin_appt: cancel program |
 | `saveOrthoRecallContact` | ✅ | ❌ | ❌ | admin_appt: log kontak |
 
-## 12. Public/Token-based Endpoints
+## 12. Aktivitas / Audit Log (AuditLogQueryService.js, audit-log.html)
+
+**Aturan: admin_appointment + admin_finance. Doctor TIDAK akses (UI Guard di scripts.html sidebar). Owner/super_admin auto-pass via fully_privileged.**
+
+| Endpoint | admin_appt | admin_fin | doctor | Catatan |
+|---|:---:|:---:|:---:|---|
+| `getAuditLogList` | ✅ | ✅ | ❌ | requireRole `['admin_appointment', 'admin_finance']`. Doctor explicit deny via `AUDIT_LOG_ROLE_ALLOWED_ENTITY_TYPES.doctor = []` |
+
+### Defense-in-Depth: Row-Level Filter per entity_type
+
+Per role, `getAuditLogList` MENGINTERSECT entity_type yang diminta dengan whitelist role-nya (`computeAuditLogAllowedEntityTypesForUser_`). User role rangkap dapat UNION dari role-role mereka.
+
+Whitelist `AUDIT_LOG_ROLE_ALLOWED_ENTITY_TYPES` (di AuditLogQueryService.js:28):
+
+| Role | Entity types yang boleh dilihat |
+|---|---|
+| `owner` / `super_admin` | `null` = semua (termasuk `user` yang owner-only) |
+| `admin_appointment` | `patient`, `appointment`, `treatment`, `ortho_recall` |
+| `admin_finance` | `billing`, `billing_adjustment`, `payment`, `billing_installment_plan`, `billing_invoice`, `billing_feedback`, `expense`, `doctor_compensation_rule`, `doctor_material_deduction`, `service_catalog`, `clinic_info` |
+| `doctor` | `[]` (kosong → endpoint reject dengan "Role Anda tidak memiliki akses ke halaman Aktivitas") |
+
+Implikasi role rangkap:
+- `[admin_appointment, admin_finance]` → union ke-15 entity (semua kecuali `user` yang owner-only)
+- `[doctor, admin_appointment]` → tetap dapat entity admin_appointment (doctor empty list dibyte-pass oleh union)
+
+### Constraint backend lain
+
+- **Clinic scope**: filter `clinic_id` otomatis di-apply dari `auth.user.clinic_id` (atau `getCurrentClinicId_()` fallback)
+- **Period preset whitelist**: hanya `today` / `7days` / `30days` (default `7days`). Custom date range ditolak supaya tidak unbounded query
+- **Hard cap**: `AUDIT_LOG_MAX_LIST_LIMIT = 2000` row per query. UI tampilkan banner kalau hit cap
+- **user_id filter**: di-validate regex `^[A-Za-z0-9_-]{1,64}$` (cegah PostgREST injection)
+
+### UI Guard
+
+- **Sidebar menu Activity**: hidden untuk role doctor (`scripts.html applySidebarRoleVisibility_`)
+- **Filter entity type di UI**: di-populate dari intersection dengan role allowed list (tidak tampilkan opsi entity yang user tidak boleh lihat)
+
+## 13. Public/Token-based Endpoints
 
 Tidak butuh role check:
 
@@ -274,6 +312,7 @@ Priority: kalau user punya rangkap `[admin_appointment, admin_finance]`, redirec
 | Ortho Recall | ✅ | ✅ | ❌ | ❌ |
 | Finance | ✅ | ❌ | ✅ | ❌ |
 | Owner Report | ✅ | ❌ | ✅ (tanpa profit) | ❌ |
+| Aktivitas (Audit Log) | ✅ | ✅ | ✅ | ❌ |
 | Settings | ✅ | ❌ | ❌ | ❌ |
 
 ### Conditional buttons / actions
