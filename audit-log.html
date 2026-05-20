@@ -5,18 +5,11 @@
      (same dark-theme toolbar/chip/panel pattern).
      Diff table tetap pakai class `.activity-diff-*` (unique).
      ========================================================= */
-  /* Filter panel: 2 kolom (Entitas + Aksi). Period dipisah ke header
-     atas (slot kanan patients-header) supaya selalu visible & konsisten
-     dengan Dashboard/Finance. Period selector pakai class shared
-     .period-filter-* dari style.html global. */
-  #activityFiltersPanel .recall-filter-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-  @media (max-width: 600px) {
-    #activityFiltersPanel .recall-filter-grid {
-      grid-template-columns: 1fr;
-    }
-  }
+  /* Filter panel (Entitas + Aksi) pakai shared class .filter-panel-grid /
+     .filter-panel-wrap dari style.html global (auto-fill, item width
+     220-280px konsisten dengan Recall). Period dipisah ke header atas
+     (slot kanan patients-header) — sinkron Dashboard/Finance — pakai
+     class .period-filter-* shared. */
 
   /* Stale-while-revalidate: dim tabel saat refresh (saat filter diubah
      atau search actor di-trigger ulang). Pagination tidak refresh karena
@@ -314,15 +307,15 @@ function showActivityPage() {
             '</div>' +
           '</div>' +
           '<div id="activityFiltersPanel" class="recall-filter-panel">' +
-            '<div class="recall-filter-grid">' +
-              '<div class="recall-filter-wrap">' +
+            '<div class="filter-panel-grid">' +
+              '<div class="filter-panel-wrap">' +
                 '<label class="patients-toolbar-label">Entitas</label>' +
                 '<select id="activityFilterEntityType" onchange="applyActivityFilters()">' +
                   '<option value="">Semua entitas</option>' +
                   buildActivityEntityTypeOptions() +
                 '</select>' +
               '</div>' +
-              '<div class="recall-filter-wrap">' +
+              '<div class="filter-panel-wrap">' +
                 '<label class="patients-toolbar-label">Aksi</label>' +
                 '<select id="activityFilterAction" onchange="applyActivityFilters()">' +
                   '<option value="">Semua aksi</option>' +

@@ -136,8 +136,8 @@ Setiap blok (toolbar, tabel) dibungkus `content-card`:
     </div>
   </div>
   <div id="recallFiltersPanel" class="recall-filter-panel">
-    <div class="recall-filter-grid">
-      <div class="recall-filter-wrap">
+    <div class="filter-panel-grid">                <!-- shared, style.html -->
+      <div class="filter-panel-wrap">              <!-- shared, style.html -->
         <label class="patients-toolbar-label">Follow Up Status</label>
         <select onchange="applyRecallFilters(false)">...</select>
       </div>
@@ -147,7 +147,13 @@ Setiap blok (toolbar, tabel) dibungkus `content-card`:
 </div>
 ```
 
-**Aturan**: Aktivitas yang punya >1 filter WAJIB pakai pola Recall (chip + panel collapse + badge count + Reset link).
+**Aturan**: Halaman yang punya >1 filter WAJIB pakai pola Recall (chip + panel collapse + badge count + Reset link).
+
+**Filter grid layout (`.filter-panel-grid` + `.filter-panel-wrap`)** dipromote
+ke `style.html` global supaya Recall + Aktivitas + halaman baru pakai pattern
+identik. Grid pakai `repeat(auto-fill, minmax(220px, 280px))` → item width
+selalu **sama persis antar halaman** meski jumlah filter berbeda. Wrap natif
+ke 1 kolom di layar sempit tanpa media query manual.
 
 ---
 
@@ -1477,7 +1483,7 @@ checklist ini sebelum commit:
 - `style-modals.html` (15K) — modal-box, detail-modal-*, modal-actions, field-error
 - `style-patients.html` (13K) — patients-shell, patients-header, patients-table, patients-empty-state
 - `style-appointments.html` (13K)
-- `style-recall.html` (11K) — recall-toolbar, recall-filter-chip, recall-filter-panel, recall-filter-grid
+- `style-recall.html` (11K) — recall-toolbar, recall-filter-chip, recall-filter-panel (grid+wrap di style.html shared)
 - `style-finance.html` (31K) — fallback acuan
 
 ### Target refactor

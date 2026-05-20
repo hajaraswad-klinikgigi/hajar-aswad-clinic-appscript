@@ -177,6 +177,33 @@
     box-shadow: none;
   }
 
+  /* =========================================================
+     SHARED FILTER PANEL GRID — Recall / Aktivitas / future pages
+     Canonical pattern untuk panel filter (label + select / input)
+     yang muncul di bawah toolbar (collapse/expand via container
+     .recall-filter-panel atau setara).
+     Auto-fill: setiap item punya lebar konsisten antar halaman.
+     Item width 220-280px → mobile auto fold ke 1 kolom otomatis
+     tanpa media query manual.
+     ========================================================= */
+  .filter-panel-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 280px));
+    gap: 16px;
+    align-items: flex-end;
+  }
+
+  .filter-panel-wrap {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .filter-panel-wrap select,
+  .filter-panel-wrap input {
+    width: 100%;
+    margin-bottom: 0;
+  }
+
   /* ===== Custom scrollbar ===== */
   ::-webkit-scrollbar {
     width: 5px;

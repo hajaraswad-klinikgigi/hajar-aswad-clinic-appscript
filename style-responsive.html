@@ -404,16 +404,10 @@
   }
 
   /* =========================================================
-     12. RECALL RESPONSIVE <= 1024px
-     ========================================================= */
-  @media (max-width: 1024px) {
-    .recall-filter-grid {
-      grid-template-columns: repeat(2, minmax(0, 1fr));
-    }
-  }
-
-  /* =========================================================
-     13. RECALL RESPONSIVE <= 768px
+     12. RECALL RESPONSIVE <= 768px
+     Grid filter pakai shared .filter-panel-grid (auto-fill) di
+     style.html — sudah handle wrap natively, tidak perlu media
+     query manual untuk grid kolom.
      ========================================================= */
   @media (max-width: 768px) {
     .recall-toolbar-main {
@@ -433,10 +427,6 @@
 
     .recall-toolbar-actions {
       justify-content: flex-start;
-    }
-
-    .recall-filter-grid {
-      grid-template-columns: 1fr;
     }
 
     .recall-expand-layout {
