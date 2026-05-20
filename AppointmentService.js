@@ -271,9 +271,10 @@ function getAppointments(payloadOrOpts) {
     isPayloadMode = false;
   }
 
+  let actorAuth = null;
   if (isPayloadMode) {
-    const auth = requireRole(payload, ['admin_appointment', 'doctor']);
-    if (!auth.success) return auth;
+    actorAuth = requireRole(payload, ['admin_appointment', 'doctor']);
+    if (!actorAuth.success) return actorAuth;
   }
 
   const opts = getAppointmentServiceUiReadOptions_(options);
@@ -303,6 +304,25 @@ function getAppointments(payloadOrOpts) {
     // Supabase staging read mode tidak perlu cache list besar.
     if (!isSupabaseReadMode) {
       putCachedJson(cacheKey, result, 30);
+    }
+  }
+
+  // Defense-in-depth row-level filter per role (PHASE_2C_ROLE_MATRIX.md sec 6).
+  // Doctor-only (tidak punya admin_appointment, bukan fully privileged) hanya
+  // boleh terima appointment status=scheduled tanggal=hari ini. UI client juga
+  // filter, backend tetap enforce supaya call langsung via google.script.run
+  // atau network inspect tidak bisa bypass batasan view doctor.
+  if (actorAuth && actorAuth.user) {
+    const actorUser = actorAuth.user;
+    if (!userIsFullyPrivileged_(actorUser) &&
+        !userHasAnyRole_(actorUser, ['admin_appointment']) &&
+        userHasAnyRole_(actorUser, ['doctor'])) {
+      const todayYmd = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd');
+      result = result.filter(function(row) {
+        const status = String(row.status || '').toLowerCase();
+        const dateYmd = String(row.appointment_date || '').slice(0, 10);
+        return status === 'scheduled' && dateYmd === todayYmd;
+      });
     }
   }
 

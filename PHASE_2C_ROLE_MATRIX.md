@@ -114,7 +114,7 @@
 
 | Endpoint | admin_appt | admin_fin | doctor | Catatan |
 |---|:---:|:---:|:---:|---|
-| `getAppointments` | ✅ | ❌ | ✅ | Doctor lihat list hari ini |
+| `getAppointments` | ✅ | ❌ | ✅ | Doctor lihat list hari ini, **status=scheduled saja** |
 | `getAppointmentById` | ✅ | ❌ | ✅ | Doctor: untuk start treatment |
 | `autoUpdateOverdueScheduledAppointments` | ✅ | ❌ | ❌ | admin_appt only |
 | `createAppointment` | ✅ | ❌ | ❌ | admin_appt only |
@@ -123,6 +123,12 @@
 | `restoreAppointment` | ✅ | ❌ | ❌ | admin_appt only |
 | `hasOpenAppointmentForPatient` | ✅ | ❌ | ✅ | Doctor cek sebelum start treatment |
 | `checkPatientOpenAppointment` | ✅ | ❌ | ✅ | sama |
+
+**⚠️ UI GUARD APPOINTMENTS UNTUK DOCTOR (decision owner 2026-05-20):**
+- Doctor **HANYA** lihat appointment status `scheduled` dengan `appointment_date = hari ini`
+- Status `completed` & `cancelled` **TIDAK** tampil (sudah selesai → tidak relevan untuk dokter; cancelled → urusan admin_appt)
+- Toggle "Cancelled" di toolbar **HIDDEN** untuk doctor (cuma 1 status relevan)
+- Backend `getAppointments` boleh return data lengkap, filter ketat di client. (Followup: filter juga di backend untuk defense-in-depth.)
 
 ## 7. Treatments (TreatmentService.js)
 
@@ -214,6 +220,35 @@ Tidak butuh role check:
 **Hybrid:**
 - **Endpoint baru** → pakai `requireRole(context, [...])` dari Auth.js
 - **Endpoint Finance existing** → tetap `requireFinancePermission_` / `requireFinanceOwnerPermission_` (sudah teruji). Verifikasi logika match dengan matrix di atas.
+
+## Defense-in-Depth: Row-Level Filtering Backend (decision owner 2026-05-20)
+
+**Prinsip universal**: untuk endpoint list/data, gating endpoint level (`requireRole`) saja tidak cukup. Backend WAJIB juga apply **row-level filter** sesuai role kalau matrix membatasi VIEW per role. Tujuan: dokter/admin yang sophisticated tidak bisa bypass filter UI via DevTools/console (`google.script.run.foo(...)`) untuk dapat data yang seharusnya tidak terlihat.
+
+**Implementasi**: setelah `requireRole` lulus, cek `auth.user` lebih lanjut → kalau role tertentu, filter `result` sebelum return.
+
+**Contoh tercakup saat ini:**
+- `getAppointments` — doctor-only: filter `status=scheduled` + `date=hari ini`
+- `getOwnerDailyReport` / `getOwnerMonthlyReport` / `getOwnerYearlyReport` — admin_finance: hide field `profit` + `margin`
+- `generateBillingFromTreatment` — doctor: auto-trigger saat save treatment (existing pattern)
+
+**Followup (belum diimplementasi, kandidat ditutup berurutan):**
+- `getMedicalRecordsByPatientId` — doctor: hanya pasien yang sedang ditangani (linked ke appointment hari ini)
+- `getPatientPhotosByPatientId` — doctor: hanya pasien yang sedang ditangani
+- `getTreatmentsByPatientId` — doctor: hanya yang dia tangani sendiri (kalau perlu hide tindakan dokter lain)
+- `getPatients` (kalau ada limit per-clinic untuk admin_appointment)
+
+**Pattern code** (template):
+```js
+if (actorAuth && actorAuth.user) {
+  const user = actorAuth.user;
+  if (!userIsFullyPrivileged_(user) &&
+      !userHasAnyRole_(user, ['role_yang_full_access']) &&
+      userHasAnyRole_(user, ['role_yang_limited'])) {
+    result = result.filter(function(row) { /* filter sesuai matrix */ });
+  }
+}
+```
 
 ## Landing Page Per Role (decision Q16)
 
