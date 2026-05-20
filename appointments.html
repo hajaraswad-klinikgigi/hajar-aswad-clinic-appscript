@@ -854,14 +854,14 @@
       const status = String(row.status || '').toLowerCase();  
       const statusBadge = getAppointmentStatusBadge(status);  
   
-      const admin = isAdmin();  
-      const owner = isOwner();  
-  
+      const canManageAppt = isFullyPrivileged() || hasAppRole('admin_appointment');
+      const canStartTx = isFullyPrivileged() || hasAppRole('doctor');
+
       const cancelLocked = status === 'cancelled' && isCancelRestoreLocked(row);
-      const canStartTreatment = !isAppointmentsFullscreenMode && status === 'scheduled' && (admin || owner);
-      const canEdit = !isAppointmentsFullscreenMode && (admin || owner) && status !== 'completed' && !cancelLocked;
-      const canCancel = !isAppointmentsFullscreenMode && (admin || owner) && status !== 'completed' && status !== 'cancelled';
-      const canRestore = !isAppointmentsFullscreenMode && (admin || owner) && status === 'cancelled' && !cancelLocked;
+      const canStartTreatment = !isAppointmentsFullscreenMode && status === 'scheduled' && canStartTx;
+      const canEdit = !isAppointmentsFullscreenMode && canManageAppt && status !== 'completed' && !cancelLocked;
+      const canCancel = !isAppointmentsFullscreenMode && canManageAppt && status !== 'completed' && status !== 'cancelled';
+      const canRestore = !isAppointmentsFullscreenMode && canManageAppt && status === 'cancelled' && !cancelLocked;
   
       const safePatientName = String(row.patient_name || '').replace(/'/g, "\\'");  
       const topActionCount = 1 + (canEdit ? 1 : 0) + ((canStartTreatment || canCancel || canRestore) ? 1 : 0);  
@@ -1547,8 +1547,8 @@
   }  
   
   function openTreatmentModal(appointmentId) {
-    if (!(isAdmin() || isOwner())) {
-      showToast('Hanya admin atau owner yang dapat memulai treatment', 'error');
+    if (!(isFullyPrivileged() || hasAppRole('doctor'))) {
+      showToast('Hanya dokter atau owner yang dapat memulai treatment', 'error');
       return;
     }
 
