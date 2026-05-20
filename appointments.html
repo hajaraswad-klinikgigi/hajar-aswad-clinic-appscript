@@ -267,17 +267,17 @@
                 >  
               </div>  
   
-              <div class="appointments-toggle-wrap">  
-                <label class="appointments-toolbar-label">Filter</label>  
-                <label class="inline-toggle appointments-inline-toggle">  
-                  <input  
-                    type="checkbox"  
-                    id="showCancelledAppointments"  
-                    onchange="handleToggleCancelledAppointments()"  
-                  >  
-                  <span>Cancelled</span>  
-                </label>  
-              </div>  
+              ${canManageAppointments() ? `<div class="appointments-toggle-wrap">
+                <label class="appointments-toolbar-label">Filter</label>
+                <label class="inline-toggle appointments-inline-toggle">
+                  <input
+                    type="checkbox"
+                    id="showCancelledAppointments"
+                    onchange="handleToggleCancelledAppointments()"
+                  >
+                  <span>Cancelled</span>
+                </label>
+              </div>` : ''}
             </div>  
           </div>  
   
@@ -744,7 +744,16 @@
     const searchInput = document.getElementById('appointmentSearchInput');
     const keyword = String(searchInput ? searchInput.value : '').toLowerCase().trim();
 
-    if (showCancelledAppointments) {
+    // Doctor (non-fully-privileged) cuma lihat scheduled hari ini — sesuai
+    // PHASE_2C_ROLE_MATRIX.md sec 6 UI Guard. Bypass toggle Cancelled.
+    if (hasAppRole('doctor') && !isFullyPrivileged() && !canManageAppointments()) {
+      const todayYmd = getTodayYmdLocal();
+      rows = rows.filter(function(row) {
+        const status = String(row.status || '').toLowerCase();
+        const dateYmd = normalizeAppointmentDateYmd(row.appointment_date || row.date || '');
+        return status === 'scheduled' && dateYmd === todayYmd;
+      });
+    } else if (showCancelledAppointments) {
       rows = rows.filter(function(row) {
         return String(row.status || '').toLowerCase() === 'cancelled';
       });
