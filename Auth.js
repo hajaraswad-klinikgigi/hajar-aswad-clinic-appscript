@@ -155,8 +155,16 @@ function findUserRawByUsername_(username) {
   }) || null;
 }
 
-function createAuthSession_(user) {
-  const safeUser = buildSafeAuthUser_(user);
+function createAuthSession_(user, opts) {
+  // Snapshot roles ke session payload supaya readAuthSession_ tidak perlu
+  // hit Supabase per request. Trade-off: role change butuh logout-login
+  // untuk effect. Klinik kecil, role change rare — acceptable.
+  const optsArg = opts || {};
+  const providedRoles = Array.isArray(optsArg.roles) ? optsArg.roles : null;
+  const userId = String((user && user.user_id) || '').trim();
+  const rolesArr = providedRoles || getAppUserRolesByUserId_(userId);
+
+  const safeUser = buildSafeAuthUser_(user, { roles: rolesArr });
   const now = new Date();
   const expiresAt = new Date(now.getTime() + (APP_SESSION_TTL_SECONDS * 1000));
 
@@ -244,38 +252,13 @@ function readAuthSession_(context) {
     };
   }
 
-  const latestUser = findUserRawById_(userId);
-
-  if (!latestUser) {
-    return {
-      success: false,
-      message: 'Akun pengguna tidak ditemukan.'
-    };
-  }
-
-  const isActive = String(latestUser.is_active || '').trim().toLowerCase() !== 'false';
-
-  if (!isActive) {
-    return {
-      success: false,
-      message: 'Akun tidak aktif.'
-    };
-  }
-
-  const latestRole = normalizeAppRole_(latestUser.role || '');
-
-  if (!isAllowedAppRole_(latestRole)) {
-    return {
-      success: false,
-      message: 'Akun ini tidak memiliki akses ke aplikasi. (role: "' + (latestRole || '<kosong>') + '")'
-    };
-  }
-
-  const roles = getAppUserRolesByUserId_(userId);
-
+  // Trust snapshot user+roles dari session payload. Saat session dibuat di
+  // createAuthSession_ (loginUser/loginWithTotp), user sudah ke-verify aktif
+  // dan role-nya valid. Hindari Supabase lookup per request untuk performa.
+  // Trade-off: kalau admin ubah role / deactivate user, perlu logout-login.
   return {
     success: true,
-    user: buildSafeAuthUser_(latestUser, { roles: roles }),
+    user: sessionUser,
     session: {
       expires_at: String(session.expires_at || '')
     }
@@ -394,8 +377,8 @@ function loginUser(username, password) {
     };
   }
 
-  const session = createAuthSession_(user);
   const roles = getAppUserRolesByUserId_(user.user_id);
+  const session = createAuthSession_(user, { roles: roles });
 
   return {
     success: true,
@@ -609,7 +592,7 @@ function loginWithTotp(email, code) {
     return { success: false, message: 'Akun ini belum diberi role. Hubungi admin klinik.' };
   }
 
-  const session = createAuthSession_(user);
+  const session = createAuthSession_(user, { roles: roles });
 
   return {
     success: true,
