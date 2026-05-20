@@ -16,7 +16,6 @@ function hashPassword(text) {
    H8 - Backend permission foundation
    ========================================================= */
 
-const APP_ALLOWED_ROLES = ['admin', 'owner'];
 const APP_SESSION_TTL_SECONDS = 21600; // 6 jam
 
 // Phase 2a: 5 role rangkap (many-to-many via app_user_roles)
@@ -25,6 +24,10 @@ const APP_ROLES_VALID = Object.freeze([
   'admin_appointment', 'admin_finance',
   'doctor'
 ]);
+
+// Role yang boleh login ke aplikasi. 'admin' = legacy single-role (pra-Phase 2A)
+// supaya akun bootstrap lama tidak terkunci sebelum migrasi ke app_user_roles.
+const APP_ALLOWED_ROLES = Object.freeze(['admin'].concat(APP_ROLES_VALID));
 
 // Owner & super_admin selalu lulus role check apapun
 const APP_ROLES_FULLY_PRIVILEGED = Object.freeze(['owner', 'super_admin']);
@@ -376,7 +379,7 @@ function loginUser(username, password) {
 
   const role = String(user.role || '').trim().toLowerCase();
 
-  if (role !== 'admin' && role !== 'owner') {
+  if (!isAllowedAppRole_(role)) {
     return {
       success: false,
       message: 'Akun ini tidak memiliki akses ke aplikasi'
