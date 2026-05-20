@@ -4,7 +4,7 @@
 -- Phase 2A men-standarkan naming role dari Bahasa Indonesia
 -- ('dokter') ke English ('doctor'). Migration ini meng-cleanup
 -- baris-baris yang masih tertinggal:
---   * users.role            → kolom legacy single-role (pra-Phase 2A)
+--   * app_users.role            → kolom legacy single-role (pra-Phase 2A)
 --   * app_user_roles.role   → tabel many-to-many Phase 2C
 --
 -- Aliasing code-side di Auth.js `normalizeAppRole_` tetap sebagai
@@ -18,9 +18,9 @@
 BEGIN;
 
 -- ── 1. Snapshot rows yang akan diubah (untuk audit/rollback) ──
-CREATE TABLE IF NOT EXISTS _backup_pre_014_users_role_dokter AS
+CREATE TABLE IF NOT EXISTS _backup_pre_014_app_users_role_dokter AS
   SELECT user_id, role
-    FROM users
+    FROM app_users
    WHERE role = 'dokter';
 
 CREATE TABLE IF NOT EXISTS _backup_pre_014_app_user_roles_dokter AS
@@ -28,8 +28,8 @@ CREATE TABLE IF NOT EXISTS _backup_pre_014_app_user_roles_dokter AS
     FROM app_user_roles
    WHERE role = 'dokter';
 
--- ── 2. Update users.role legacy ─────────────────────────────
-UPDATE users
+-- ── 2. Update app_users.role legacy ─────────────────────────────
+UPDATE app_users
    SET role = 'doctor'
  WHERE role = 'dokter';
 
@@ -44,16 +44,16 @@ COMMIT;
 -- VERIFIKASI (jalankan setelah COMMIT)
 -- =========================================================
 -- 1. Pastikan tidak ada 'dokter' tersisa:
--- SELECT 'users' AS source, COUNT(*) AS leftover
---   FROM users WHERE role = 'dokter'
+-- SELECT 'app_users' AS source, COUNT(*) AS leftover
+--   FROM app_users WHERE role = 'dokter'
 -- UNION ALL
 -- SELECT 'app_user_roles', COUNT(*)
 --   FROM app_user_roles WHERE role = 'dokter';
 -- → kedua baris harus leftover = 0
 --
 -- 2. Cek jumlah baris yang ke-update:
--- SELECT 'users' AS source, COUNT(*) AS migrated
---   FROM _backup_pre_014_users_role_dokter
+-- SELECT 'app_users' AS source, COUNT(*) AS migrated
+--   FROM _backup_pre_014_app_users_role_dokter
 -- UNION ALL
 -- SELECT 'app_user_roles', COUNT(*)
 --   FROM _backup_pre_014_app_user_roles_dokter;
@@ -61,7 +61,7 @@ COMMIT;
 -- 3. Spot-check akun yang berubah:
 -- SELECT u.user_id, u.username, u.role,
 --        ARRAY_AGG(aur.role) AS app_roles
---   FROM users u
+--   FROM app_users u
 --   LEFT JOIN app_user_roles aur ON aur.user_id = u.user_id
 --  WHERE u.role = 'doctor'
 --  GROUP BY u.user_id, u.username, u.role;
@@ -69,8 +69,8 @@ COMMIT;
 -- =========================================================
 -- ROLLBACK (kalau perlu, jalankan manual)
 -- =========================================================
--- UPDATE users u SET role = b.role
---   FROM _backup_pre_014_users_role_dokter b
+-- UPDATE app_users u SET role = b.role
+--   FROM _backup_pre_014_app_users_role_dokter b
 --  WHERE u.user_id = b.user_id;
 -- UPDATE app_user_roles a SET role = b.role
 --   FROM _backup_pre_014_app_user_roles_dokter b
@@ -80,5 +80,5 @@ COMMIT;
 -- =========================================================
 -- CLEANUP backup tables (jalankan kalau confident setelah ~3 hari)
 -- =========================================================
--- DROP TABLE IF EXISTS _backup_pre_014_users_role_dokter;
+-- DROP TABLE IF EXISTS _backup_pre_014_app_users_role_dokter;
 -- DROP TABLE IF EXISTS _backup_pre_014_app_user_roles_dokter;
