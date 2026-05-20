@@ -435,6 +435,32 @@ query risk, dan inkonsisten dengan Dashboard/Finance. Di-revisi ke period preset
 dropdown (today/7days/30days). Sesuai pola Dashboard/Finance — single source of
 truth period pattern.
 
+### 4.4 Period selector canonical — shared class + default `today`
+
+**Class**: ketiga halaman (Dashboard, Finance, Aktivitas) WAJIB pakai shared
+class dari `style.html` global:
+
+```html
+<div class="period-filter-wrap">
+  <label class="period-filter-label" for="xPeriodSelect">Periode</label>
+  <select id="xPeriodSelect" class="period-filter-select"
+          onchange="changeXPeriod(this)">
+    <option value="today" selected>Hari Ini</option>
+    <option value="7days">7 Hari</option>
+    <option value="30days">30 Hari</option>
+  </select>
+</div>
+```
+
+**Lokasi**: di **slot kanan header utama** (`{module}-header` flex space-between).
+JANGAN taruh di toolbar/filter panel — inkonsisten dengan Dashboard/Finance.
+
+**Default value**: `'today'` — konsisten ketiga halaman. Owner buka halaman langsung
+lihat data hari ini, lalu ubah ke 7/30 hari kalau perlu audit panjang.
+
+**Whitelist backend**: setiap modul yang punya period harus validasi via whitelist
+`{MODULE}_VALID_PERIODS` atau setara — cegah injection / unbounded query.
+
 **JANGAN refactor balik ke server-side pagination** dengan offset/has_next.
 Pengalaman 2026-05-19: Aktivitas pernah server-side dengan `getAuditLogPage(page_number)`
 — hasilnya navigasi 1-3 detik per klik karena round-trip Apps Script + Supabase.

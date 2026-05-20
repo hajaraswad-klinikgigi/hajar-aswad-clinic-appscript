@@ -45,13 +45,14 @@ const AUDIT_LOG_MAX_LIST_LIMIT = 2000;
 
 // Whitelist period preset → jumlah hari ke belakang dari local midnight
 // hari ini. Hanya preset ini yang diterima backend (cegah unbounded query).
-// 7days default — mencakup pemakaian harian normal & tetap fit di cap.
+// Default 'today' — konsisten dengan Dashboard/Finance (single canonical
+// default untuk semua halaman dengan period preset).
 const AUDIT_LOG_VALID_PERIODS = {
   today:    0,
   '7days':  7,
   '30days': 30
 };
-const AUDIT_LOG_DEFAULT_PERIOD = '7days';
+const AUDIT_LOG_DEFAULT_PERIOD = 'today';
 
 // Whitelist `action` values yang sah. Sinkron dengan ACTIVITY_ACTION_LABELS
 // di audit-log.html. Input dari user yang tidak ada di whitelist akan

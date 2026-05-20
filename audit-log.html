@@ -5,8 +5,10 @@
      (same dark-theme toolbar/chip/panel pattern).
      Diff table tetap pakai class `.activity-diff-*` (unique).
      ========================================================= */
-  /* Filter panel: 2 kolom (Entitas + Aksi). Period dipisah ke toolbar
-     utama supaya selalu visible & query selalu bounded. */
+  /* Filter panel: 2 kolom (Entitas + Aksi). Period dipisah ke header
+     atas (slot kanan patients-header) supaya selalu visible & konsisten
+     dengan Dashboard/Finance. Period selector pakai class shared
+     .period-filter-* dari style.html global. */
   #activityFiltersPanel .recall-filter-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -14,19 +16,6 @@
     #activityFiltersPanel .recall-filter-grid {
       grid-template-columns: 1fr;
     }
-  }
-
-  /* Period selector di toolbar utama — selaras tinggi dengan search-box
-     dan tombol chip Filters via global rule di style.html. */
-  .activity-toolbar-period-wrap {
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
-    min-width: 140px;
-  }
-  .activity-toolbar-period-wrap select {
-    width: 140px;
-    max-width: 100%;
   }
 
   /* Stale-while-revalidate: dim tabel saat refresh (saat filter diubah
@@ -213,7 +202,7 @@ let activityCapLimit = 2000;
 let activityHitCap = false;
 let activityAllowedEntityTypes = null;
 let activityActiveSince = '2026-05-19';
-let activityPeriod = '7days';                          // primary scope, tidak di-reset Reset link
+let activityPeriod = 'today';                          // primary scope, tidak di-reset Reset link
 let activityFiltersApplied = {};
 let activityFiltersExpanded = false;
 let activitySearchDebounce = null;
@@ -221,7 +210,7 @@ const ACTIVITY_SEARCH_DEBOUNCE_MS = 220;
 // Sinkron dengan AUDIT_LOG_VALID_PERIODS di AuditLogQueryService.js.
 // Frontend whitelist mencegah call ke backend dengan value invalid.
 const ACTIVITY_VALID_PERIODS = { today: true, '7days': true, '30days': true };
-const ACTIVITY_DEFAULT_PERIOD = '7days';
+const ACTIVITY_DEFAULT_PERIOD = 'today';
 // Race condition handling — konsisten dengan Dashboard/Finance
 // (commit 22662b5). Request token discard stale response saat rapid
 // switch period/filter. Cache per (period+entity+action) dengan TTL
@@ -293,6 +282,14 @@ function showActivityPage() {
           '<h1 class="patients-title">Log Aktivitas Sistem</h1>' +
           '<div class="patients-subtitle">Rekam jejak perubahan data oleh seluruh pengguna staff klinik</div>' +
         '</div>' +
+        '<div class="period-filter-wrap">' +
+          '<label class="period-filter-label" for="activityPeriodSelect">Periode</label>' +
+          '<select id="activityPeriodSelect" class="period-filter-select" onchange="changeActivityPeriod(this)">' +
+            '<option value="today" selected>Hari Ini</option>' +
+            '<option value="7days">7 Hari</option>' +
+            '<option value="30days">30 Hari</option>' +
+          '</select>' +
+        '</div>' +
       '</div>' +
 
       '<div class="content-card patients-toolbar-card">' +
@@ -303,14 +300,6 @@ function showActivityPage() {
               '<input type="text" id="activitySearchActor" class="search-box" ' +
                 'placeholder="Cari nama / username pengguna..." ' +
                 'oninput="handleActivitySearch()">' +
-            '</div>' +
-            '<div class="activity-toolbar-period-wrap">' +
-              '<label class="patients-toolbar-label" for="activityPeriodSelect">Periode</label>' +
-              '<select id="activityPeriodSelect" onchange="changeActivityPeriod(this)">' +
-                '<option value="today">Hari Ini</option>' +
-                '<option value="7days" selected>7 Hari</option>' +
-                '<option value="30days">30 Hari</option>' +
-              '</select>' +
             '</div>' +
             '<div class="recall-toolbar-actions">' +
               '<button type="button" id="activityFiltersToggleBtn" class="recall-filter-chip" ' +
@@ -394,7 +383,7 @@ function showActivityPage() {
   activityCurrentPage = 1;
   // Period: reset ke default tiap entry — konsisten dengan template
   // option `selected` di markup. Owner masuk halaman, dropdown selalu
-  // mulai dari "7 Hari".
+  // mulai dari "Hari Ini" (sinkron dengan Dashboard/Finance).
   activityPeriod = ACTIVITY_DEFAULT_PERIOD;
   var periodSel = document.getElementById('activityPeriodSelect');
   if (periodSel) periodSel.value = activityPeriod;
