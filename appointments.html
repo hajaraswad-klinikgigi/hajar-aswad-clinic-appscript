@@ -863,9 +863,12 @@
       const canCancel = !isAppointmentsFullscreenMode && canManageAppt && status !== 'completed' && status !== 'cancelled';
       const canRestore = !isAppointmentsFullscreenMode && canManageAppt && status === 'cancelled' && !cancelLocked;
   
-      const safePatientName = String(row.patient_name || '').replace(/'/g, "\\'");  
-      const topActionCount = 1 + (canEdit ? 1 : 0) + ((canStartTreatment || canCancel || canRestore) ? 1 : 0);  
-      const topActionWidth = (topActionCount * 38) + ((topActionCount - 1) * 8);  
+      const safePatientName = String(row.patient_name || '').replace(/'/g, "\\'");
+      const topActionCount = 1 + (canEdit ? 1 : 0) + ((canStartTreatment || canCancel || canRestore) ? 1 : 0);
+      const computedTopActionWidth = (topActionCount * 38) + ((topActionCount - 1) * 8);
+      // Min 130px supaya tombol "Mulai Treatment" tidak terpotong di mode doctor
+      // (cuma 2 icon top → 84px), tapi tetap auto-grow kalau icon top > 3.
+      const topActionWidth = Math.max(130, computedTopActionWidth);
       const queueNumber = appointmentQueueMap[String(row.appointment_id || '')] || '-';
   
       return `  
