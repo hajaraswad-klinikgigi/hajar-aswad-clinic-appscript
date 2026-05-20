@@ -87,6 +87,31 @@
     color: #f1f5f9;
   }
 
+  /* Standardize height untuk semua control yang biasanya berdampingan
+     di toolbar/filter. Tanpa rule ini, <input type="date"> punya native
+     calendar picker widget yang bikin computed height lebih tinggi dari
+     <select> meski padding/font sama (browser default behavior).
+     Pakai box-sizing border-box supaya padding tidak nambah height.
+     Pattern ini sudah ada di style-finance.html owner-report dan terbukti
+     work; di-promote jadi global supaya berlaku konsisten di semua modul. */
+  input[type="text"],
+  input[type="search"],
+  input[type="email"],
+  input[type="tel"],
+  input[type="number"],
+  input[type="password"],
+  input[type="date"],
+  input[type="datetime-local"],
+  input[type="time"],
+  input[type="month"],
+  input[type="week"],
+  select {
+    box-sizing: border-box;
+    height: 42px;
+    line-height: 1.4;
+  }
+  /* Textarea tetap auto-height (multi-line); jangan dipaksa 42px */
+
   input:focus,
   select:focus,
   textarea:focus {
