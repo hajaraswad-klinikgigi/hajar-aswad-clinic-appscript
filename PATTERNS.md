@@ -422,11 +422,18 @@ navigasi prev/next/goTo INSTAN.
 | State | `xAllRows[]` + `xFilteredRows[]` + `xCurrentPage` + `xPageSize` |
 
 **Aktivitas — handling volume jutaan row (multi-klinik)**: backend cap response ke
-`AUDIT_LOG_MAX_LIST_LIMIT = 2000` row, dengan default `start_date` = 7 hari lalu.
-Kalau hasil hit cap → banner UI: *"Hasil dibatasi 2000 aktivitas terbaru. Persempit
-rentang tanggal..."*. Volume realistis multi-klinik dalam 1 minggu fit di cap.
-Untuk arsip > 7 hari, user wajib filter date — expected behavior, sama seperti
-tools enterprise (Sentry, Datadog).
+`AUDIT_LOG_MAX_LIST_LIMIT = 2000` row, dengan default `period` = `'7days'`
+(whitelist `today` / `7days` / `30days`). Kalau hasil hit cap → banner UI:
+*"Hasil dibatasi 2000 aktivitas terbaru. Persempit periode..."*. Volume realistis
+multi-klinik dalam 1 minggu fit di cap. Untuk arsip > 30 hari, owner buka query
+terpisah di Supabase — bukan use case UI.
+
+**JANGAN pakai datepicker `<input type="date">` ganda (start/end) untuk filter
+list inline**: pengalaman 2026-05-20, Aktivitas pernah pakai 2 datepicker di filter
+panel → alignment dengan select bermasalah (height beda di Chrome), unbounded
+query risk, dan inkonsisten dengan Dashboard/Finance. Di-revisi ke period preset
+dropdown (today/7days/30days). Sesuai pola Dashboard/Finance — single source of
+truth period pattern.
 
 **JANGAN refactor balik ke server-side pagination** dengan offset/has_next.
 Pengalaman 2026-05-19: Aktivitas pernah server-side dengan `getAuditLogPage(page_number)`
@@ -785,7 +792,9 @@ google.script.run
 | Current page | `{entity}CurrentPage` | `patientCurrentPage` | `activityPageNumber` ✗ (sebut "Page", bukan "PageNumber") |
 | Page size const | `{entity}PageSize` | `const patientPageSize = 5` | `activityPageSize` ✓ OK |
 | Search debounce | `{entity}SearchDebounce` | `patientSearchDebounce` | `activitySearchDebounce` ✓ OK |
-| In-flight | `{action}{entity}InFlight` | `deletePatientPhotoInFlight` | `activityLoading` ✗ (gunakan `loadActivityInFlight` atau ikut canonical `xInFlight`) |
+| In-flight (legacy) | `{action}{entity}InFlight` | `deletePatientPhotoInFlight` | OK untuk mutation single-shot (delete, save) |
+| Race-condition (list fetch) | `{module}RequestToken` int | `dashboardRequestToken`, `financeBootstrapRequestToken`, `activityRequestToken` | Increment per call, handler discard kalau mismatch — PRELUDE pakai pola ini bukan inflight flag |
+| Cache TTL | `{MODULE}_CACHE_TTL_MS` + `{module}Cache` obj | `DASHBOARD_CACHE_TTL_MS`, `activityCache` | TTL 5 menit canonical |
 | Form mode | `{entity}FormMode` | `patientFormMode` | n/a |
 
 ### 9.3 ID DOM convention
@@ -1166,7 +1175,7 @@ Berikut **inkonsistensi terverifikasi** yang ditemukan di `audit-log.html` /
 | D2 | `escapeAppHtml` | `audit-log.html:412, 416, ...` | `escapeHtml` | Konsolidasi (atau pastikan alias) |
 | D3 | `activityPageNumber` (canonical: `currentPage`) | state | `activityCurrentPage` | Rename |
 | D4 | `activityRows` (ambigu — page-rows, bukan all) | state | Tetap `activityRows` OK kalau server-side, tapi dokumentasikan beda |
-| D5 | `activityLoading` boolean | state | Canonical pakai `loadXInFlight` | Rename `loadActivityInFlight` |
+| D5 | ~~`activityLoading` boolean~~ | state | RESOLVED 2026-05-20: pindah ke pola token `activityRequestToken` (sinkron Dashboard/Finance), inflight flag dihapus |
 | D6 | `activityTbody` (DOM ID) | `audit-log.html:296` | Canonical: `activityTableBody` | Rename |
 
 ### E. Variable declaration
@@ -1192,7 +1201,8 @@ Berikut **inkonsistensi terverifikasi** yang ditemukan di `audit-log.html` /
 | # | Inkonsistensi | Lokasi | Canonical | Fix |
 |---|---|---|---|---|
 | H1 | Debounce 280 ms | `audit-log.html:171` | 220 ms (Patients/Appointments/Recall) | Turunkan ke 220 ms (optional — debatable karena server-roundtrip lebih mahal; bisa juga **diskusi**: tetap 280 untuk Aktivitas?) |
-| H2 | Filter date `<input type="date">` tanpa label format ID | `audit-log.html:261, 265` | Canonical date inputs di Patients juga pakai `type="date"` (OK) — tapi label “Dari tanggal” / “Sampai tanggal” formatnya konsisten | OK, no fix needed |
+| H2 | ~~Filter date `<input type="date">` (Dari/Sampai tanggal)~~ | ~~`audit-log.html:261, 265`~~ | RESOLVED 2026-05-20: diganti period preset dropdown (today/7days/30days) sinkron Dashboard/Finance. Mencegah unbounded query + alignment issue |
+| H3 | List fetch tanpa race-condition handler | `audit-log.html:loadActivity` | Dashboard/Finance pakai `{module}RequestToken` + cache TTL 5 menit + period selector never locked | RESOLVED 2026-05-20: `activityRequestToken` + `activityCache` + `ACTIVITY_CACHE_TTL_MS` |
 
 ### I. Server-side pagination — **OBSOLETE (2026-05-20)**
 
@@ -1255,9 +1265,14 @@ via `array.slice()`. Response shape baru:
   cap_limit: 2000,
   hit_cap: boolean,       // true → banner UI peringatan
   active_since, allowed_entity_types, filters_applied,
-  effective_start_date    // resolved setelah default 7 hari applied
+  effective_period        // 'today' | '7days' | '30days' — sinkron whitelist
 }
 ```
+
+**Update 2026-05-20 (period preset)**: filter `start_date`/`end_date` di-replace
+dengan `period` whitelist (`today` / `7days` / `30days`, default `7days`).
+Konsisten dengan Dashboard/Finance, mencegah unbounded query, dan menghindari
+masalah alignment datepicker vs select di UI.
 
 **Justifikasi revisi**:
 - **Konsistensi UX > antisipasi performa**: Patients/Appointments/Recall/Finance
@@ -1372,7 +1387,10 @@ checklist ini sebelum commit:
 - [ ] Search debounce 220 ms (atau alasan dokumentasi kalau beda)
 - [ ] Setiap row precompute `_search_text` (lowercase, fields yang searchable)
 - [ ] Pagination handler: `prev`, `next`, `goTo` dengan guard `document.activeElement !== inp`
-- [ ] In-flight guard: `xInFlight` boolean, reset di success **dan** failure handler
+- [ ] List fetch (period/filter change): pakai `{module}RequestToken` (increment, handler discard kalau mismatch) — BUKAN `xInFlight` flag yang `return` immediately
+- [ ] Cache per filter-state dengan TTL `{MODULE}_CACHE_TTL_MS = 5*60*1000` (Dashboard/Finance/Aktivitas canonical)
+- [ ] Period selector NEVER di-disable saat fetch (rapid switch responsif)
+- [ ] Mutation single-shot (delete/save): `{action}{entity}InFlight` boolean, reset di success **dan** failure handler
 - [ ] Modal open/close: toggle `display:flex/none` + class `hidden` (DUA-nya)
 - [ ] `setModalProcessingState(modalId, isLoading, { primaryButtonId, loadingText, idleText })`
 - [ ] Format tanggal display: dash `DD-MM-YYYY`, bukan slash

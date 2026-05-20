@@ -76,14 +76,14 @@ Legend:
 |---|---|---|
 | A1 Auth gate | ✅ | `requireRole(['admin_appointment', 'admin_finance'])` |
 | A2 Clinic scope | ✅ | `clinic_id=eq.X` di semua query |
-| A3 Input validation whitelist | ✅ | actions/entity_types/dates/user_id regex (2026-05-20) |
+| A3 Input validation whitelist | ✅ | actions/entity_types/period whitelist/user_id regex (2026-05-20). Period preset menggantikan free-form date — query selalu bounded |
 | A4 Error message leak | 🔴 | `'Audit log SELECT failed: HTTP ' + code + ' - ' + JSON.stringify(body)` masih ada |
 | A5 Role-based visibility | ✅ | `AUDIT_LOG_ROLE_ALLOWED_ENTITY_TYPES` whitelist |
 | B6 Index DB | ✅ | Migration 012: `idx_audit_log_clinic_occurred` (2026-05-20) |
-| B7 Client-side pagination | ✅ | Refactor 2026-05-20, cap 2000 + default 7 hari |
-| B8 Cache + TTL | ⚠️ | Bulk lookup `app_users` tiap fetch (belum di-cache) |
-| B9 Request token | ⚠️ | Tidak ada (user jarang rapid switch, low priority) |
-| C10 Stale-while-revalidate | ✅ | Refactor 2026-05-20, UI tidak lock saat balik ke halaman |
+| B7 Client-side pagination | ✅ | Refactor 2026-05-20, cap 2000 + default period `7days` |
+| B8 Cache + TTL | ✅ | `activityCache` keyed `{period+entities+actions}`, TTL 5 menit (2026-05-20 sore). Bulk lookup `app_users` masih per-fetch — masuk Tier 2 |
+| B9 Request token | ✅ | `activityRequestToken` (2026-05-20 sore) — sinkron Dashboard/Finance |
+| C10 Stale-while-revalidate | ✅ | Refactor 2026-05-20, UI tidak lock saat balik ke halaman + period selector never locked |
 
 **Open items spesifik Aktivitas**:
 - 🔴 **Retention policy** — `audit_log` retain selamanya. 5 tahun multi-klinik = 5M+ row. Bom waktu.
