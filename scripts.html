@@ -430,6 +430,11 @@
     pendingDeactivatePatientId = null;
     pendingDeactivatePatientName = '';
 
+    // Reset state modul lain supaya tidak leak ke sesi berikutnya.
+    if (typeof window.resetAppointmentsState === 'function') {
+      window.resetAppointmentsState();
+    }
+
     if (inactivityTimer_)        { clearTimeout(inactivityTimer_);        inactivityTimer_ = null; }
     if (inactivityWarningTimer_) { clearTimeout(inactivityWarningTimer_); inactivityWarningTimer_ = null; }
 
