@@ -420,19 +420,46 @@
     const sessionToken = getCurrentSessionToken();
 
     if (sessionToken) {
-      // Fire-and-forget invalidate token di backend; page reload akan hapus
-      // semua state in-memory di sisi client.
       google.script.run.logoutAuthSession(sessionToken);
     }
+    currentUser = null;
+    allPatients = [];
+    filteredPatients = [];
+    patientCurrentPage = 1;
+    patientFormMode = 'create';
+    pendingDeactivatePatientId = null;
+    pendingDeactivatePatientName = '';
+
+    // Reset state modul lain supaya tidak leak ke sesi user berikutnya.
+    // Manual register karena window.location.reload() bikin blank putih
+    // di Apps Script iframe (token sandbox 1-time expired).
+    [
+      'resetAppointmentsState'
+      // Followup: tambah resetter untuk recall, finance, patient detail,
+      // settings, owner-report saat modul-modul itu nambah state lokal.
+    ].forEach(function(fnName) {
+      if (typeof window[fnName] === 'function') {
+        try { window[fnName](); } catch (e) {}
+      }
+    });
 
     if (inactivityTimer_)        { clearTimeout(inactivityTimer_);        inactivityTimer_ = null; }
     if (inactivityWarningTimer_) { clearTimeout(inactivityWarningTimer_); inactivityWarningTimer_ = null; }
 
-    // Full page reload — reset SEMUA module variable JS sekaligus tanpa perlu
-    // daftar resetter per modul. Lebih robust untuk fitur baru (modul yang
-    // ditambah ke depan tidak perlu register reset hook). Trade-off: ~0.5s
-    // flicker reload, acceptable untuk action eksplisit logout.
-    window.location.reload();
+    closeSidebar();
+
+    document.getElementById('dashboardView').style.display = 'none';
+    document.getElementById('loginView').style.display = 'flex';
+    var msgEl = document.getElementById('message');
+    if (msgEl) msgEl.innerText = '';
+    var contentEl = document.getElementById('contentArea');
+    if (contentEl) contentEl.innerHTML = '';
+
+    // Reset form login supaya user input fresh.
+    var emailEl = document.getElementById('loginEmail');
+    var codeEl  = document.getElementById('loginTotpCode');
+    if (emailEl) emailEl.value = '';
+    if (codeEl)  codeEl.value  = '';
   }
 
   function showToast(message, type) {

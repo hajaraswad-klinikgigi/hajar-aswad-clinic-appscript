@@ -55,6 +55,48 @@
     services: null
   };
 
+  // Dipanggil dari scripts.html logoutLocal supaya state modul ini tidak
+  // leak ke sesi user berikutnya (switch login doctor → super admin tanpa
+  // refresh halaman menampilkan data sisa role sebelumnya).
+  window.resetAppointmentsState = function() {
+    allAppointments = [];
+    filteredAppointments = [];
+    fullscreenAppointments = [];
+    isAppointmentsFullscreenMode = false;
+
+    appointmentCurrentPage = 1;
+    appointmentFormMode = 'create';
+
+    pendingCancelAppointmentId = null;
+    pendingCancelAppointmentLabel = '';
+    pendingRestoreAppointmentId = null;
+    pendingRestoreAppointmentLabel = '';
+
+    showCancelledAppointments = false;
+
+    appointmentPatientHasOpenAppointment = false;
+    appointmentPatientCheckToken = 0;
+
+    if (appointmentListSearchDebounce)    { clearTimeout(appointmentListSearchDebounce);    appointmentListSearchDebounce = null; }
+    if (appointmentPatientSearchDebounce) { clearTimeout(appointmentPatientSearchDebounce); appointmentPatientSearchDebounce = null; }
+    if (appointmentsAutoPagingTimer)      { clearTimeout(appointmentsAutoPagingTimer);      appointmentsAutoPagingTimer = null; }
+    if (appointmentsLiveRefreshTimer)     { clearTimeout(appointmentsLiveRefreshTimer);     appointmentsLiveRefreshTimer = null; }
+
+    appointmentsAutoPagingEnabled = false;
+    appointmentsFullscreenSessionId = 0;
+    appointmentsLiveRefreshInFlight = false;
+    appointmentsLastSignature = '';
+    appointmentQueueMap = {};
+
+    treatmentSubmitInFlight = false;
+    treatmentInitInFlight = false;
+    treatmentInitToken = 0;
+    cancelAppointmentInFlight = false;
+    restoreAppointmentInFlight = false;
+
+    window.treatmentItemsState = [];
+  };
+
   
   function formatAppointmentTimeDisplay(value) {  
     if (!value) return '';  
