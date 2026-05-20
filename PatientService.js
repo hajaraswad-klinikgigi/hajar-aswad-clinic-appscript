@@ -15,7 +15,10 @@ function isPatientActiveValue(value) {
 }
 
 function nowIso() {
-  return Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd HH:mm:ss');
+  // Return ISO 8601 UTC dengan 'Z' marker supaya Postgres TIMESTAMPTZ
+  // parse dengan timezone yang benar (sebelumnya: 'yyyy-MM-dd HH:mm:ss'
+  // Bangkok local tanpa TZ → Postgres anggap UTC → geser +7 jam).
+  return new Date().toISOString();
 }
 
 function appendObject(sheetName, obj) {
