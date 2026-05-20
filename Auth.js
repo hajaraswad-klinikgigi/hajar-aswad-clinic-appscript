@@ -41,8 +41,16 @@ function isGlobalScopeRole_(role) {
   return APP_ROLES_GLOBAL_SCOPE.indexOf(normalizeAppRole_(role)) !== -1;
 }
 
+// Mapping role legacy (pra-Phase 2A — Bahasa Indonesia) ke nama canonical Phase 2C.
+// Safety-net untuk akun lama yang belum dimigrasi via SQL. Migrasi DB definitif
+// via migrations/014_normalize_legacy_role_dokter.sql.
+const APP_ROLE_LEGACY_ALIAS = Object.freeze({
+  dokter: 'doctor'
+});
+
 function normalizeAppRole_(role) {
-  return String(role || '').trim().toLowerCase();
+  const lower = String(role || '').trim().toLowerCase();
+  return APP_ROLE_LEGACY_ALIAS[lower] || lower;
 }
 
 function isAllowedAppRole_(role) {
