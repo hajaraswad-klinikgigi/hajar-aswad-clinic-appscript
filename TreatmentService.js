@@ -106,9 +106,22 @@ function normalizeTreatmentRow(row) {
   return obj;
 }
 
-function getTreatmentByAppointmentId(appointmentId, options) {
+function getTreatmentByAppointmentId(appointmentIdOrPayload, options) {
+  // Frontend kirim payload {session_token, appointment_id}; internal/legacy kirim (id, opts).
+  let appointmentId;
+  let readOptions;
+  if (appointmentIdOrPayload && typeof appointmentIdOrPayload === 'object' && appointmentIdOrPayload.session_token) {
+    const auth = requireRole(appointmentIdOrPayload, ['admin_finance', 'doctor']);
+    if (!auth.success) return auth;
+    appointmentId = appointmentIdOrPayload.appointment_id;
+    readOptions = appointmentIdOrPayload;
+  } else {
+    appointmentId = appointmentIdOrPayload;
+    readOptions = options;
+  }
+
   const normalizedAppointmentId = String(appointmentId || '').trim();
-  const opts = getTreatmentServiceUiReadOptions_(options);
+  const opts = getTreatmentServiceUiReadOptions_(readOptions);
 
   if (!normalizedAppointmentId) {
     return {
