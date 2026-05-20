@@ -1954,9 +1954,23 @@
           </td>  
           <td class="treatment-price-col">${formatCurrencyIdr(unitPrice)}</td>
           <td class="treatment-price-col">${formatCurrencyIdr(subtotal)}</td>
-          <td>  
-            <button type="button" class="treatment-remove-btn" onclick="removeTreatmentItemRow(${index})">Hapus</button>  
-          </td>  
+          <td>
+            <button
+              type="button"
+              class="treatment-item-delete-btn"
+              title="Hapus tindakan"
+              aria-label="Hapus tindakan"
+              onclick="removeTreatmentItemRow(${index})"
+            >
+              <svg viewBox="0 0 24 24" fill="none" stroke-width="2">
+                <path d="M3 6h18"></path>
+                <path d="M8 6V4h8v2"></path>
+                <path d="M19 6l-1 14H6L5 6"></path>
+                <path d="M10 11v6"></path>
+                <path d="M14 11v6"></path>
+              </svg>
+            </button>
+          </td>
         </tr>  
       `;  
     }).join('');  
