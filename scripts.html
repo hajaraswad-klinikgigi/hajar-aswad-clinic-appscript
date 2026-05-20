@@ -310,6 +310,10 @@
     return isFullyPrivileged() || hasAppRole('admin_appointment');
   }
 
+  function canManageAppointments() {
+    return isFullyPrivileged() || hasAppRole('admin_appointment');
+  }
+
   function canManageServiceCatalog() {
     return isFullyPrivileged();
   }

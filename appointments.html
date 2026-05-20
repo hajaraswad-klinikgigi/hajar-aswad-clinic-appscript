@@ -244,13 +244,13 @@
                 <span>Fullscreen</span>  
               </button>  
   
-              <button  
-                type="button"  
-                class="action-btn appointments-create-btn"  
-                onclick="openCreateAppointmentModal()"  
+              ${canManageAppointments() ? `<button
+                type="button"
+                class="action-btn appointments-create-btn"
+                onclick="openCreateAppointmentModal()"
               >
-                <span>+ Appointment</span>  
-              </button>  
+                <span>+ Appointment</span>
+              </button>` : ''}
             </div>  
           </div>  
   
@@ -1100,6 +1100,11 @@
   }
 
   function openCreateAppointmentModal(prefillPatient) {
+    if (!canManageAppointments()) {
+      showToast('Hanya admin appointment atau owner yang dapat menambah appointment', 'error');
+      return;
+    }
+
     appointmentFormMode = 'create';
     appointmentPatientHasOpenAppointment = false;
     appointmentPatientCheckToken++;
