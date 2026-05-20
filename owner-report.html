@@ -329,7 +329,7 @@ function ownerRenderInContainer(containerId) {
       </div>
       <div class="owner-report-ctrl-right">
         <div id="ownerDateControl" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
-          <input type="date" id="ownerDateInput" class="finance-period-select"
+          <input type="date" id="ownerDateInput" class="period-filter-select"
             value="${ownerReportDate}" onchange="ownerOnDateChange(this.value)">
         </div>
       </div>
@@ -387,20 +387,20 @@ function ownerSwitchTab(tab) {
         value="${ownerReportDate}" onchange="ownerOnDateChange(this.value)">`;
     } else if (tab === 'monthly') {
       dateCtrl.innerHTML = `
-        <select id="ownerMonthInput" class="finance-period-select" onchange="ownerOnMonthChange()">
+        <select id="ownerMonthInput" class="period-filter-select" onchange="ownerOnMonthChange()">
           ${[1,2,3,4,5,6,7,8,9,10,11,12].map(function(m){
             const names=['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'];
             return '<option value="'+m+'"'+(m===ownerReportMonth?' selected':'')+'>'+names[m-1]+'</option>';
           }).join('')}
         </select>
-        <select id="ownerYearInput" class="finance-period-select" onchange="ownerOnMonthChange()">
+        <select id="ownerYearInput" class="period-filter-select" onchange="ownerOnMonthChange()">
           ${[2024,2025,2026,2027].map(function(y){
             return '<option value="'+y+'"'+(y===ownerReportYear?' selected':'')+'>'+y+'</option>';
           }).join('')}
         </select>`;
     } else {
       dateCtrl.innerHTML = `
-        <select id="ownerYearInput" class="finance-period-select" onchange="ownerOnYearChange()">
+        <select id="ownerYearInput" class="period-filter-select" onchange="ownerOnYearChange()">
           ${[2024,2025,2026,2027].map(function(y){
             return '<option value="'+y+'"'+(y===ownerReportYear?' selected':'')+'>'+y+'</option>';
           }).join('')}

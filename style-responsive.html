@@ -10,6 +10,21 @@
   }
 
   /* =========================================================
+     SHARED PERIOD FILTER — mobile fold: full width
+     Pakai class shared .period-filter-wrap / -select (style.html global)
+     dipakai Dashboard + Finance + Aktivitas.
+     ========================================================= */
+  @media (max-width: 520px) {
+    .period-filter-wrap {
+      width: 100%;
+      min-width: 0;
+    }
+    .period-filter-select {
+      width: 100%;
+    }
+  }
+
+  /* =========================================================
      2. GLOBAL RESPONSIVE <= 1024px
      ========================================================= */
   @media (max-width: 1024px) {
@@ -316,15 +331,6 @@
       align-items: stretch;
     }
 
-    .dashboard-filter-wrap {
-      width: 100%;
-      min-width: 0;
-    }
-
-    .dashboard-filter-select {
-      width: 100%;
-    }
-
     .dashboard-hero-grid,
     .dashboard-stat-strip {
       grid-template-columns: 1fr;
@@ -575,15 +581,6 @@
   @media (max-width: 520px) {
     .finance-header {
       align-items: stretch;
-    }
-
-    .finance-period-filter-wrap {
-      width: 100%;
-      min-width: 0;
-    }
-
-    .finance-period-select {
-      width: 100%;
     }
 
     .finance-kpi-grid,
