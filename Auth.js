@@ -259,7 +259,7 @@ function readAuthSession_(context) {
   if (!isAllowedAppRole_(latestRole)) {
     return {
       success: false,
-      message: 'Akun ini tidak memiliki akses ke aplikasi.'
+      message: 'Akun ini tidak memiliki akses ke aplikasi. (role: "' + (latestRole || '<kosong>') + '")'
     };
   }
 
@@ -382,7 +382,7 @@ function loginUser(username, password) {
   if (!isAllowedAppRole_(role)) {
     return {
       success: false,
-      message: 'Akun ini tidak memiliki akses ke aplikasi'
+      message: 'Akun ini tidak memiliki akses ke aplikasi (role: "' + (role || '<kosong>') + '")'
     };
   }
 
