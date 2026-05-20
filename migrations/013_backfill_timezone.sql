@@ -25,27 +25,81 @@
 --   - clinics (insert via migration DEFAULT now())
 --
 -- SAFETY:
---   1. Backup database WAJIB sebelum execute (Supabase Dashboard →
---      Database → Backups → Create backup)
---   2. Script wrapped dalam BEGIN/COMMIT — kalau ada error, rollback
---      otomatis (sebelum COMMIT)
---   3. Per-kolom UPDATE (bukan per-row) supaya row dengan created_at
---      pre-deploy + updated_at post-deploy ter-handle benar
---   4. WHERE col IS NOT NULL untuk kolom optional supaya NULL tidak
---      ter-evaluasi (defensif)
---   5. Edge case: ~0.1% probability post-deploy row punya ms = 0
+--   1. Backup IN-DATABASE: script ini BUAT SENDIRI tabel backup
+--      `_backup_pre_013_<nama_tabel>` SEBELUM UPDATE. Tidak perlu
+--      tombol Backup Supabase (yang hanya ada di plan Pro+). Tabel
+--      backup di-create dalam transaction yang sama dengan UPDATE,
+--      jadi kalau gagal di tengah → semua rollback otomatis.
+--   2. Per-kolom UPDATE (bukan per-row) supaya row dengan created_at
+--      pre-deploy + updated_at post-deploy ter-handle benar.
+--   3. WHERE col IS NOT NULL untuk kolom optional supaya NULL tidak
+--      ter-evaluasi (defensif).
+--   4. Edge case: ~0.1% probability post-deploy row punya ms = 0
 --      kebetulan → akan false-positive shifted. Volume diestimasi
 --      <1 row per ribuan write. Acceptable.
 --
 -- LANGKAH EXECUTE:
---   1. BACKUP DATABASE di Supabase Dashboard
---   2. Buka Supabase SQL Editor
---   3. Paste seluruh script ini
---   4. Klik RUN
---   5. Spot-check via query verifikasi di akhir
+--   1. Buka Supabase SQL Editor
+--   2. Paste seluruh script ini
+--   3. Klik RUN — tunggu sampai sukses
+--   4. Spot-check via query verifikasi di akhir
+--   5. Setelah confident hasil benar, owner boleh DROP tabel backup
+--      via: DROP TABLE _backup_pre_013_<nama_tabel>;
+--
+-- RESTORE PLAN (kalau hasil ternyata salah):
+--   Untuk tiap tabel yang perlu di-restore:
+--     TRUNCATE <table>;
+--     INSERT INTO <table> SELECT * FROM _backup_pre_013_<table>;
 -- =========================================================
 
 BEGIN;
+
+-- =========================================================
+-- BACKUP TABLES (snapshot pre-backfill, dalam transaction yang sama)
+-- =========================================================
+-- Hapus backup table lama kalau ada (untuk safety re-run script)
+DROP TABLE IF EXISTS _backup_pre_013_audit_log;
+DROP TABLE IF EXISTS _backup_pre_013_patients;
+DROP TABLE IF EXISTS _backup_pre_013_appointments;
+DROP TABLE IF EXISTS _backup_pre_013_treatments;
+DROP TABLE IF EXISTS _backup_pre_013_treatment_items;
+DROP TABLE IF EXISTS _backup_pre_013_billings;
+DROP TABLE IF EXISTS _backup_pre_013_billing_items;
+DROP TABLE IF EXISTS _backup_pre_013_billing_adjustments;
+DROP TABLE IF EXISTS _backup_pre_013_billing_installments;
+DROP TABLE IF EXISTS _backup_pre_013_billing_feedbacks;
+DROP TABLE IF EXISTS _backup_pre_013_payments;
+DROP TABLE IF EXISTS _backup_pre_013_expenses;
+DROP TABLE IF EXISTS _backup_pre_013_ortho_recalls;
+DROP TABLE IF EXISTS _backup_pre_013_patient_photos;
+DROP TABLE IF EXISTS _backup_pre_013_service_catalog;
+DROP TABLE IF EXISTS _backup_pre_013_clinic_info;
+DROP TABLE IF EXISTS _backup_pre_013_medical_records;
+DROP TABLE IF EXISTS _backup_pre_013_app_users;
+DROP TABLE IF EXISTS _backup_pre_013_app_user_roles;
+DROP TABLE IF EXISTS _backup_pre_013_totp_setup_tokens;
+
+-- Snapshot
+CREATE TABLE _backup_pre_013_audit_log            AS SELECT * FROM audit_log;
+CREATE TABLE _backup_pre_013_patients             AS SELECT * FROM patients;
+CREATE TABLE _backup_pre_013_appointments         AS SELECT * FROM appointments;
+CREATE TABLE _backup_pre_013_treatments           AS SELECT * FROM treatments;
+CREATE TABLE _backup_pre_013_treatment_items      AS SELECT * FROM treatment_items;
+CREATE TABLE _backup_pre_013_billings             AS SELECT * FROM billings;
+CREATE TABLE _backup_pre_013_billing_items        AS SELECT * FROM billing_items;
+CREATE TABLE _backup_pre_013_billing_adjustments  AS SELECT * FROM billing_adjustments;
+CREATE TABLE _backup_pre_013_billing_installments AS SELECT * FROM billing_installments;
+CREATE TABLE _backup_pre_013_billing_feedbacks    AS SELECT * FROM billing_feedbacks;
+CREATE TABLE _backup_pre_013_payments             AS SELECT * FROM payments;
+CREATE TABLE _backup_pre_013_expenses             AS SELECT * FROM expenses;
+CREATE TABLE _backup_pre_013_ortho_recalls        AS SELECT * FROM ortho_recalls;
+CREATE TABLE _backup_pre_013_patient_photos       AS SELECT * FROM patient_photos;
+CREATE TABLE _backup_pre_013_service_catalog      AS SELECT * FROM service_catalog;
+CREATE TABLE _backup_pre_013_clinic_info          AS SELECT * FROM clinic_info;
+CREATE TABLE _backup_pre_013_medical_records      AS SELECT * FROM medical_records;
+CREATE TABLE _backup_pre_013_app_users            AS SELECT * FROM app_users;
+CREATE TABLE _backup_pre_013_app_user_roles       AS SELECT * FROM app_user_roles;
+CREATE TABLE _backup_pre_013_totp_setup_tokens    AS SELECT * FROM totp_setup_tokens;
 
 -- =========================================================
 -- AUDIT LOG (paling sering dilihat owner di halaman Aktivitas)
@@ -332,6 +386,48 @@ COMMIT;
 -- =========================================================
 -- ROLLBACK PLAN (kalau hasil ternyata tidak benar):
 -- =========================================================
--- Restore dari Supabase Backup yang dibuat di langkah 1.
--- Dashboard → Database → Backups → pilih backup → Restore
+-- Restore per tabel dari snapshot _backup_pre_013_*. Jalankan
+-- ini di SQL Editor untuk setiap tabel yang perlu di-restore:
+--
+-- BEGIN;
+--   TRUNCATE audit_log CASCADE;
+--   INSERT INTO audit_log SELECT * FROM _backup_pre_013_audit_log;
+--   -- ulangi untuk tabel lain sesuai kebutuhan
+-- COMMIT;
+--
+-- ATAU restore SEMUA tabel sekaligus (kalau mau revert total):
+-- BEGIN;
+--   TRUNCATE app_user_roles, totp_setup_tokens CASCADE;
+--   TRUNCATE audit_log, patients, appointments, treatments,
+--            treatment_items, billings, billing_items,
+--            billing_adjustments, billing_installments,
+--            billing_feedbacks, payments, expenses,
+--            ortho_recalls, patient_photos, service_catalog,
+--            clinic_info, medical_records, app_users CASCADE;
+--   INSERT INTO audit_log            SELECT * FROM _backup_pre_013_audit_log;
+--   INSERT INTO patients             SELECT * FROM _backup_pre_013_patients;
+--   INSERT INTO appointments         SELECT * FROM _backup_pre_013_appointments;
+--   INSERT INTO treatments           SELECT * FROM _backup_pre_013_treatments;
+--   INSERT INTO treatment_items      SELECT * FROM _backup_pre_013_treatment_items;
+--   INSERT INTO billings             SELECT * FROM _backup_pre_013_billings;
+--   INSERT INTO billing_items        SELECT * FROM _backup_pre_013_billing_items;
+--   INSERT INTO billing_adjustments  SELECT * FROM _backup_pre_013_billing_adjustments;
+--   INSERT INTO billing_installments SELECT * FROM _backup_pre_013_billing_installments;
+--   INSERT INTO billing_feedbacks    SELECT * FROM _backup_pre_013_billing_feedbacks;
+--   INSERT INTO payments             SELECT * FROM _backup_pre_013_payments;
+--   INSERT INTO expenses             SELECT * FROM _backup_pre_013_expenses;
+--   INSERT INTO ortho_recalls        SELECT * FROM _backup_pre_013_ortho_recalls;
+--   INSERT INTO patient_photos       SELECT * FROM _backup_pre_013_patient_photos;
+--   INSERT INTO service_catalog      SELECT * FROM _backup_pre_013_service_catalog;
+--   INSERT INTO clinic_info          SELECT * FROM _backup_pre_013_clinic_info;
+--   INSERT INTO medical_records      SELECT * FROM _backup_pre_013_medical_records;
+--   INSERT INTO app_users            SELECT * FROM _backup_pre_013_app_users;
+--   INSERT INTO app_user_roles       SELECT * FROM _backup_pre_013_app_user_roles;
+--   INSERT INTO totp_setup_tokens    SELECT * FROM _backup_pre_013_totp_setup_tokens;
+-- COMMIT;
+--
+-- CLEANUP backup tables setelah confident hasil benar:
+-- DROP TABLE IF EXISTS _backup_pre_013_audit_log;
+-- DROP TABLE IF EXISTS _backup_pre_013_patients;
+-- (ulangi untuk semua _backup_pre_013_* tables)
 -- =========================================================
