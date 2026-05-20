@@ -5,19 +5,28 @@
      (same dark-theme toolbar/chip/panel pattern).
      Diff table tetap pakai class `.activity-diff-*` (unique).
      ========================================================= */
-  /* Override recall grid utk 4 filter field di Aktivitas */
+  /* Filter panel: 2 kolom (Entitas + Aksi). Period dipisah ke toolbar
+     utama supaya selalu visible & query selalu bounded. */
   #activityFiltersPanel .recall-filter-grid {
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-  }
-  @media (max-width: 1024px) {
-    #activityFiltersPanel .recall-filter-grid {
-      grid-template-columns: repeat(2, minmax(0, 1fr));
-    }
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
   @media (max-width: 600px) {
     #activityFiltersPanel .recall-filter-grid {
       grid-template-columns: 1fr;
     }
+  }
+
+  /* Period selector di toolbar utama — selaras tinggi dengan search-box
+     dan tombol chip Filters via global rule di style.html. */
+  .activity-toolbar-period-wrap {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    min-width: 140px;
+  }
+  .activity-toolbar-period-wrap select {
+    width: 140px;
+    max-width: 100%;
   }
 
   /* Stale-while-revalidate: dim tabel saat refresh (saat filter diubah
@@ -185,6 +194,12 @@
    Backend kirim semua row sesuai filter (max activityCapLimit),
    client paginate via array.slice() supaya navigasi INSTAN.
 
+   Race-condition handling — sinkron dengan Dashboard/Finance
+   (commit 22662b5): request token discard stale response saat user
+   rapid switch period/filter; cache TTL 5 menit per (period+filter)
+   supaya freshness OK tanpa over-refetch; period selector NEVER
+   locked supaya rapid switch tetap responsif.
+
    activityAllRows  = hasil mentah dari backend (≤ cap)
    activityFilteredRows = sama dengan allRows untuk now (semua filter
                           server-side). Disiapkan kalau nanti ada
@@ -196,14 +211,24 @@ let activityCurrentPage = 1;
 const activityPageSize = 5;
 let activityCapLimit = 2000;
 let activityHitCap = false;
-let activityEffectiveStartDate = '';
 let activityAllowedEntityTypes = null;
 let activityActiveSince = '2026-05-19';
+let activityPeriod = '7days';                          // primary scope, tidak di-reset Reset link
 let activityFiltersApplied = {};
-let loadActivityInFlight = false;
 let activityFiltersExpanded = false;
 let activitySearchDebounce = null;
 const ACTIVITY_SEARCH_DEBOUNCE_MS = 220;
+// Sinkron dengan AUDIT_LOG_VALID_PERIODS di AuditLogQueryService.js.
+// Frontend whitelist mencegah call ke backend dengan value invalid.
+const ACTIVITY_VALID_PERIODS = { today: true, '7days': true, '30days': true };
+const ACTIVITY_DEFAULT_PERIOD = '7days';
+// Race condition handling — konsisten dengan Dashboard/Finance
+// (commit 22662b5). Request token discard stale response saat rapid
+// switch period/filter. Cache per (period+entity+action) dengan TTL
+// 5 menit supaya owner lihat data segar tapi tidak refetch berulang.
+let activityRequestToken = 0;
+let activityCache = {};
+const ACTIVITY_CACHE_TTL_MS = 5 * 60 * 1000;
 
 var ACTIVITY_ENTITY_TYPE_LABELS = {
   patient:                   'Pasien',
@@ -279,6 +304,14 @@ function showActivityPage() {
                 'placeholder="Cari nama / username pengguna..." ' +
                 'oninput="handleActivitySearch()">' +
             '</div>' +
+            '<div class="activity-toolbar-period-wrap">' +
+              '<label class="patients-toolbar-label" for="activityPeriodSelect">Periode</label>' +
+              '<select id="activityPeriodSelect" onchange="changeActivityPeriod(this)">' +
+                '<option value="today">Hari Ini</option>' +
+                '<option value="7days" selected>7 Hari</option>' +
+                '<option value="30days">30 Hari</option>' +
+              '</select>' +
+            '</div>' +
             '<div class="recall-toolbar-actions">' +
               '<button type="button" id="activityFiltersToggleBtn" class="recall-filter-chip" ' +
                 'onclick="toggleActivityFilters()" aria-label="Toggle filters" title="Filters">' +
@@ -293,14 +326,6 @@ function showActivityPage() {
           '</div>' +
           '<div id="activityFiltersPanel" class="recall-filter-panel">' +
             '<div class="recall-filter-grid">' +
-              '<div class="recall-filter-wrap">' +
-                '<label class="patients-toolbar-label">Dari tanggal</label>' +
-                '<input type="date" id="activityFilterStartDate" onchange="applyActivityFilters()">' +
-              '</div>' +
-              '<div class="recall-filter-wrap">' +
-                '<label class="patients-toolbar-label">Sampai tanggal</label>' +
-                '<input type="date" id="activityFilterEndDate" onchange="applyActivityFilters()">' +
-              '</div>' +
               '<div class="recall-filter-wrap">' +
                 '<label class="patients-toolbar-label">Entitas</label>' +
                 '<select id="activityFilterEntityType" onchange="applyActivityFilters()">' +
@@ -367,6 +392,12 @@ function showActivityPage() {
   activityFiltersApplied = {};
   activityFiltersExpanded = false;
   activityCurrentPage = 1;
+  // Period: reset ke default tiap entry — konsisten dengan template
+  // option `selected` di markup. Owner masuk halaman, dropdown selalu
+  // mulai dari "7 Hari".
+  activityPeriod = ACTIVITY_DEFAULT_PERIOD;
+  var periodSel = document.getElementById('activityPeriodSelect');
+  if (periodSel) periodSel.value = activityPeriod;
 
   updateActivityFilterControls();
 
@@ -393,8 +424,11 @@ function showActivityPage() {
    ========================================================= */
 
 // Set visual loading state pada area tabel + pagination saat fetch
-// ke server (initial load atau filter berubah). Pagination CLIENT-SIDE
-// tidak trigger ini — navigasi prev/next/goTo instan.
+// ke server (initial load tanpa cache). Pagination CLIENT-SIDE tidak
+// trigger ini — navigasi prev/next/goTo instan.
+// PERIOD selector & filter panel select TIDAK pernah di-lock — rapid
+// switch tetap responsif, race condition di-handle via request token
+// (sama pola Dashboard/Finance commit 22662b5).
 // Konsisten dengan Patients: pagination count tetap menampilkan nilai
 // sebelumnya (atau '-' default) — TIDAK di-override jadi 'Memuat...'.
 function setActivityListLoading(isLoading) {
@@ -418,73 +452,131 @@ function setActivityListLoading(isLoading) {
   }
 }
 
+// Build cache key dari (period + filter panel state). Sort array supaya
+// urutan tidak menghasilkan key berbeda untuk filter set yang sama.
+function buildActivityCacheKey_(period, filters) {
+  var f = filters || {};
+  var entities = Array.isArray(f.entity_types) ? f.entity_types.slice().sort() : [];
+  var actions  = Array.isArray(f.actions)      ? f.actions.slice().sort()      : [];
+  return JSON.stringify({ p: period, e: entities, a: actions });
+}
+
+function getActivityCached_(key) {
+  var entry = activityCache[key];
+  if (!entry) return null;
+  if (Date.now() - entry.timestamp > ACTIVITY_CACHE_TTL_MS) {
+    delete activityCache[key];
+    return null;
+  }
+  return entry.data;
+}
+
+function setActivityCached_(key, res) {
+  activityCache[key] = { data: res, timestamp: Date.now() };
+}
+
 function loadActivity() {
-  if (loadActivityInFlight) return;
-  loadActivityInFlight = true;
-  // Hanya lock UI kalau belum ada data sama sekali (initial load /
-  // fresh entry tanpa cache). Stale-while-revalidate: kalau sudah ada
-  // data lama, biarkan user lihat & interact — fetch di background,
-  // UI auto-update saat response masuk. Konsisten dengan Patients.
-  var isInitialLoad = !activityAllRows || activityAllRows.length === 0;
-  if (isInitialLoad) {
+  var period = activityPeriod;
+  var filters = activityFiltersApplied || {};
+  var cacheKey = buildActivityCacheKey_(period, filters);
+
+  // Increment token — handler yang in-flight dengan token lama akan
+  // discard hasilnya (race condition fix saat rapid period/filter switch).
+  // Konsisten dengan Dashboard/Finance (commit 22662b5).
+  var myToken = ++activityRequestToken;
+  var cached = getActivityCached_(cacheKey);
+
+  // Defensive cleanup: kalau ada stale loading state dari request lama
+  // yang sudah ter-discard, unlock UI di awal. Idempotent kalau tidak ada.
+  setActivityListLoading(false);
+
+  if (cached) {
+    // Stale-while-revalidate: render cache instan, lalu refetch background.
+    applyActivityResponse_(cached);
+  } else if (!activityAllRows || activityAllRows.length === 0) {
+    // Initial load tanpa fallback data — show loading state.
     setActivityListLoading(true);
   }
+  // else: tidak ada cache untuk key ini tapi ada data lama dari key lain —
+  // biarkan tampil sebagai fallback sampai response baru masuk.
 
-  var payload = attachAuthContext(Object.assign({}, activityFiltersApplied || {}));
+  var payload = attachAuthContext(Object.assign(
+    {},
+    filters,
+    { period: period }
+  ));
 
   google.script.run
     .withSuccessHandler(function(res) {
-      loadActivityInFlight = false;
+      // Discard kalau token sudah berubah (user pindah period/filter dulu).
+      if (myToken !== activityRequestToken) return;
       setActivityListLoading(false);
       if (!res || !res.success) {
         showToast(res && res.message || 'Gagal memuat aktivitas', 'error');
+        // Pertahankan cached data kalau ada — jangan kosongkan UI
+        // karena background fetch gagal. Konsisten dengan Dashboard.
+        if (!cached) {
+          activityAllRows = [];
+          activityFilteredRows = [];
+          activityHitCap = false;
+          renderActivityCapBanner();
+          renderActivityTable();
+        }
+        return;
+      }
+      setActivityCached_(cacheKey, res);
+      applyActivityResponse_(res);
+    })
+    .withFailureHandler(function(err) {
+      if (myToken !== activityRequestToken) return;
+      setActivityListLoading(false);
+      showToast('Error: ' + ((err && err.message) || err), 'error');
+      if (!cached) {
         activityAllRows = [];
         activityFilteredRows = [];
         activityHitCap = false;
         renderActivityCapBanner();
         renderActivityTable();
-        return;
       }
-      var data = res.data || {};
-      var rawRows = Array.isArray(data.rows) ? data.rows : [];
-      // Precompute _search_text per row (gabungan user_id + full_name +
-      // username, lowercase) supaya search substring client-side instan.
-      activityAllRows = rawRows.map(function(r) {
-        var searchText = [
-          r.actor_user_id || '',
-          r.actor_full_name || '',
-          r.actor_username || ''
-        ].join(' ').toLowerCase();
-        r._search_text = searchText;
-        return r;
-      });
-      activityHitCap = !!data.hit_cap;
-      activityCapLimit = Number(data.cap_limit || activityCapLimit);
-      activityEffectiveStartDate = String(data.effective_start_date || '');
-      activityAllowedEntityTypes = data.allowed_entity_types || null;
-      activityActiveSince = data.active_since || activityActiveSince;
-      activityFiltersApplied = data.filters_applied || {};
-      // Tidak reset activityCurrentPage di sini — caller yang reset kalau
-      // perlu (showActivityPage / applyActivityFilters). Konsisten dengan
-      // Patients: renderActivityTable clamp page > totalPages.
-
-      renderActivityCapBanner();
-      // Apply current search keyword (kalau ada) → set filteredRows + render
-      applyActivitySearchClient();
-      syncActivityEntityTypeOptions();
-      updateActivityFilterControls();
-    })
-    .withFailureHandler(function(err) {
-      loadActivityInFlight = false;
-      setActivityListLoading(false);
-      showToast('Error: ' + ((err && err.message) || err), 'error');
-      activityAllRows = [];
-      activityFilteredRows = [];
-      activityHitCap = false;
-      renderActivityCapBanner();
-      renderActivityTable();
     })
     .getAuditLogList(payload);
+}
+
+function applyActivityResponse_(res) {
+  var data = res.data || {};
+  var rawRows = Array.isArray(data.rows) ? data.rows : [];
+  // Precompute _search_text per row (gabungan user_id + full_name +
+  // username, lowercase) supaya search substring client-side instan.
+  activityAllRows = rawRows.map(function(r) {
+    var searchText = [
+      r.actor_user_id || '',
+      r.actor_full_name || '',
+      r.actor_username || ''
+    ].join(' ').toLowerCase();
+    r._search_text = searchText;
+    return r;
+  });
+  activityHitCap = !!data.hit_cap;
+  activityCapLimit = Number(data.cap_limit || activityCapLimit);
+  activityAllowedEntityTypes = data.allowed_entity_types || null;
+  activityActiveSince = data.active_since || activityActiveSince;
+  activityFiltersApplied = data.filters_applied || {};
+  // Sinkronisasi period dari server (server mungkin override invalid
+  // value ke default) ke state + dropdown UI.
+  if (data.effective_period && ACTIVITY_VALID_PERIODS[data.effective_period]) {
+    activityPeriod = data.effective_period;
+    var periodSel = document.getElementById('activityPeriodSelect');
+    if (periodSel && periodSel.value !== activityPeriod) {
+      periodSel.value = activityPeriod;
+    }
+  }
+  // Tidak reset activityCurrentPage di sini — caller yang reset kalau
+  // perlu (showActivityPage / applyActivityFilters / changeActivityPeriod).
+  // renderActivityTable clamp page > totalPages.
+  renderActivityCapBanner();
+  applyActivitySearchClient();
+  syncActivityEntityTypeOptions();
+  updateActivityFilterControls();
 }
 
 function renderActivityCapBanner() {
@@ -499,7 +591,7 @@ function renderActivityCapBanner() {
   el.className = 'activity-cap-banner';
   el.innerHTML =
     '<span class="activity-cap-banner-title">Hasil dibatasi ' + activityCapLimit + ' aktivitas terbaru.</span>' +
-    'Persempit rentang tanggal atau filter entitas/aksi untuk melihat catatan yang lebih lama.';
+    'Persempit periode atau filter entitas/aksi untuk melihat catatan yang lebih lama.';
 }
 
 function renderActivityTable() {
@@ -685,14 +777,11 @@ function syncActivityEntityTypeOptions() {
 }
 
 function getActiveActivityFilterCount() {
-  // Hitung filter di panel saja (date×2, entity, action). Search actor di luar.
-  var startEl  = document.getElementById('activityFilterStartDate');
-  var endEl    = document.getElementById('activityFilterEndDate');
+  // Hitung filter di panel saja (entity + action). Period di toolbar
+  // utama selalu set (primary scope) — tidak dihitung. Search actor di luar.
   var entityEl = document.getElementById('activityFilterEntityType');
   var actionEl = document.getElementById('activityFilterAction');
   var count = 0;
-  if (startEl  && String(startEl.value  || '').trim()) count++;
-  if (endEl    && String(endEl.value    || '').trim()) count++;
   if (entityEl && String(entityEl.value || '').trim()) count++;
   if (actionEl && String(actionEl.value || '').trim()) count++;
   return count;
@@ -731,6 +820,19 @@ function toggleActivityFilters() {
   updateActivityFilterControls();
 }
 
+// Period selector di toolbar utama. Validasi whitelist client-side
+// (sinkron dengan backend AUDIT_LOG_VALID_PERIODS). Invalid value
+// fallback ke default supaya state UI tidak mismatch dropdown.
+function changeActivityPeriod(el) {
+  var raw = el ? String(el.value || '').trim() : '';
+  var next = ACTIVITY_VALID_PERIODS[raw] ? raw : ACTIVITY_DEFAULT_PERIOD;
+  if (el && el.value !== next) el.value = next;
+  if (next === activityPeriod) return;
+  activityPeriod = next;
+  activityCurrentPage = 1;
+  loadActivity();
+}
+
 // Search aktor: CLIENT-SIDE substring di _search_text precomputed.
 // Tidak trigger fetch backend → instan. Debounce 220 ms supaya tidak
 // rerender setiap keystroke.
@@ -758,27 +860,17 @@ function applyActivitySearchClient() {
   renderActivityTable();
 }
 
-// Filter panel (date/entity/action) trigger fetch backend karena
-// affect query scope. Setelah load, re-apply client-side search filter.
+// Filter panel (entity/action) trigger fetch backend karena affect query
+// scope. Period dipisah ke toolbar utama (lihat changeActivityPeriod).
+// Setelah load, re-apply client-side search filter.
 function applyActivityFilters() {
-  var startEl  = document.getElementById('activityFilterStartDate');
-  var endEl    = document.getElementById('activityFilterEndDate');
   var entityEl = document.getElementById('activityFilterEntityType');
   var actionEl = document.getElementById('activityFilterAction');
 
-  var start  = startEl  ? String(startEl.value || '').trim()  : '';
-  var end    = endEl    ? String(endEl.value || '').trim()    : '';
   var entity = entityEl ? String(entityEl.value || '').trim() : '';
   var action = actionEl ? String(actionEl.value || '').trim() : '';
 
-  if (start && end && start > end) {
-    showToast('Tanggal mulai tidak boleh lebih besar dari tanggal akhir', 'error');
-    return;
-  }
-
   activityFiltersApplied = {
-    start_date:     start || null,
-    end_date:       end || null,
     entity_types:   entity ? [entity] : [],
     actions:        action ? [action] : []
   };
@@ -791,11 +883,11 @@ function resetActivityFilters() {
   activityFiltersApplied = {};
   activityCurrentPage = 1;
 
-  // Reset hanya filter panel (date/entity/action). Search input tidak
-  // di-reset karena Reset link cuma untuk filter panel (konsisten dengan
-  // pola Recall).
-  var ids = ['activityFilterStartDate', 'activityFilterEndDate',
-             'activityFilterEntityType', 'activityFilterAction'];
+  // Reset hanya filter panel (entity/action). Search input dan Period
+  // selector di toolbar utama TIDAK di-reset — Reset link scope cuma
+  // untuk filter panel (konsisten dengan pola Recall). Period adalah
+  // primary scope, owner ubah manual dari dropdown kalau perlu.
+  var ids = ['activityFilterEntityType', 'activityFilterAction'];
   ids.forEach(function(id) {
     var el = document.getElementById(id);
     if (el) el.value = '';

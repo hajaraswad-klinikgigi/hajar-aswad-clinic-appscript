@@ -2,8 +2,8 @@
    AUDIT LOG QUERY SERVICE — Phase 3 (P3c.1)
    Backend query endpoint untuk halaman "Aktivitas".
 
-   Filter: date range (occurred_at), entity_type[], action[],
-           actor_user_id[].
+   Filter: period preset (today/7days/30days), entity_type[],
+           action[], actor_user_id[].
    Search aktor by nama: di FRONTEND substring match (backend
            enrich rows dengan actor_full_name + actor_username
            supaya client punya field untuk search).
@@ -39,14 +39,19 @@ const AUDIT_LOG_ROLE_ALLOWED_ENTITY_TYPES = {
 };
 
 // Hard cap jumlah row per query. Di atas ini user wajib persempit
-// filter date — sengaja ditampilkan banner di UI. Dipilih 2000 supaya
+// period — sengaja ditampilkan banner di UI. Dipilih 2000 supaya
 // payload tetap <~500KB untuk volume realistis multi-klinik produksi.
 const AUDIT_LOG_MAX_LIST_LIMIT = 2000;
 
-// Default window date kalau user tidak set start_date. 7 hari mencakup
-// pemakaian harian normal (audit aktivitas minggu ini) dan tetap fit
-// di cap meski multi-klinik volume tinggi.
-const AUDIT_LOG_DEFAULT_WINDOW_DAYS = 7;
+// Whitelist period preset → jumlah hari ke belakang dari local midnight
+// hari ini. Hanya preset ini yang diterima backend (cegah unbounded query).
+// 7days default — mencakup pemakaian harian normal & tetap fit di cap.
+const AUDIT_LOG_VALID_PERIODS = {
+  today:    0,
+  '7days':  7,
+  '30days': 30
+};
+const AUDIT_LOG_DEFAULT_PERIOD = '7days';
 
 // Whitelist `action` values yang sah. Sinkron dengan ACTIVITY_ACTION_LABELS
 // di audit-log.html. Input dari user yang tidak ada di whitelist akan
@@ -72,11 +77,6 @@ const AUDIT_LOG_VALID_ENTITY_TYPES = {
   doctor_material_deduction: true, service_catalog: true,
   clinic_info: true, user: true
 };
-
-// Regex strict untuk date input — kalau tidak match, value di-drop dan
-// fallback ke default 7 hari. Cegah PostgREST error message leak dari
-// string aneh yang inject ke filter `gte.`/`lte.`.
-const AUDIT_LOG_DATE_REGEX = /^\d{4}-\d{2}-\d{2}$/;
 
 // Regex untuk user_id (alfanumerik + dash/underscore, max 64 char).
 // User_id existing format: USR-xxxx, OWNER-xxxx, dll. Tolerant tapi
@@ -110,16 +110,24 @@ function computeAuditLogAllowedEntityTypesForUser_(user) {
 }
 
 /**
- * Hitung default start_date kalau user tidak set: hari ini - 7 hari,
- * dalam format 'YYYY-MM-DD'.
+ * Hitung start datetime untuk period preset, dalam ISO string UTC.
+ * Local midnight hari ini dikurangi N hari (N dari AUDIT_LOG_VALID_PERIODS).
  *
- * @returns {string}  'YYYY-MM-DD'
+ * Konversi local→UTC penting supaya "today" benar-benar capture event
+ * sejak 00:00 waktu klinik (Asia/Jakarta), bukan 00:00 UTC yang baru
+ * dimulai jam 07:00 lokal.
+ *
+ * @param {string} period  'today' | '7days' | '30days'
+ * @returns {string}  ISO datetime, mis. '2026-05-13T17:00:00.000Z'
  */
-function computeAuditLogDefaultStartDate_() {
-  const now = new Date();
-  const past = new Date(now.getTime() - AUDIT_LOG_DEFAULT_WINDOW_DAYS * 24 * 60 * 60 * 1000);
-  const pad = function(n) { return ('0' + n).slice(-2); };
-  return past.getFullYear() + '-' + pad(past.getMonth() + 1) + '-' + pad(past.getDate());
+function computeAuditLogStartFromPeriod_(period) {
+  const days = AUDIT_LOG_VALID_PERIODS[period];
+  const start = new Date();
+  start.setHours(0, 0, 0, 0);
+  if (days > 0) {
+    start.setDate(start.getDate() - days);
+  }
+  return start.toISOString();
 }
 
 /**
@@ -134,9 +142,8 @@ function computeAuditLogDefaultStartDate_() {
  * Payload:
  *   {
  *     session_token: string,
- *     start_date?:     'YYYY-MM-DD' atau ISO datetime,
- *                      Default: 7 hari sebelum hari ini.
- *     end_date?:       'YYYY-MM-DD' atau ISO datetime,
+ *     period?:         'today' | '7days' | '30days',
+ *                      Default: '7days'. Invalid value fallback ke default.
  *     entity_types?:   string[],   // multi-select
  *     actions?:        string[],   // multi-select
  *     actor_user_ids?: string[]    // multi-select (jarang dipakai; UI tidak expose)
@@ -156,9 +163,9 @@ function computeAuditLogDefaultStartDate_() {
  *       active_since:   '2026-05-19',
  *       allowed_entity_types: null | string[],
  *       filters_applied: {
- *         start_date, end_date, entity_types, actions, actor_user_ids
+ *         period, entity_types, actions, actor_user_ids
  *       },
- *       effective_start_date: 'YYYY-MM-DD'   // setelah default applied
+ *       effective_period: 'today' | '7days' | '30days'
  *     }
  *   }
  */
@@ -191,27 +198,16 @@ function getAuditLogList(payload) {
       filterPairs.push(['clinic_id', 'eq.' + clinicId]);
     }
 
-    // Date range — auto-convert YYYY-MM-DD ke ISO with day boundary.
-    // Default start_date = 7 hari lalu supaya window tidak unbounded.
-    // VALIDASI strict regex YYYY-MM-DD: kalau tidak match → drop value
-    // dan fallback ke default. Cegah string aneh inject ke PostgREST
-    // filter `gte.`/`lte.` yang bisa leak error message ke UI.
-    let startDate = String(p.start_date || '').trim();
-    if (startDate && !AUDIT_LOG_DATE_REGEX.test(startDate)) {
-      startDate = '';
+    // Period preset — whitelist validation. Invalid/missing fallback ke
+    // AUDIT_LOG_DEFAULT_PERIOD ('7days'). Backend tidak menerima custom
+    // date range untuk cegah unbounded query & konsistensi UI dengan
+    // Dashboard/Finance.
+    let effectivePeriod = String(p.period || '').trim();
+    if (!Object.prototype.hasOwnProperty.call(AUDIT_LOG_VALID_PERIODS, effectivePeriod)) {
+      effectivePeriod = AUDIT_LOG_DEFAULT_PERIOD;
     }
-    if (!startDate) {
-      startDate = computeAuditLogDefaultStartDate_();
-    }
-    filterPairs.push(['occurred_at', 'gte.' + startDate + 'T00:00:00Z']);
-
-    let endDate = String(p.end_date || '').trim();
-    if (endDate && !AUDIT_LOG_DATE_REGEX.test(endDate)) {
-      endDate = '';
-    }
-    if (endDate) {
-      filterPairs.push(['occurred_at', 'lte.' + endDate + 'T23:59:59Z']);
-    }
+    const startIso = computeAuditLogStartFromPeriod_(effectivePeriod);
+    filterPairs.push(['occurred_at', 'gte.' + startIso]);
 
     // entity_type — intersect dengan allowed list (role-based visibility).
     // Whitelist validation: hanya nilai di AUDIT_LOG_VALID_ENTITY_TYPES yang
@@ -248,13 +244,12 @@ function getAuditLogList(payload) {
             active_since: AUDIT_LOG_ACTIVE_SINCE,
             allowed_entity_types: allowedEntityTypes,
             filters_applied: {
-              start_date: startDate || null,
-              end_date: endDate || null,
+              period: effectivePeriod,
               entity_types: [],
               actions: [],
               actor_user_ids: []
             },
-            effective_start_date: startDate
+            effective_period: effectivePeriod
           }
         };
       }
@@ -324,13 +319,12 @@ function getAuditLogList(payload) {
         active_since: AUDIT_LOG_ACTIVE_SINCE,
         allowed_entity_types: allowedEntityTypes,
         filters_applied: {
-          start_date: startDate || null,
-          end_date: endDate || null,
+          period: effectivePeriod,
           entity_types: effectiveEntityTypes,
           actions: cleanedActions,
           actor_user_ids: cleanedActors
         },
-        effective_start_date: startDate
+        effective_period: effectivePeriod
       }
     };
 
@@ -509,11 +503,17 @@ function testAuditLogQueryList() {
       addIssue('DOCTOR_NOT_DENIED', { allowed: doctorAllowed });
     }
 
-    // Verifikasi default start_date helper
-    const defStart = computeAuditLogDefaultStartDate_();
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(defStart)) {
-      addIssue('DEFAULT_START_DATE_FORMAT_WRONG', { value: defStart });
+    // Verifikasi period preset helper
+    if (!Object.prototype.hasOwnProperty.call(AUDIT_LOG_VALID_PERIODS, AUDIT_LOG_DEFAULT_PERIOD)) {
+      addIssue('DEFAULT_PERIOD_NOT_IN_WHITELIST', { value: AUDIT_LOG_DEFAULT_PERIOD });
     }
+    const isoRegex = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z$/;
+    Object.keys(AUDIT_LOG_VALID_PERIODS).forEach(function(period) {
+      const iso = computeAuditLogStartFromPeriod_(period);
+      if (!isoRegex.test(iso)) {
+        addIssue('PERIOD_ISO_FORMAT_WRONG', { period: period, value: iso });
+      }
+    });
 
     // Direct query tanpa requireRole (akses Supabase langsung)
     const q = querySupabaseAuditLog_([], { limit: 10, order: 'occurred_at.desc,id.desc' });
@@ -525,8 +525,9 @@ function testAuditLogQueryList() {
       actor_user_id: q.rows[0].actor_user_id
     } : null;
     result.cap_limit = AUDIT_LOG_MAX_LIST_LIMIT;
-    result.default_window_days = AUDIT_LOG_DEFAULT_WINDOW_DAYS;
-    result.default_start_date_today = defStart;
+    result.default_period = AUDIT_LOG_DEFAULT_PERIOD;
+    result.valid_periods = Object.keys(AUDIT_LOG_VALID_PERIODS);
+    result.start_iso_default = computeAuditLogStartFromPeriod_(AUDIT_LOG_DEFAULT_PERIOD);
 
     Logger.log(JSON.stringify(result, null, 2));
     return result;
